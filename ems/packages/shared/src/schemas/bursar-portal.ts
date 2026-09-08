@@ -69,6 +69,10 @@ export const bursarFeeItemSchema = z.object({
   isActive: z.boolean(),
   createdAt: isoDateTimeSchema,
   dueDate: isoDateSchema.nullable(),
+  academicYearId: uuidSchema.nullable(),
+  academicYearName: z.string().nullable(),
+  semesterId: uuidSchema.nullable(),
+  semesterName: z.string().nullable(),
 })
 
 export const createBursarFeeItemRequestSchema = z.object({
@@ -78,6 +82,7 @@ export const createBursarFeeItemRequestSchema = z.object({
   dueDate: isoDateSchema,
   programmeId: uuidSchema.optional(),
   yearOfStudy: z.number().int().min(1).max(6).nullable().optional(),
+  semesterId: uuidSchema,
   isMandatory: z.boolean().optional(),
 })
 
@@ -258,6 +263,7 @@ export const bursarFeeMessageSchema = z.object({
 
 export const issueSemesterFeesResultSchema = z.object({
   issuedCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
   skippedCount: z.number().int().nonnegative(),
   semesterLabel: z.string(),
 })

@@ -1,10 +1,11 @@
 import { z } from 'zod'
-import { isoDateSchema } from './primitives'
+import { isoDateSchema, uuidSchema } from './primitives'
 
 export const invoiceLineItemSchema = z.object({
   name: z.string(),
   amount: z.number().int(),
   dueDate: isoDateSchema,
+  feeItemId: uuidSchema.optional(),
 })
 
 export type InvoiceLineItem = z.infer<typeof invoiceLineItemSchema>

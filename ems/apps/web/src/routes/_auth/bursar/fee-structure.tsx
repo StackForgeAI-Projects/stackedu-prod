@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { BursarFeeItem } from '@stackedu/shared'
 import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,13 +19,17 @@ import { Label } from '@/components/ui/label'
 import { formatCurrency, formatDateShort, getActiveCurrency, setActiveCurrency } from '@/lib/utils'
 import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 import {
+  bursarAcademicYearsQueryKey,
   bursarFeeItemsQueryKey,
   bursarProgrammesQueryKey,
+  bursarSemestersQueryKey,
   createBursarFeeItem,
   deleteBursarFeeItem,
   issueSemesterFeeInvoices,
+  listBursarAcademicYears,
   listBursarFeeItems,
   listBursarProgrammes,
+  listBursarSemesters,
   updateBursarFeeItem,
 } from '@/lib/api/bursar'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -52,6 +56,8 @@ type FormState = {
   category: string
   amount: string
   dueDate: string
+  academicYearId: string
+  semesterId: string
   programmeId: string
   yearGroup: YearGroup
   active: boolean
@@ -62,6 +68,8 @@ const DEFAULT_FORM: FormState = {
   category: 'Tuition',
   amount: '',
   dueDate: '',
+  academicYearId: '',
+  semesterId: '',
   programmeId: ALL_PROGRAMMES,
   yearGroup: 'All Years',
   active: true,
@@ -80,7 +88,7 @@ function studyYearToGroup(year: number | null): YearGroup {
 
 function FeeStructurePage() {
   const queryClient = useQueryClient()
-  const [academicYear, setAcYear] = useState('2024/2025')
+  const [academicYearId, setAcademicYearId] = useState('')
   const [currency, setCurrency] = useState(() => getActiveCurrency())
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editItem, setEditItem] = useState<BursarFeeItem | null>(null)
@@ -101,19 +109,64 @@ function FeeStructurePage() {
     queryFn: listBursarProgrammes,
   })
 
+  const { data: academicYears = [] } = useQuery({
+    queryKey: bursarAcademicYearsQueryKey,
+    queryFn: listBursarAcademicYears,
+  })
+
+  const { data: formSemesters = [] } = useQuery({
+    queryKey: bursarSemestersQueryKey(form.academicYearId || 'none'),
+    queryFn: () => listBursarSemesters(form.academicYearId),
+    enabled: Boolean(form.academicYearId),
+  })
+
+  useEffect(() => {
+    if (!academicYears.length) return
+    if (!academicYearId || !academicYears.some((year) => year.id === academicYearId)) {
+      setAcademicYearId(academicYears.find((year) => year.isCurrent)?.id ?? academicYears[0]!.id)
+    }
+  }, [academicYears, academicYearId])
+
+  useEffect(() => {
+    if (!sheetOpen || editItem || !academicYears.length) return
+    const defaultYearId = academicYears.find((year) => year.isCurrent)?.id ?? academicYears[0]!.id
+    setForm((current) => ({
+      ...current,
+      academicYearId: current.academicYearId || defaultYearId,
+    }))
+  }, [sheetOpen, editItem, academicYears])
+
+  useEffect(() => {
+    if (!sheetOpen || editItem || !formSemesters.length) return
+    const defaultSemesterId = formSemesters.find((semester) => semester.isCurrent)?.id ?? formSemesters[0]!.id
+    setForm((current) => ({
+      ...current,
+      semesterId: current.semesterId && formSemesters.some((semester) => semester.id === current.semesterId)
+        ? current.semesterId
+        : defaultSemesterId,
+    }))
+  }, [sheetOpen, editItem, formSemesters, form.academicYearId])
+
+  const selectedAcademicYear = academicYears.find((year) => year.id === academicYearId)
+
+  const yearItems = useMemo(() => {
+    if (!academicYearId) return items
+    return items.filter((item) => item.academicYearId === academicYearId)
+  }, [items, academicYearId])
+
   const allCategories = [...BASE_CATEGORIES, ...customCategories]
   const categoryColors = (cat: string) => BASE_CATEGORY_COLORS[cat] ?? { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
 
   const grouped = useMemo(() => {
-    return items.reduce<Record<string, BursarFeeItem[]>>((acc, item) => {
+    return yearItems.reduce<Record<string, BursarFeeItem[]>>((acc, item) => {
       const key = item.programmeName || 'All Programmes'
       if (!acc[key]) acc[key] = []
       acc[key].push(item)
       return acc
     }, {})
-  }, [items])
+  }, [yearItems])
 
-  const activeItems = items.filter((i) => i.isActive)
+  const activeItems = yearItems.filter((i) => i.isActive)
   const totalTuition = activeItems.filter((i) => i.category === 'Tuition').reduce((s, i) => s + i.amount, 0)
   const totalLevies = activeItems.filter((i) => i.category !== 'Tuition').reduce((s, i) => s + i.amount, 0)
   const grandTotal = totalTuition + totalLevies
@@ -122,7 +175,7 @@ function FeeStructurePage() {
     mutationFn: async () => {
       const resolvedCategory = form.category === TYPE_NEW_SENTINEL ? newCategoryInput.trim() : form.category
       const amount = parseInt(form.amount, 10)
-      if (!form.name || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim()) {
+      if (!form.name || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim() || !form.semesterId) {
         throw new Error('Please fill in all required fields.')
       }
       const payload = {
@@ -142,11 +195,16 @@ function FeeStructurePage() {
         dueDate: payload.dueDate,
         programmeId: payload.programmeId,
         yearOfStudy: payload.yearOfStudy,
+        semesterId: form.semesterId,
         isMandatory: true,
       })
     },
     onSuccess: async (saved) => {
-      toast.success(editItem ? `Fee item "${saved.name}" updated.` : `Fee item "${saved.name}" added.`)
+      toast.success(
+        editItem
+          ? `Fee item "${saved.name}" updated.`
+          : `Fee item "${saved.name}" added. Matching students were charged for ${saved.semesterName ?? 'the selected semester'}.`,
+      )
       if (form.category === TYPE_NEW_SENTINEL && newCategoryInput.trim()) {
         setCustomCategories((prev) => prev.includes(newCategoryInput.trim()) ? prev : [...prev, newCategoryInput.trim()])
       }
@@ -169,14 +227,27 @@ function FeeStructurePage() {
   const issueMutation = useMutation({
     mutationFn: issueSemesterFeeInvoices,
     onSuccess: (result) => {
-      toast.success(`Issued ${result.issuedCount} invoice${result.issuedCount === 1 ? '' : 's'} for ${result.semesterLabel}.`)
+      const parts = [
+        result.issuedCount ? `${result.issuedCount} new invoice${result.issuedCount === 1 ? '' : 's'}` : null,
+        result.updatedCount ? `${result.updatedCount} updated invoice${result.updatedCount === 1 ? '' : 's'}` : null,
+      ].filter(Boolean)
+      toast.success(
+        parts.length
+          ? `${parts.join(' and ')} for ${result.semesterLabel}.`
+          : `No new charges for ${result.semesterLabel}. All matching students are already billed.`,
+      )
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not issue semester fees.')),
   })
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ ...DEFAULT_FORM, programmeId: programmes[0]?.id ?? ALL_PROGRAMMES })
+    const defaultYearId = academicYears.find((year) => year.isCurrent)?.id ?? academicYears[0]?.id ?? ''
+    setForm({
+      ...DEFAULT_FORM,
+      academicYearId: defaultYearId,
+      programmeId: programmes[0]?.id ?? ALL_PROGRAMMES,
+    })
     setNewCategoryInput('')
     setSheetOpen(true)
   }
@@ -188,6 +259,8 @@ function FeeStructurePage() {
       category: item.category,
       amount: String(item.amount),
       dueDate: item.dueDate ?? '',
+      academicYearId: item.academicYearId ?? academicYearId,
+      semesterId: item.semesterId ?? '',
       programmeId: item.programmeId ?? programmes.find((p) => p.name === item.programmeName)?.id ?? ALL_PROGRAMMES,
       yearGroup: studyYearToGroup(item.yearOfStudy),
       active: item.isActive,
@@ -199,7 +272,7 @@ function FeeStructurePage() {
   const requestSaveConfirm = () => {
     const resolvedCategory = form.category === TYPE_NEW_SENTINEL ? newCategoryInput.trim() : form.category
     const amount = parseInt(form.amount, 10)
-    if (!form.name.trim() || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim()) {
+    if (!form.name.trim() || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim() || (!editItem && !form.semesterId)) {
       toast.error('Please fill in all required fields.')
       return
     }
@@ -230,11 +303,18 @@ function FeeStructurePage() {
                   <SelectItem value="USD">USD — US Dollar</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={academicYear} onValueChange={setAcYear}>
-                <SelectTrigger className="w-36 text-sm h-9"><SelectValue /></SelectTrigger>
+              <Select
+                value={academicYearId || undefined}
+                onValueChange={setAcademicYearId}
+                disabled={!academicYears.length}
+              >
+                <SelectTrigger className="w-36 text-sm h-9"><SelectValue placeholder="Academic year" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2024/2025">2024/2025</SelectItem>
-                  <SelectItem value="2023/2024">2023/2024</SelectItem>
+                  {academicYears.map((year) => (
+                    <SelectItem key={year.id} value={year.id}>
+                      {year.name}{year.isCurrent ? ' · current' : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <button
@@ -265,7 +345,7 @@ function FeeStructurePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <StatTile icon={BookOpen} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TUITION" value={formatCurrency(totalTuition)} delta="Active tuition items" deltaColor="var(--muted-foreground)" animationDelay={0} />
                 <StatTile icon={BookOpen} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="TOTAL LEVIES" value={formatCurrency(totalLevies)} delta="Active levies only" deltaColor="var(--muted-foreground)" animationDelay={60} />
-                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={`Academic Year ${academicYear}`} deltaColor="var(--muted-foreground)" animationDelay={120} />
+                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={selectedAcademicYear ? `Academic Year ${selectedAcademicYear.name}` : 'Select an academic year'} deltaColor="var(--muted-foreground)" animationDelay={120} />
               </div>
 
               <div className="flex flex-col gap-8">
@@ -408,6 +488,48 @@ function FeeStructurePage() {
               </div>
 
               <div>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Academic year *</label>
+                <Select
+                  value={form.academicYearId || undefined}
+                  onValueChange={(v) => setForm((f) => ({ ...f, academicYearId: v, semesterId: '' }))}
+                  disabled={Boolean(editItem) || !academicYears.length}
+                >
+                  <SelectTrigger className="w-full text-sm"><SelectValue placeholder="Select academic year…" /></SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map((year) => (
+                      <SelectItem key={year.id} value={year.id}>
+                        {year.name}{year.isCurrent ? ' · current' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Semester *</label>
+                {editItem ? (
+                  <p className="text-sm rounded-xl px-3 py-2.5" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
+                    {editItem.semesterName ?? 'Current semester'}
+                  </p>
+                ) : (
+                  <Select
+                    value={form.semesterId || undefined}
+                    onValueChange={(v) => setForm((f) => ({ ...f, semesterId: v }))}
+                    disabled={!form.academicYearId || !formSemesters.length}
+                  >
+                    <SelectTrigger className="w-full text-sm"><SelectValue placeholder="Select semester…" /></SelectTrigger>
+                    <SelectContent>
+                      {formSemesters.map((semester) => (
+                        <SelectItem key={semester.id} value={semester.id}>
+                          {semester.name}{semester.isCurrent ? ' · current' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div>
                 <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Programme</label>
                 <Select value={form.programmeId} onValueChange={(v) => setForm((f) => ({ ...f, programmeId: v }))}>
                   <SelectTrigger className="w-full text-sm"><SelectValue placeholder="Select programme…" /></SelectTrigger>
@@ -462,7 +584,12 @@ function FeeStructurePage() {
           </>
         }
         notices={[
-          { icon: 'file', label: 'Students will only be charged after you apply fees to the semester.' },
+          {
+            icon: 'file',
+            label: editItem
+              ? 'Changes update the fee structure. Existing student invoices are not changed automatically.'
+              : 'Matching students are charged immediately for the selected semester.',
+          },
         ]}
         confirmLabel={editItem ? 'Save changes' : 'Add fee item'}
         confirmVariant="brand"
@@ -481,8 +608,9 @@ function FeeStructurePage() {
         tone="warning"
         headlineLabel="Confirm"
         headline="Issue semester invoices"
-        summary="Matching students will receive invoices on their Fees page based on active fee items for their programme and year group."
+        summary="All active fee items for the current semester will be applied to matching students. New invoices are created where needed; existing semester invoices get any missing fees added."
         notices={[
+          { icon: 'bell', label: 'Use this at the start of term or to catch up if any students were missed.' },
           { icon: 'bell', label: 'Students receive automatic reminders 1 week, 72h, 48h, and 24h before each fee due date.' },
         ]}
         confirmLabel="Apply to semester"

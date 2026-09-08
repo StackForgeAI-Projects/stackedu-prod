@@ -108,7 +108,7 @@ export const invoices = pgTable(
     issuedAt: timestamp('issued_at', { withTimezone: true, mode: 'string' }),
     dueDate: date('due_date'),
     /** Snapshot of the fee items at issue time, so later price changes cannot alter an issued invoice. */
-    lineItems: jsonb('line_items').$type<Array<{ name: string; amount: number; dueDate: string }>>(),
+    lineItems: jsonb('line_items').$type<Array<{ name: string; amount: number; dueDate: string; feeItemId?: string }>>(),
     ...timestamps(),
   },
   (t) => [

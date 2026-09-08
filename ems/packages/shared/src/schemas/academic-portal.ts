@@ -236,6 +236,12 @@ export const academicSemesterOptionSchema = z.object({
   isCurrent: z.boolean(),
 })
 
+export const academicYearOptionSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  isCurrent: z.boolean(),
+})
+
 export const rejectResultBatchRequestSchema = z.object({
   reason: z.string().trim().min(4).max(500),
 })
@@ -405,6 +411,7 @@ export function isSemesterCalendarCategory(category: string): boolean {
 export type AcademicLecturerRow = z.infer<typeof academicLecturerRowSchema>
 export type AcademicResultBatch = z.infer<typeof academicResultBatchSchema>
 export type AcademicSemesterOption = z.infer<typeof academicSemesterOptionSchema>
+export type AcademicYearOption = z.infer<typeof academicYearOptionSchema>
 export type AcademicAtRiskStudent = z.infer<typeof academicAtRiskStudentSchema>
 export type AcademicNotification = z.infer<typeof academicNotificationSchema>
 export type AcademicReports = z.infer<typeof academicReportsSchema>

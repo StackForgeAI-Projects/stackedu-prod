@@ -959,6 +959,36 @@ export async function listAcademicSemesters(
   }))
 }
 
+export async function listAcademicYears(
+  institutionId: string,
+): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  const db = await getInstitutionDb(institutionId)
+  return db
+    .select({
+      id: academicYears.id,
+      name: academicYears.name,
+      isCurrent: academicYears.isCurrent,
+    })
+    .from(academicYears)
+    .orderBy(desc(academicYears.startDate))
+}
+
+export async function listSemestersForAcademicYear(
+  institutionId: string,
+  academicYearId: string,
+): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  const db = await getInstitutionDb(institutionId)
+  return db
+    .select({
+      id: semesters.id,
+      name: semesters.name,
+      isCurrent: semesters.isCurrent,
+    })
+    .from(semesters)
+    .where(eq(semesters.academicYearId, academicYearId))
+    .orderBy(semesters.sequence)
+}
+
 export async function approveAcademicResultBatch(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },

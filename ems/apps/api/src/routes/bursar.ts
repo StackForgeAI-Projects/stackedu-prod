@@ -8,6 +8,7 @@ import {
   resolveBursarReconciliationRequestSchema,
   setBursarFeeHoldRequestSchema,
   updateBursarFeeItemRequestSchema,
+  uuidSchema,
   voidBursarReceiptRequestSchema,
 } from '@stackedu/shared'
 import { validationFailed } from '../lib/errors'
@@ -22,6 +23,7 @@ import {
   getBursarReports,
   getBursarStudentAccount,
   issueSemesterFeeInvoices,
+  listBursarAcademicYears,
   listBursarAudienceOptions,
   listBursarFeeItems,
   listBursarFeeMessages,
@@ -30,6 +32,7 @@ import {
   listBursarProgrammes,
   listBursarReceipts,
   listBursarReconciliation,
+  listBursarSemesters,
   listBursarStudentAccounts,
   markAllBursarNotificationsRead,
   markBursarNotificationRead,
@@ -88,6 +91,21 @@ bursarRoutes.get('/bursar/payments', ...bursarOnly, async (c) => {
 bursarRoutes.get('/bursar/programmes', ...bursarOnly, async (c) => {
   const user = c.get('user')!
   return c.json({ programmes: await listBursarProgrammes(user.institution.id, user.id) })
+})
+
+bursarRoutes.get('/bursar/academic-years', ...bursarOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({ academicYears: await listBursarAcademicYears(user.institution.id, user.id) })
+})
+
+bursarRoutes.get('/bursar/semesters', ...bursarOnly, async (c) => {
+  const user = c.get('user')!
+  const academicYearId = c.req.query('academicYearId')
+  const parsed = uuidSchema.safeParse(academicYearId)
+  if (!parsed.success) throw validationFailed({ academicYearId: ['Choose an academic year.'] })
+  return c.json({
+    semesters: await listBursarSemesters(user.institution.id, user.id, parsed.data),
+  })
 })
 
 bursarRoutes.get('/bursar/fee-items', ...bursarOnly, async (c) => {

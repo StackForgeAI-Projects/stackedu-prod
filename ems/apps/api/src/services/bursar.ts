@@ -27,7 +27,7 @@ import type {
 import { titleAndFirstName } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
-import { departments, programmes, semesters, courses } from '../db/institution/schema/academic'
+import { departments, programmes, semesters, courses, academicYears } from '../db/institution/schema/academic'
 import { notifications } from '../db/institution/schema/communication'
 import {
   announcements,
@@ -50,12 +50,11 @@ import { writeAudit } from '../lib/audit'
 import { feeDescriptionFromLineItems } from '../lib/fee-description'
 import { badRequest, forbidden, notFound } from '../lib/errors'
 import {
-  feeItemsApplyToStudent,
-  invoicePayloadFromFeeItems,
+  applyFeeItemsToStudents,
   type ApplicableFeeItemRow,
 } from '../lib/fee-invoice'
 import { audienceLabel, encodeAudience, resolveAudienceUserIds } from './announcement-audience'
-import { currentSemester, relativeTime } from './academic'
+import { currentSemester, listAcademicYears, listSemestersForAcademicYear, relativeTime } from './academic'
 import { notifyUserIds } from './role-notifications'
 
 type Actor = { id: string; email: string; role: UserRole }
@@ -337,9 +336,8 @@ async function ensureFeeStructure(
   institutionId: string,
   db: Awaited<ReturnType<typeof getInstitutionDb>>,
   actor: Actor,
-  input: { programmeId?: string; yearOfStudy?: number | null },
+  input: { programmeId?: string; yearOfStudy?: number | null; semesterId: string },
 ): Promise<string> {
-  const semester = await currentSemester(institutionId)
   const [existing] = await db
     .select({ id: feeStructures.id })
     .from(feeStructures)
@@ -349,7 +347,7 @@ async function ensureFeeStructure(
         input.yearOfStudy != null
           ? eq(feeStructures.yearOfStudy, input.yearOfStudy)
           : isNull(feeStructures.yearOfStudy),
-        semester?.id ? eq(feeStructures.semesterId, semester.id) : isNull(feeStructures.semesterId),
+        eq(feeStructures.semesterId, input.semesterId),
       ),
     )
     .limit(1)
@@ -365,7 +363,7 @@ async function ensureFeeStructure(
       name: programme?.name ? `${programme.name} fees` : 'General fees',
       programmeId: input.programmeId ?? null,
       yearOfStudy: input.yearOfStudy ?? null,
-      semesterId: semester?.id ?? null,
+      semesterId: input.semesterId,
       createdBy: actor.id,
       isActive: true,
     })
@@ -379,6 +377,23 @@ export async function listBursarProgrammes(
 ): Promise<Array<{ id: string; name: string }>> {
   const { db } = await requireBursar(institutionId, userId)
   return db.select({ id: programmes.id, name: programmes.name }).from(programmes).orderBy(programmes.name)
+}
+
+export async function listBursarAcademicYears(
+  institutionId: string,
+  userId: string,
+): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  await requireBursar(institutionId, userId)
+  return listAcademicYears(institutionId)
+}
+
+export async function listBursarSemesters(
+  institutionId: string,
+  userId: string,
+  academicYearId: string,
+): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  await requireBursar(institutionId, userId)
+  return listSemestersForAcademicYear(institutionId, academicYearId)
 }
 
 export async function listBursarFeeItems(institutionId: string, userId: string): Promise<BursarFeeItem[]> {
@@ -397,10 +412,16 @@ export async function listBursarFeeItems(institutionId: string, userId: string):
       isActive: feeStructures.isActive,
       createdAt: feeItems.createdAt,
       dueDate: feeItems.dueDate,
+      academicYearId: academicYears.id,
+      academicYearName: academicYears.name,
+      semesterId: semesters.id,
+      semesterName: semesters.name,
     })
     .from(feeItems)
     .innerJoin(feeStructures, eq(feeItems.feeStructureId, feeStructures.id))
     .leftJoin(programmes, eq(feeStructures.programmeId, programmes.id))
+    .leftJoin(semesters, eq(feeStructures.semesterId, semesters.id))
+    .leftJoin(academicYears, eq(semesters.academicYearId, academicYears.id))
     .orderBy(desc(feeItems.createdAt))
 
   return rows.map((row) => ({
@@ -416,6 +437,10 @@ export async function listBursarFeeItems(institutionId: string, userId: string):
     isActive: row.isActive,
     createdAt: row.createdAt,
     dueDate: row.dueDate,
+    academicYearId: row.academicYearId,
+    academicYearName: row.academicYearName,
+    semesterId: row.semesterId,
+    semesterName: row.semesterName,
   }))
 }
 
@@ -426,9 +451,18 @@ export async function createBursarFeeItem(
   input: CreateBursarFeeItemRequest,
 ): Promise<BursarFeeItem> {
   const { db } = await requireBursar(institutionId, userId)
+
+  const [semester] = await db
+    .select({ id: semesters.id, name: semesters.name })
+    .from(semesters)
+    .where(eq(semesters.id, input.semesterId))
+    .limit(1)
+  if (!semester) throw badRequest('Choose a valid semester.')
+
   const structureId = await ensureFeeStructure(institutionId, db, actor, {
     programmeId: input.programmeId,
     yearOfStudy: input.yearOfStudy ?? null,
+    semesterId: input.semesterId,
   })
 
   const [created] = await db
@@ -443,6 +477,17 @@ export async function createBursarFeeItem(
     })
     .returning({ id: feeItems.id })
 
+  await applyFeeItemsToStudents(db, semester.id, semester.name, [
+    {
+      itemId: created!.id,
+      name: input.name,
+      amount: input.amount,
+      dueDate: input.dueDate,
+      programmeId: input.programmeId ?? null,
+      yearOfStudy: input.yearOfStudy ?? null,
+    },
+  ])
+
   await writeAudit({
     institutionId,
     actorId: actor.id,
@@ -451,7 +496,7 @@ export async function createBursarFeeItem(
     action: 'fee_item.create',
     targetType: 'fee_item',
     targetId: created!.id,
-    metadata: { name: input.name, amount: input.amount },
+    metadata: { name: input.name, amount: input.amount, semesterId: input.semesterId },
   })
 
   const items = await listBursarFeeItems(institutionId, userId)
@@ -1406,81 +1451,16 @@ export async function issueSemesterFeeInvoices(
 
   if (!applicableItems.length) throw badRequest('Add active fee items before issuing semester fees.')
 
+  let issuedCount = 0
+  let updatedCount = 0
+  let skippedCount = 0
   try {
-    invoicePayloadFromFeeItems(applicableItems)
+    const result = await applyFeeItemsToStudents(db, semester.id, semester.name, applicableItems)
+    issuedCount = result.issuedCount
+    updatedCount = result.updatedCount
+    skippedCount = result.skippedCount
   } catch (error) {
     throw badRequest(error instanceof Error ? error.message : 'Set due dates on all active fee items.')
-  }
-
-  const studentRows = await db
-    .select({
-      id: students.id,
-      studentNumber: students.studentNumber,
-      programmeId: students.programmeId,
-      yearOfStudy: students.yearOfStudy,
-    })
-    .from(students)
-    .where(eq(students.enrolmentStatus, 'Active'))
-
-  let issuedCount = 0
-  let skippedCount = 0
-  const now = new Date().toISOString()
-
-  for (const student of studentRows) {
-    const [existing] = await db
-      .select({ id: invoices.id })
-      .from(invoices)
-      .where(and(eq(invoices.studentId, student.id), eq(invoices.semesterId, semester.id)))
-      .limit(1)
-    if (existing) {
-      skippedCount += 1
-      continue
-    }
-
-    const items = feeItemsApplyToStudent(applicableItems, student)
-    if (!items.length) {
-      skippedCount += 1
-      continue
-    }
-
-    const { lineItems, amountDue, dueDate } = invoicePayloadFromFeeItems(items)
-
-    await db.insert(invoices).values({
-      invoiceNumber: `INV-${student.studentNumber}-${semester.name.replace(/\s+/g, '-').toUpperCase()}`,
-      studentId: student.id,
-      semesterId: semester.id,
-      amountDue,
-      amountPaid: 0,
-      status: 'Issued',
-      issuedAt: now,
-      dueDate,
-      lineItems,
-    })
-
-    const [account] = await db
-      .select()
-      .from(studentFeeAccounts)
-      .where(eq(studentFeeAccounts.studentId, student.id))
-      .limit(1)
-
-    if (account) {
-      await db
-        .update(studentFeeAccounts)
-        .set({
-          totalCharged: account.totalCharged + amountDue,
-          balance: account.balance + amountDue,
-        })
-        .where(eq(studentFeeAccounts.id, account.id))
-    } else {
-      await db.insert(studentFeeAccounts).values({
-        studentId: student.id,
-        totalCharged: amountDue,
-        totalPaid: 0,
-        balance: amountDue,
-      })
-    }
-
-    issuedCount += 1
   }
 
   await writeAudit({
@@ -1491,11 +1471,12 @@ export async function issueSemesterFeeInvoices(
     action: 'fee_structure.issue_semester',
     targetType: 'semester',
     targetId: semester.id,
-    metadata: { issuedCount, skippedCount },
+    metadata: { issuedCount, updatedCount, skippedCount },
   })
 
   return {
     issuedCount,
+    updatedCount,
     skippedCount,
     semesterLabel: semester.name,
   }

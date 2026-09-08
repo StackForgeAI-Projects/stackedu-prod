@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
 import {
@@ -22,6 +22,7 @@ import { studentProfiles, students } from '../src/db/institution/schema/students
 import { AppError } from '../src/lib/errors'
 import {
   createBursarAnnouncement,
+  createBursarFeeItem,
   getBursarDashboard,
   getBursarProfile,
   getBursarStudentAccount,
@@ -30,6 +31,7 @@ import {
   listBursarFeeMessages,
   listBursarNotifications,
   listBursarPayments,
+  listBursarSemesters,
   listBursarStudentAccounts,
   recordBursarManualPayment,
   releaseBursarFeeHold,
@@ -48,6 +50,8 @@ describe('bursar portal', () => {
   let studentUserId: string
   let receiptId: string
   let semesterId: string
+  let programmeId: string
+  let academicYearId: string
 
   beforeAll(async () => {
     platform = await createTestPlatform()
@@ -110,6 +114,8 @@ describe('bursar portal', () => {
       })
       .returning()
     semesterId = semester!.id
+    academicYearId = year!.id
+    programmeId = programme!.id
 
     const [student] = await db
       .insert(students)
@@ -337,6 +343,17 @@ describe('bursar portal', () => {
     ).rejects.toMatchObject({ message: 'This fee must be paid in full.' })
   })
 
+  it('lists institution academic years for the bursar fee structure', async () => {
+    const { listBursarAcademicYears } = await import('../src/services/bursar')
+    const years = await listBursarAcademicYears(institutionId, bursar.id)
+    expect(years.some((year) => year.name === '2026/2027' && year.isCurrent)).toBe(true)
+  })
+
+  it('lists semesters for an academic year', async () => {
+    const semesters = await listBursarSemesters(institutionId, bursar.id, academicYearId)
+    expect(semesters.some((semester) => semester.name === 'Semester 1' && semester.isCurrent)).toBe(true)
+  })
+
   it('lists fee items with date added and due date fields', async () => {
     const db = await getInstitutionDb(institutionId)
     const [structure] = await db
@@ -362,10 +379,106 @@ describe('bursar portal', () => {
     expect(tuition).toBeDefined()
     expect(tuition?.dueDate).toBe('2026-12-31')
     expect(tuition?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}/)
+    expect(tuition?.academicYearName).toBe('2026/2027')
+    expect(tuition?.semesterName).toBe('Semester 1')
+  })
+
+  it('charges matching students immediately when a fee item is created', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const csStudentUser = await createUser({
+      institutionId,
+      email: 'cs-student@btu.test',
+      fullName: 'CS Student',
+      role: 'Student',
+      password: 'Student#2026',
+    })
+    const [csStudent] = await db
+      .insert(students)
+      .values({
+        userId: csStudentUser.id,
+        studentNumber: 'BTU-2026-003',
+        programmeId,
+        yearOfStudy: 1,
+      })
+      .returning()
+
+    await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Computer Lab Fee',
+      category: 'Levy',
+      amount: 35_000,
+      dueDate: '2026-11-30',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    const [invoice] = await db
+      .select({ lineItems: invoices.lineItems, amountDue: invoices.amountDue })
+      .from(invoices)
+      .where(and(eq(invoices.studentId, csStudent!.id), eq(invoices.semesterId, semesterId)))
+      .limit(1)
+
+    expect(invoice?.amountDue).toBe(35_000)
+    expect(invoice?.lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Computer Lab Fee', amount: 35_000, dueDate: '2026-11-30' }),
+      ]),
+    )
+  })
+
+  it('adds a new fee to an existing semester invoice when another fee item is created', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const mergeStudentUser = await createUser({
+      institutionId,
+      email: 'merge-student@btu.test',
+      fullName: 'Merge Student',
+      role: 'Student',
+      password: 'Student#2026',
+    })
+    const [mergeStudent] = await db
+      .insert(students)
+      .values({
+        userId: mergeStudentUser.id,
+        studentNumber: 'BTU-2026-004',
+        programmeId,
+        yearOfStudy: 1,
+      })
+      .returning()
+
+    await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Semester Tuition',
+      category: 'Tuition',
+      amount: 120_000,
+      dueDate: '2026-12-15',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Library Levy',
+      category: 'Levy',
+      amount: 15_000,
+      dueDate: '2026-12-20',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    const [invoice] = await db
+      .select({ lineItems: invoices.lineItems, amountDue: invoices.amountDue })
+      .from(invoices)
+      .where(and(eq(invoices.studentId, mergeStudent!.id), eq(invoices.semesterId, semesterId)))
+      .limit(1)
+
+    expect(invoice?.amountDue).toBe(135_000)
+    expect(invoice?.lineItems).toHaveLength(2)
   })
 
   it('issues semester invoices from active fee items', async () => {
     const db = await getInstitutionDb(institutionId)
+    await db.update(feeStructures).set({ isActive: false })
+
     const [structure] = await db
       .insert(feeStructures)
       .values({
@@ -409,7 +522,9 @@ describe('bursar portal', () => {
       .where(eq(students.studentNumber, 'BTU-2026-002'))
       .limit(1)
     expect(issuedInvoice?.lineItems).toEqual(
-      expect.arrayContaining([{ name: 'Tuition Fee', amount: 50_000, dueDate: '2026-12-31' }]),
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Tuition Fee', amount: 50_000, dueDate: '2026-12-31' }),
+      ]),
     )
     expect(issuedInvoice?.dueDate).toBe('2026-12-31')
   })

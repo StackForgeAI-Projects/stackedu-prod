@@ -30,6 +30,8 @@ export const bursarPaymentsQueryKey = (filters?: Record<string, string | undefin
   ['bursar', 'payments', filters ?? {}] as const
 export const bursarFeeItemsQueryKey = ['bursar', 'fee-items'] as const
 export const bursarProgrammesQueryKey = ['bursar', 'programmes'] as const
+export const bursarAcademicYearsQueryKey = ['bursar', 'academic-years'] as const
+export const bursarSemestersQueryKey = (academicYearId: string) => ['bursar', 'semesters', academicYearId] as const
 export const bursarStudentAccountsQueryKey = ['bursar', 'student-accounts'] as const
 export const bursarStudentAccountQueryKey = (id: string) => ['bursar', 'student-account', id] as const
 export const bursarReceiptsQueryKey = (filters?: Record<string, string | undefined>) =>
@@ -69,6 +71,22 @@ export async function listBursarPayments(filters?: {
 export async function listBursarProgrammes(): Promise<Array<{ id: string; name: string }>> {
   const { programmes } = await api.get<{ programmes: Array<{ id: string; name: string }> }>('/bursar/programmes')
   return programmes
+}
+
+export async function listBursarAcademicYears(): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  const { academicYears } = await api.get<{ academicYears: Array<{ id: string; name: string; isCurrent: boolean }> }>(
+    '/bursar/academic-years',
+  )
+  return academicYears
+}
+
+export async function listBursarSemesters(
+  academicYearId: string,
+): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
+  const { semesters } = await api.get<{ semesters: Array<{ id: string; name: string; isCurrent: boolean }> }>(
+    `/bursar/semesters?academicYearId=${encodeURIComponent(academicYearId)}`,
+  )
+  return semesters
 }
 
 export async function listBursarFeeItems(): Promise<BursarFeeItem[]> {
