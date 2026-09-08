@@ -84,6 +84,7 @@ export const createBursarFeeItemRequestSchema = z.object({
   yearOfStudy: z.number().int().min(1).max(6).nullable().optional(),
   semesterId: uuidSchema,
   isMandatory: z.boolean().optional(),
+  isActive: z.boolean().optional(),
 })
 
 export const updateBursarFeeItemRequestSchema = createBursarFeeItemRequestSchema.partial().extend({

@@ -24,7 +24,7 @@ import type {
   UpdateBursarFeeItemRequest,
   UserRole,
 } from '@stackedu/shared'
-import { titleAndFirstName } from '@stackedu/shared'
+import { titleAndFirstName, displayFullName, formatDisplayName, isBillingSemesterName } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
 import { departments, programmes, semesters, courses, academicYears } from '../db/institution/schema/academic'
@@ -47,7 +47,7 @@ import {
 import { users } from '../db/institution/schema/people'
 import { studentProfiles, students } from '../db/institution/schema/students'
 import { writeAudit } from '../lib/audit'
-import { feeDescriptionFromLineItems } from '../lib/fee-description'
+import { feeDescriptionFromLineItems, paymentDescriptionsById } from '../lib/fee-description'
 import { badRequest, forbidden, notFound } from '../lib/errors'
 import {
   applyFeeItemsToStudents,
@@ -125,7 +125,11 @@ async function studentDisplayName(
     .where(eq(students.id, studentId))
     .limit(1)
   if (!row) throw notFound('That student')
-  const name = row.firstName && row.lastName ? `${row.firstName} ${row.lastName}` : row.fullName
+  const name = displayFullName({
+    fullName: row.fullName,
+    firstName: row.firstName,
+    lastName: row.lastName,
+  })
   return { name, studentNumber: row.studentNumber, email: row.email }
 }
 
@@ -147,6 +151,7 @@ async function mapPaymentRow(
     programmeName?: string | null
     customDescription?: string
   },
+  resolvedDescription?: string,
 ): Promise<BursarPaymentRow> {
   const student = await studentDisplayName(db, row.studentId)
   const fallback = row.programmeName ? `${row.programmeName} fees` : 'Tuition and fees'
@@ -159,7 +164,7 @@ async function mapPaymentRow(
     amount: row.amount,
     method: row.method,
     status: row.status,
-    description: row.customDescription ?? feeDescriptionFromLineItems(row.lineItems, fallback),
+    description: row.customDescription ?? resolvedDescription ?? feeDescriptionFromLineItems(row.lineItems, fallback),
     paidAt: row.paidAt,
     createdAt: row.createdAt,
     receiptNumber: row.receiptNumber,
@@ -179,7 +184,7 @@ export async function getBursarProfile(institutionId: string, userId: string): P
 
   return {
     userId: user.id,
-    fullName: user.fullName,
+    fullName: formatDisplayName(user.fullName),
     firstName: firstName(user.fullName),
     email: user.email,
     role: user.role,
@@ -311,6 +316,7 @@ export async function listBursarPayments(
       id: payments.id,
       reference: payments.reference,
       studentId: payments.studentId,
+      invoiceId: payments.invoiceId,
       amount: payments.amount,
       method: payments.method,
       status: payments.status,
@@ -330,7 +336,18 @@ export async function listBursarPayments(
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(payments.createdAt))
 
-  return Promise.all(rows.map((row) => mapPaymentRow(db, row)))
+  const descriptions = paymentDescriptionsById(
+    rows.map((row) => ({
+      id: row.id,
+      invoiceId: row.invoiceId,
+      amount: row.amount,
+      paidAt: row.paidAt,
+      lineItems: row.lineItems,
+      programmeName: row.programmeName,
+    })),
+  )
+
+  return Promise.all(rows.map((row) => mapPaymentRow(db, row, descriptions.get(row.id))))
 }
 
 async function ensureFeeStructure(
@@ -394,7 +411,8 @@ export async function listBursarSemesters(
   academicYearId: string,
 ): Promise<Array<{ id: string; name: string; isCurrent: boolean }>> {
   await requireBursar(institutionId, userId)
-  return listSemestersForAcademicYear(institutionId, academicYearId)
+  const semesters = await listSemestersForAcademicYear(institutionId, academicYearId)
+  return semesters.filter((semester) => isBillingSemesterName(semester.name))
 }
 
 export async function listBursarFeeItems(institutionId: string, userId: string): Promise<BursarFeeItem[]> {
@@ -478,16 +496,20 @@ export async function createBursarFeeItem(
     })
     .returning({ id: feeItems.id })
 
-  await applyFeeItemsToStudents(db, semester.id, semester.name, [
-    {
-      itemId: created!.id,
-      name: input.name,
-      amount: input.amount,
-      dueDate: input.dueDate,
-      programmeId: input.programmeId ?? null,
-      yearOfStudy: input.yearOfStudy ?? null,
-    },
-  ])
+  if (input.isActive === false) {
+    await db.update(feeStructures).set({ isActive: false }).where(eq(feeStructures.id, structureId))
+  } else {
+    await applyFeeItemsToStudents(db, semester.id, semester.name, [
+      {
+        itemId: created!.id,
+        name: input.name,
+        amount: input.amount,
+        dueDate: input.dueDate,
+        programmeId: input.programmeId ?? null,
+        yearOfStudy: input.yearOfStudy ?? null,
+      },
+    ])
+  }
 
   await writeAudit({
     institutionId,
@@ -605,7 +627,11 @@ export async function listBursarStudentAccounts(
     return {
       studentId: row.studentId,
       studentNumber: row.studentNumber,
-      name: row.firstName && row.lastName ? `${row.firstName} ${row.lastName}` : row.fullName,
+      name: displayFullName({
+        fullName: row.fullName,
+        firstName: row.firstName,
+        lastName: row.lastName,
+      }),
       programme: row.programme,
       yearOfStudy: row.yearOfStudy,
       totalCharged: row.totalCharged ?? 0,
@@ -647,6 +673,7 @@ export async function getBursarStudentAccount(
     .select({
       id: payments.id,
       reference: payments.reference,
+      invoiceId: payments.invoiceId,
       amount: payments.amount,
       method: payments.method,
       status: payments.status,
@@ -663,6 +690,17 @@ export async function getBursarStudentAccount(
     .innerJoin(programmes, eq(programmes.id, students.programmeId))
     .where(eq(payments.studentId, studentId))
     .orderBy(desc(payments.createdAt))
+
+  const paymentDescriptions = paymentDescriptionsById(
+    paymentRows.map((row) => ({
+      id: row.id,
+      invoiceId: row.invoiceId,
+      amount: row.amount,
+      paidAt: row.paidAt,
+      lineItems: row.lineItems,
+      programmeName: row.programmeName,
+    })),
+  )
 
   const [activeHold] = await db
     .select({ reason: feeHolds.reason })
@@ -685,10 +723,12 @@ export async function getBursarStudentAccount(
       paidAt: row.paidAt,
       receiptNumber: row.receiptNumber,
       verificationCode: row.verificationCode,
-      description: feeDescriptionFromLineItems(
-        row.lineItems,
-        row.programmeName ? `${row.programmeName} fees` : 'Tuition and fees',
-      ),
+      description:
+        paymentDescriptions.get(row.id) ??
+        feeDescriptionFromLineItems(
+          row.lineItems,
+          row.programmeName ? `${row.programmeName} fees` : 'Tuition and fees',
+        ),
     })),
   }
 }
@@ -1320,7 +1360,11 @@ export async function listBursarAudienceOptions(
     students: studentRows.map((row) => ({
       id: row.id,
       studentNumber: row.studentNumber,
-      name: row.firstName && row.lastName ? `${row.firstName} ${row.lastName}` : row.fullName,
+      name: displayFullName({
+        fullName: row.fullName,
+        firstName: row.firstName,
+        lastName: row.lastName,
+      }),
     })),
     courses: courseRows.map((row) => ({
       offeringId: row.offeringId,

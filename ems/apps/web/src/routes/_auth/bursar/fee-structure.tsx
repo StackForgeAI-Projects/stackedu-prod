@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, useEffect } from 'react'
 import type { BursarFeeItem } from '@stackedu/shared'
+import { isTuitionFeeCategory } from '@stackedu/shared'
 import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { BursarShell } from '@/components/BursarShell'
@@ -48,6 +49,10 @@ const YEAR_GROUPS = ['All Years', 'Year 1', 'Year 2', 'Year 3', 'Year 4'] as con
 const BASE_CATEGORIES = ['Tuition', 'Levy', 'Other']
 const TYPE_NEW_SENTINEL = '__type_new__'
 const ALL_PROGRAMMES = '__all_programmes__'
+const ALL_PROGRAMMES_FILTER = '__all_programmes_filter__'
+const FEE_TYPE_ALL = 'all'
+const FEE_TYPE_TUITION = 'tuition'
+const FEE_TYPE_OTHER = 'other'
 
 type YearGroup = (typeof YEAR_GROUPS)[number]
 
@@ -98,6 +103,8 @@ function FeeStructurePage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [customCategories, setCustomCategories] = useState<string[]>([])
   const [newCategoryInput, setNewCategoryInput] = useState('')
+  const [programmeFilter, setProgrammeFilter] = useState(ALL_PROGRAMMES_FILTER)
+  const [feeTypeFilter, setFeeTypeFilter] = useState<'all' | 'tuition' | 'other'>(FEE_TYPE_ALL)
 
   const { data: items = [], isPending, error } = useQuery({
     queryKey: bursarFeeItemsQueryKey,
@@ -154,22 +161,47 @@ function FeeStructurePage() {
     return items.filter((item) => item.academicYearId === academicYearId)
   }, [items, academicYearId])
 
+  const filteredItems = useMemo(() => {
+    return yearItems.filter((item) => {
+      if (programmeFilter !== ALL_PROGRAMMES_FILTER) {
+        if (item.programmeId && item.programmeId !== programmeFilter) return false
+      }
+      if (feeTypeFilter === FEE_TYPE_TUITION && !isTuitionFeeCategory(item.category)) return false
+      if (feeTypeFilter === FEE_TYPE_OTHER && isTuitionFeeCategory(item.category)) return false
+      return true
+    })
+  }, [yearItems, programmeFilter, feeTypeFilter])
+
+  const filterSummary = useMemo(() => {
+    const programmeLabel =
+      programmeFilter === ALL_PROGRAMMES_FILTER
+        ? 'All programmes'
+        : programmes.find((programme) => programme.id === programmeFilter)?.name ?? 'Programme'
+    const feeLabel =
+      feeTypeFilter === FEE_TYPE_ALL
+        ? 'All fee types'
+        : feeTypeFilter === FEE_TYPE_TUITION
+          ? 'Tuition only'
+          : 'Other fees only'
+    return `${programmeLabel} · ${feeLabel}`
+  }, [programmeFilter, feeTypeFilter, programmes])
+
   const allCategories = [...BASE_CATEGORIES, ...customCategories]
   const categoryColors = (cat: string) => BASE_CATEGORY_COLORS[cat] ?? { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
 
   const grouped = useMemo(() => {
-    return yearItems.reduce<Record<string, BursarFeeItem[]>>((acc, item) => {
+    return filteredItems.reduce<Record<string, BursarFeeItem[]>>((acc, item) => {
       const key = item.programmeName || 'All Programmes'
       if (!acc[key]) acc[key] = []
       acc[key].push(item)
       return acc
     }, {})
-  }, [yearItems])
+  }, [filteredItems])
 
-  const activeItems = yearItems.filter((i) => i.isActive)
-  const totalTuition = activeItems.filter((i) => i.category === 'Tuition').reduce((s, i) => s + i.amount, 0)
-  const totalLevies = activeItems.filter((i) => i.category !== 'Tuition').reduce((s, i) => s + i.amount, 0)
-  const grandTotal = totalTuition + totalLevies
+  const activeItems = filteredItems.filter((i) => i.isActive)
+  const totalTuition = activeItems.filter((i) => isTuitionFeeCategory(i.category)).reduce((s, i) => s + i.amount, 0)
+  const totalOtherFees = activeItems.filter((i) => !isTuitionFeeCategory(i.category)).reduce((s, i) => s + i.amount, 0)
+  const grandTotal = totalTuition + totalOtherFees
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -197,6 +229,7 @@ function FeeStructurePage() {
         yearOfStudy: payload.yearOfStudy,
         semesterId: form.semesterId,
         isMandatory: true,
+        isActive: form.active,
       })
     },
     onSuccess: async (saved) => {
@@ -336,6 +369,32 @@ function FeeStructurePage() {
             </div>
           </div>
 
+          {!isPending && !error ? (
+            <div className="flex flex-wrap items-center gap-3 mb-6 p-4 rounded-xl" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)' }}>
+              <span className="t-label" style={{ color: 'var(--muted-foreground)' }}>Filter by</span>
+              <Select value={programmeFilter} onValueChange={setProgrammeFilter}>
+                <SelectTrigger className="w-full sm:w-52 text-sm h-9"><SelectValue placeholder="Programme" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_PROGRAMMES_FILTER}>All programmes</SelectItem>
+                  {programmes.map((programme) => (
+                    <SelectItem key={programme.id} value={programme.id}>{programme.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={feeTypeFilter} onValueChange={(value) => setFeeTypeFilter(value as 'all' | 'tuition' | 'other')}>
+                <SelectTrigger className="w-full sm:w-44 text-sm h-9"><SelectValue placeholder="Fee type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FEE_TYPE_ALL}>All fee types</SelectItem>
+                  <SelectItem value={FEE_TYPE_TUITION}>Tuition only</SelectItem>
+                  <SelectItem value={FEE_TYPE_OTHER}>Other fees only</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="t-caption w-full sm:w-auto sm:ml-auto" style={{ color: 'var(--muted-foreground)' }}>
+                Showing {activeItems.length} active fee item{activeItems.length === 1 ? '' : 's'} · {filterSummary}
+              </p>
+            </div>
+          ) : null}
+
           {isPending ? (
             <p className="t-body py-8" style={{ color: 'var(--muted-foreground)' }}>Loading fee structure…</p>
           ) : error ? (
@@ -343,11 +402,16 @@ function FeeStructurePage() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                <StatTile icon={BookOpen} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TUITION" value={formatCurrency(totalTuition)} delta="Active tuition items" deltaColor="var(--muted-foreground)" animationDelay={0} />
-                <StatTile icon={BookOpen} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="TOTAL LEVIES" value={formatCurrency(totalLevies)} delta="Active levies only" deltaColor="var(--muted-foreground)" animationDelay={60} />
-                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={selectedAcademicYear ? `Academic Year ${selectedAcademicYear.name}` : 'Select an academic year'} deltaColor="var(--muted-foreground)" animationDelay={120} />
+                <StatTile icon={BookOpen} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TUITION" value={formatCurrency(totalTuition)} delta="Tuition category only" deltaColor="var(--muted-foreground)" animationDelay={0} />
+                <StatTile icon={BookOpen} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="OTHER FEES" value={formatCurrency(totalOtherFees)} delta="All non-tuition fees" deltaColor="var(--muted-foreground)" animationDelay={60} />
+                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={`${filterSummary}${selectedAcademicYear ? ` · ${selectedAcademicYear.name}` : ''}`} deltaColor="var(--muted-foreground)" animationDelay={120} />
               </div>
 
+              {Object.keys(grouped).length === 0 ? (
+                <p className="t-body py-8 text-center" style={{ color: 'var(--muted-foreground)' }}>
+                  No fee items match the selected filters. Try choosing All programmes or All fee types.
+                </p>
+              ) : (
               <div className="flex flex-col gap-8">
                 {Object.entries(grouped).map(([programme, progItems]) => {
                   const progTotal = progItems.filter((i) => i.isActive).reduce((s, i) => s + i.amount, 0)
@@ -434,6 +498,7 @@ function FeeStructurePage() {
                   )
                 })}
               </div>
+              )}
             </>
           )}
         </div>
@@ -483,7 +548,7 @@ function FeeStructurePage() {
                   style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
                 />
                 <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                  Students are reminded 1 week, 72 hours, 48 hours, and 24 hours before this date.
+                  Students are reminded 1 week, 72 hours, 48 hours, and 24 hours before this date. After the due date, the fee stays on the student account as overdue until paid.
                 </p>
               </div>
 
@@ -550,11 +615,16 @@ function FeeStructurePage() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Switch id="active-toggle" checked={form.active} onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))} />
-                <Label htmlFor="active-toggle" className="text-sm cursor-pointer" style={{ color: 'var(--foreground)' }}>
-                  {form.active ? 'Active' : 'Inactive'}
-                </Label>
+              <div>
+                <div className="flex items-center gap-3">
+                  <Switch id="active-toggle" checked={form.active} onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))} />
+                  <Label htmlFor="active-toggle" className="text-sm cursor-pointer" style={{ color: 'var(--foreground)' }}>
+                    {form.active ? 'Active' : 'Inactive'}
+                  </Label>
+                </div>
+                <p className="t-caption mt-1.5" style={{ color: 'var(--muted-foreground)' }}>
+                  Active fees are charged to matching students and included when you apply fees to a semester. Inactive fees stay listed but are not billed.
+                </p>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -588,7 +658,9 @@ function FeeStructurePage() {
             icon: 'file',
             label: editItem
               ? 'Changes update the fee structure. Existing student invoices are not changed automatically.'
-              : 'Matching students are charged immediately for the selected semester.',
+              : form.active
+                ? 'Matching students are charged immediately for the selected semester.'
+                : 'This fee will be saved as inactive and will not be charged until you activate it.',
           },
         ]}
         confirmLabel={editItem ? 'Save changes' : 'Add fee item'}

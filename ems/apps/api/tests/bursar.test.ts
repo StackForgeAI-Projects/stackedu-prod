@@ -351,8 +351,19 @@ describe('bursar portal', () => {
   })
 
   it('lists semesters for an academic year', async () => {
-    const semesters = await listBursarSemesters(institutionId, bursar.id, academicYearId)
-    expect(semesters.some((semester) => semester.name === 'Semester 1' && semester.isCurrent)).toBe(true)
+    const db = await getInstitutionDb(institutionId)
+    await db.insert(semesters).values({
+      academicYearId,
+      name: 'Orientation day',
+      sequence: 3,
+      startDate: '2026-08-20',
+      endDate: '2026-08-20',
+      isCurrent: false,
+    })
+
+    const semestersList = await listBursarSemesters(institutionId, bursar.id, academicYearId)
+    expect(semestersList.some((semester) => semester.name === 'Semester 1' && semester.isCurrent)).toBe(true)
+    expect(semestersList.some((semester) => semester.name === 'Orientation day')).toBe(false)
   })
 
   it('lists fee items with date added and due date fields', async () => {

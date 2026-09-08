@@ -18,7 +18,7 @@ import type {
   StudentTranscript,
   SubmitAssessmentRequest,
 } from '@stackedu/shared'
-import { splitFullName, titleAndFirstName } from '@stackedu/shared'
+import { splitFullName, titleAndFirstName, displayFullName, formatDisplayName } from '@stackedu/shared'
 import { env } from '../config/env'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
@@ -55,7 +55,7 @@ import {
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import { createDownloadUrl, fileNameFromStorageKey } from '../lib/storage'
-import { feeDescriptionFromLineItems } from '../lib/fee-description'
+import { feeDescriptionForPayment, feeDescriptionFromLineItems } from '../lib/fee-description'
 import { readPaymentPolicy } from '../lib/payment-policy-store'
 import { initiatePaymentGateway } from './payment-gateway'
 import {
@@ -127,13 +127,18 @@ export async function getStudentProfile(
   userId: string,
 ): Promise<StudentProfile> {
   const row = await requireStudent(institutionId, userId)
-  const firstName = row.firstName ?? titleAndFirstName(row.fullName)
-  const lastName = row.lastName ?? splitFullName(row.fullName).lastName
+  const formattedName = displayFullName({
+    fullName: row.fullName,
+    firstName: row.firstName,
+    lastName: row.lastName,
+  })
+  const firstName = formatDisplayName(row.firstName ?? titleAndFirstName(row.fullName))
+  const lastName = formatDisplayName(row.lastName ?? splitFullName(row.fullName).lastName)
   return {
     studentId: row.studentId,
     userId: row.userId,
     studentNumber: row.studentNumber,
-    fullName: row.fullName,
+    fullName: formattedName,
     firstName,
     lastName,
     email: row.email,
@@ -956,6 +961,7 @@ export async function getStudentReceipt(
       verificationCode: receipts.verificationCode,
       lineItems: invoices.lineItems,
       programmeName: programmes.name,
+      invoiceAmountPaid: invoices.amountPaid,
     })
     .from(payments)
     .leftJoin(receipts, eq(receipts.paymentId, payments.id))
@@ -984,7 +990,12 @@ export async function getStudentReceipt(
     studentNumber: profile.studentNumber,
     studentName: profile.fullName,
     institutionName: institution?.name ?? 'StackEDU',
-    description: feeDescriptionFromLineItems(row.lineItems, fallback),
+    description: feeDescriptionForPayment(
+      row.lineItems,
+      row.amount,
+      Math.max(0, (row.invoiceAmountPaid ?? row.amount) - row.amount),
+      fallback,
+    ),
     verificationCode: row.verificationCode,
   }
 }

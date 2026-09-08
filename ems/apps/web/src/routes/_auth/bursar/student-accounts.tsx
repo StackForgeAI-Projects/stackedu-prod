@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, Download, Lock, Users } from 'lucide-react'
+import { AlertCircle, Download, Eye, Lock, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { BursarShell } from '@/components/BursarShell'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { DataTable } from '@/components/DataTable'
+import { IconActionButton } from '@/components/IconActionButton'
 import { StatTile } from '@/components/StatTile'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
@@ -156,6 +157,20 @@ function StudentAccountsPage() {
                         </span>
                       )
                     },
+                  },
+                  {
+                    id: 'view',
+                    header: '',
+                    className: 'text-right w-12',
+                    cell: (student) => (
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <IconActionButton
+                          label="View account"
+                          icon={Eye}
+                          onClick={() => navigate({ to: '/bursar/student-account', search: { id: student.studentId } })}
+                        />
+                      </div>
+                    ),
                   },
                 ]}
               />

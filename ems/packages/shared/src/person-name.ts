@@ -59,3 +59,42 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
   const last = parts.slice(givenIndex + 1).join(' ') || first
   return { firstName: first, lastName: last }
 }
+
+function capitalizeSegment(segment: string): string {
+  if (!segment) return segment
+  return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase()
+}
+
+function capitalizeWord(word: string): string {
+  return word
+    .split('-')
+    .map((segment) => capitalizeSegment(segment))
+    .join('-')
+}
+
+/** Title-case a person's display name while preserving honorifics. */
+export function formatDisplayName(fullName: string): string {
+  return fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      if (isHonorific(part)) {
+        const bare = part.replace(/\./g, '')
+        return `${bare.charAt(0).toUpperCase()}${bare.slice(1).toLowerCase()}.`
+      }
+      return capitalizeWord(part)
+    })
+    .join(' ')
+}
+
+export function displayFullName(input: {
+  fullName: string
+  firstName?: string | null
+  lastName?: string | null
+}): string {
+  if (input.firstName?.trim() && input.lastName?.trim()) {
+    return formatDisplayName(`${input.firstName.trim()} ${input.lastName.trim()}`)
+  }
+  return formatDisplayName(input.fullName)
+}

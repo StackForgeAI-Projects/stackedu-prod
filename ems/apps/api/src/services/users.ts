@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { UserRole } from '@stackedu/shared'
+import { formatDisplayName } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { userDirectory } from '../db/platform/schema'
 import { users } from '../db/institution/schema'
@@ -55,7 +56,7 @@ export async function createUser(input: CreateUserInput): Promise<CreatedUser> {
     .insert(users)
     .values({
       email,
-      fullName: input.fullName,
+      fullName: formatDisplayName(input.fullName.trim()),
       role: input.role,
       passwordHash,
       phone: input.phone ?? null,

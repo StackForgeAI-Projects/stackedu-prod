@@ -408,6 +408,19 @@ export function isSemesterCalendarCategory(category: string): boolean {
   return category.trim().toLowerCase() === 'semester'
 }
 
+/** Semesters that can carry tuition and fee billing — excludes orientation/career day records. */
+export function isBillingSemesterName(name: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return false
+  if (/(orientation|career)\s*day/.test(normalized)) return false
+  if (/semester\s*[12]\b|first\s+semester|second\s+semester/.test(normalized)) return true
+  return /semester/i.test(normalized) && !/\bday\b/.test(normalized)
+}
+
+export function isTuitionFeeCategory(category: string): boolean {
+  return category.trim().toLowerCase() === 'tuition'
+}
+
 export type AcademicLecturerRow = z.infer<typeof academicLecturerRowSchema>
 export type AcademicResultBatch = z.infer<typeof academicResultBatchSchema>
 export type AcademicSemesterOption = z.infer<typeof academicSemesterOptionSchema>
