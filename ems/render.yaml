@@ -20,7 +20,7 @@ services:
     plan: starter
     branch: main
     rootDir: .
-    buildCommand: bun install --frozen-lockfile && bun run --filter '@stackedu/api' build
+    buildCommand: bun install --frozen-lockfile && bun run --filter '@stackedu/api' build && bun run --filter '@stackedu/api' db:migrate
     startCommand: node apps/api/dist/index.js
     # Liveness only — deliberately does not touch the database, so a brief
     # database problem cannot cause Render to restart a healthy container.

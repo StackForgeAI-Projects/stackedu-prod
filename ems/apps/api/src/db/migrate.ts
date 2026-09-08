@@ -1,5 +1,3 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { asc, eq } from 'drizzle-orm'
@@ -7,12 +5,11 @@ import postgres from 'postgres'
 import { env } from '../config/env'
 import type { Logger } from '../lib/logger'
 import { getPlatformDb } from './connection'
+import { migrationsFolder } from './migration-paths'
 import { institutionDatabases, institutions, migrationHistory } from './platform/schema'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-
-export const PLATFORM_MIGRATIONS_FOLDER = path.resolve(here, '../../drizzle/platform')
-export const INSTITUTION_MIGRATIONS_FOLDER = path.resolve(here, '../../drizzle/institution')
+export const PLATFORM_MIGRATIONS_FOLDER = migrationsFolder('platform')
+export const INSTITUTION_MIGRATIONS_FOLDER = migrationsFolder('institution')
 
 export interface MigrationOutcome {
   target: string

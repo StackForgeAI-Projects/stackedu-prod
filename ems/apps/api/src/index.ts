@@ -2,10 +2,31 @@ import './config/load-dotenv'
 import { serve } from '@hono/node-server'
 import { createApp } from './app'
 import { closeAllConnections, getInstitutionDb, getPlatformDb } from './db/connection'
+import { migrateAllInstitutions, migratePlatform } from './db/migrate'
 import { institutions } from './db/platform/schema'
 import { processFeeDueReminders } from './lib/fee-due-reminders'
 
 const { app, env, logger } = createApp()
+
+async function runPendingMigrations(): Promise<void> {
+  if (env.NODE_ENV !== 'production') return
+
+  const platform = await migratePlatform(logger)
+  if (!platform.succeeded) {
+    logger.error('Refusing to start: platform migration failed', { error: platform.error })
+    process.exit(1)
+  }
+
+  const outcomes = await migrateAllInstitutions({ logger })
+  const failed = outcomes.find((outcome) => !outcome.succeeded)
+  if (failed) {
+    logger.error('Refusing to start: institution migration failed', {
+      institution: failed.target,
+      error: failed.error,
+    })
+    process.exit(1)
+  }
+}
 
 async function runFeeDueReminders() {
   try {
@@ -21,48 +42,54 @@ async function runFeeDueReminders() {
   }
 }
 
-if (env.NODE_ENV !== 'test') {
-  void runFeeDueReminders()
-  setInterval(() => void runFeeDueReminders(), 60 * 60 * 1000).unref()
-}
+async function start() {
+  await runPendingMigrations()
 
-const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
-  logger.info('API listening', {
-    port: info.port,
-    environment: env.NODE_ENV,
-    allowedOrigins: env.ALLOWED_ORIGINS,
+  if (env.NODE_ENV !== 'test') {
+    void runFeeDueReminders()
+    setInterval(() => void runFeeDueReminders(), 60 * 60 * 1000).unref()
+  }
+
+  const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+    logger.info('API listening', {
+      port: info.port,
+      environment: env.NODE_ENV,
+      allowedOrigins: env.ALLOWED_ORIGINS,
+    })
   })
-})
 
-/**
- * Render sends SIGTERM before replacing a container. Finishing in-flight
- * requests and closing pools cleanly is what makes a deploy invisible to
- * someone who happens to be submitting a form at that moment.
- */
-let shuttingDown = false
+  /**
+   * Render sends SIGTERM before replacing a container. Finishing in-flight
+   * requests and closing pools cleanly is what makes a deploy invisible to
+   * someone who happens to be submitting a form at that moment.
+   */
+  let shuttingDown = false
 
-async function shutdown(signal: string) {
-  if (shuttingDown) return
-  shuttingDown = true
-  logger.info('Shutting down', { signal })
+  async function shutdown(signal: string) {
+    if (shuttingDown) return
+    shuttingDown = true
+    logger.info('Shutting down', { signal })
 
-  const forceExit = setTimeout(() => {
-    logger.error('Shutdown timed out, exiting immediately')
-    process.exit(1)
-  }, 15_000)
-  forceExit.unref()
+    const forceExit = setTimeout(() => {
+      logger.error('Shutdown timed out, exiting immediately')
+      process.exit(1)
+    }, 15_000)
+    forceExit.unref()
 
-  server.close(async () => {
-    await closeAllConnections()
-    clearTimeout(forceExit)
-    logger.info('Shutdown complete')
-    process.exit(0)
-  })
+    server.close(async () => {
+      await closeAllConnections()
+      clearTimeout(forceExit)
+      logger.info('Shutdown complete')
+      process.exit(0)
+    })
+  }
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+  process.on('SIGINT', () => void shutdown('SIGINT'))
 }
-
-process.on('SIGTERM', () => void shutdown('SIGTERM'))
-process.on('SIGINT', () => void shutdown('SIGINT'))
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled promise rejection', { error: reason })
 })
+
+void start()
