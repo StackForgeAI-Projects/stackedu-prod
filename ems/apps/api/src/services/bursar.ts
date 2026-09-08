@@ -51,6 +51,7 @@ import { feeDescriptionFromLineItems } from '../lib/fee-description'
 import { badRequest, forbidden, notFound } from '../lib/errors'
 import {
   applyFeeItemsToStudents,
+  revokeUnpaidFeeItemFromInvoices,
   type ApplicableFeeItemRow,
 } from '../lib/fee-invoice'
 import { audienceLabel, encodeAudience, resolveAudienceUserIds } from './announcement-audience'
@@ -540,8 +541,24 @@ export async function deleteBursarFeeItem(
   itemId: string,
 ): Promise<void> {
   const { db } = await requireBursar(institutionId, userId)
-  const [existing] = await db.select({ id: feeItems.id }).from(feeItems).where(eq(feeItems.id, itemId)).limit(1)
+  const [existing] = await db
+    .select({
+      id: feeItems.id,
+      name: feeItems.name,
+      semesterId: feeStructures.semesterId,
+    })
+    .from(feeItems)
+    .innerJoin(feeStructures, eq(feeItems.feeStructureId, feeStructures.id))
+    .where(eq(feeItems.id, itemId))
+    .limit(1)
   if (!existing) throw notFound('That fee item')
+
+  const { removedCount, keptCount } = await revokeUnpaidFeeItemFromInvoices(db, {
+    feeItemId: existing.id,
+    feeName: existing.name,
+    semesterId: existing.semesterId,
+  })
+
   await db.delete(feeItems).where(eq(feeItems.id, itemId))
   await writeAudit({
     institutionId,
@@ -551,6 +568,7 @@ export async function deleteBursarFeeItem(
     action: 'fee_item.delete',
     targetType: 'fee_item',
     targetId: itemId,
+    metadata: { removedFromInvoices: removedCount, keptOnInvoices: keptCount },
   })
 }
 

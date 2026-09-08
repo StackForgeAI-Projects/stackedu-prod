@@ -89,6 +89,107 @@ async function chargeStudentAccount(db: InstitutionDb, studentId: string, amount
   })
 }
 
+async function adjustStudentAccountCharge(db: InstitutionDb, studentId: string, amountDelta: number): Promise<void> {
+  if (amountDelta === 0) return
+
+  const [account] = await db
+    .select()
+    .from(studentFeeAccounts)
+    .where(eq(studentFeeAccounts.studentId, studentId))
+    .limit(1)
+
+  if (!account) return
+
+  const totalCharged = Math.max(account.totalPaid, account.totalCharged + amountDelta)
+  await db
+    .update(studentFeeAccounts)
+    .set({
+      totalCharged,
+      balance: totalCharged - account.totalPaid,
+    })
+    .where(eq(studentFeeAccounts.id, account.id))
+}
+
+export function allocateInvoicePaymentsToLineItems(
+  lineItems: InvoiceLineItemWithFee[],
+  amountPaid: number,
+): number[] {
+  let remaining = amountPaid
+  return lineItems.map((item) => {
+    const applied = Math.min(remaining, item.amount)
+    remaining -= applied
+    return applied
+  })
+}
+
+function findLineItemIndex(
+  lineItems: InvoiceLineItemWithFee[],
+  feeItemId: string,
+  feeName: string,
+): number {
+  const byId = lineItems.findIndex((line) => line.feeItemId === feeItemId)
+  if (byId >= 0) return byId
+  return lineItems.findIndex((line) => !line.feeItemId && line.name === feeName)
+}
+
+function invoiceStatusFromAmounts(
+  amountDue: number,
+  amountPaid: number,
+): 'Issued' | 'PartiallyPaid' | 'Paid' | 'Draft' {
+  if (amountDue <= 0) return amountPaid > 0 ? 'Paid' : 'Issued'
+  if (amountPaid >= amountDue) return 'Paid'
+  if (amountPaid > 0) return 'PartiallyPaid'
+  return 'Issued'
+}
+
+export async function revokeUnpaidFeeItemFromInvoices(
+  db: InstitutionDb,
+  input: { feeItemId: string; feeName: string; semesterId: string | null },
+): Promise<{ removedCount: number; keptCount: number }> {
+  const invoiceRows = await db
+    .select()
+    .from(invoices)
+    .where(input.semesterId ? eq(invoices.semesterId, input.semesterId) : undefined)
+
+  let removedCount = 0
+  let keptCount = 0
+
+  for (const invoice of invoiceRows) {
+    const lineItems = (invoice.lineItems ?? []) as InvoiceLineItemWithFee[]
+    const index = findLineItemIndex(lineItems, input.feeItemId, input.feeName)
+    if (index < 0) continue
+
+    const allocations = allocateInvoicePaymentsToLineItems(lineItems, invoice.amountPaid)
+    if (allocations[index]! > 0) {
+      keptCount += 1
+      continue
+    }
+
+    const removedAmount = lineItems[index]!.amount
+    const newLineItems = lineItems.filter((_, itemIndex) => itemIndex !== index)
+
+    if (!newLineItems.length && invoice.amountPaid === 0) {
+      await db.delete(invoices).where(eq(invoices.id, invoice.id))
+    } else {
+      const amountDue = invoiceAmountDue(newLineItems)
+      await db
+        .update(invoices)
+        .set({
+          lineItems: newLineItems,
+          amountDue,
+          dueDate: newLineItems.length ? earliestInvoiceDueDate(newLineItems) : null,
+          status: invoiceStatusFromAmounts(amountDue, invoice.amountPaid),
+        })
+        .where(eq(invoices.id, invoice.id))
+    }
+
+    await adjustStudentAccountCharge(db, invoice.studentId, -removedAmount)
+    removedCount += 1
+  }
+
+  return { removedCount, keptCount }
+}
+
 export async function applyFeeItemsToStudents(
   db: InstitutionDb,
   semesterId: string,

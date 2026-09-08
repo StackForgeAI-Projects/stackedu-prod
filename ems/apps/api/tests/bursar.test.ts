@@ -23,6 +23,7 @@ import { AppError } from '../src/lib/errors'
 import {
   createBursarAnnouncement,
   createBursarFeeItem,
+  deleteBursarFeeItem,
   getBursarDashboard,
   getBursarProfile,
   getBursarStudentAccount,
@@ -473,6 +474,167 @@ describe('bursar portal', () => {
 
     expect(invoice?.amountDue).toBe(135_000)
     expect(invoice?.lineItems).toHaveLength(2)
+  })
+
+  it('removes an unpaid deleted fee from the student invoice and balance', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const deleteStudentUser = await createUser({
+      institutionId,
+      email: 'delete-fee-student@btu.test',
+      fullName: 'Delete Fee Student',
+      role: 'Student',
+      password: 'Student#2026',
+    })
+    const [deleteStudent] = await db
+      .insert(students)
+      .values({
+        userId: deleteStudentUser.id,
+        studentNumber: 'BTU-2026-005',
+        programmeId,
+        yearOfStudy: 1,
+      })
+      .returning()
+
+    const created = await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Sports Levy',
+      category: 'Levy',
+      amount: 20_000,
+      dueDate: '2026-12-10',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    const { getStudentFees } = await import('../src/services/student')
+    const before = await getStudentFees(institutionId, deleteStudentUser.id)
+    expect(before.invoices.some((invoice) => invoice.lineItems.some((line) => line.name === 'Sports Levy'))).toBe(true)
+    expect(before.balance).toBeGreaterThanOrEqual(20_000)
+
+    await deleteBursarFeeItem(institutionId, bursar.id, bursar, created.id)
+
+    const after = await getStudentFees(institutionId, deleteStudentUser.id)
+    expect(after.invoices.some((invoice) => invoice.lineItems.some((line) => line.name === 'Sports Levy'))).toBe(false)
+
+    const [account] = await db
+      .select({ balance: studentFeeAccounts.balance, totalCharged: studentFeeAccounts.totalCharged })
+      .from(studentFeeAccounts)
+      .where(eq(studentFeeAccounts.studentId, deleteStudent!.id))
+      .limit(1)
+    expect(account?.balance ?? 0).toBeLessThan(before.balance)
+  })
+
+  it('keeps a deleted fee on the student invoice when payment was made on it', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const paidStudentUser = await createUser({
+      institutionId,
+      email: 'paid-fee-student@btu.test',
+      fullName: 'Paid Fee Student',
+      role: 'Student',
+      password: 'Student#2026',
+    })
+    const [paidStudent] = await db
+      .insert(students)
+      .values({
+        userId: paidStudentUser.id,
+        studentNumber: 'BTU-2026-006',
+        programmeId,
+        yearOfStudy: 1,
+      })
+      .returning()
+
+    const created = await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Exam Fee',
+      category: 'Other',
+      amount: 25_000,
+      dueDate: '2026-12-05',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    const { payStudentFees, getStudentFees } = await import('../src/services/student')
+    await payStudentFees(institutionId, paidStudentUser.id, {
+      amount: 25_000,
+      method: 'MoMo',
+      payerPhone: '0780000000',
+    })
+
+    await deleteBursarFeeItem(institutionId, bursar.id, bursar, created.id)
+
+    const after = await getStudentFees(institutionId, paidStudentUser.id)
+    expect(after.invoices.some((invoice) => invoice.lineItems.some((line) => line.name === 'Exam Fee'))).toBe(true)
+
+    const [account] = await db
+      .select({ totalPaid: studentFeeAccounts.totalPaid })
+      .from(studentFeeAccounts)
+      .where(eq(studentFeeAccounts.studentId, paidStudent!.id))
+      .limit(1)
+    expect(account?.totalPaid).toBeGreaterThanOrEqual(25_000)
+  })
+
+  it('removes only the unpaid fee when another line item on the invoice was paid first', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const splitStudentUser = await createUser({
+      institutionId,
+      email: 'split-fee-student@btu.test',
+      fullName: 'Split Fee Student',
+      role: 'Student',
+      password: 'Student#2026',
+    })
+    const [splitStudent] = await db
+      .insert(students)
+      .values({
+        userId: splitStudentUser.id,
+        studentNumber: 'BTU-2026-007',
+        programmeId,
+        yearOfStudy: 1,
+      })
+      .returning()
+
+    const primary = await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Split Primary Levy',
+      category: 'Levy',
+      amount: 100_000,
+      dueDate: '2026-12-01',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+    const secondary = await createBursarFeeItem(institutionId, bursar.id, bursar, {
+      name: 'Split Secondary Levy',
+      category: 'Levy',
+      amount: 35_000,
+      dueDate: '2026-12-20',
+      programmeId,
+      yearOfStudy: 1,
+      semesterId,
+    })
+
+    await recordBursarManualPayment(institutionId, bursar.id, bursar, splitStudent!.id, {
+      amount: 50_000,
+      method: 'BankTransfer',
+      description: 'Partial levy payment',
+      notes: 'Applied to the first levy line item',
+    })
+
+    await deleteBursarFeeItem(institutionId, bursar.id, bursar, secondary.id)
+
+    const [invoice] = await db
+      .select({ lineItems: invoices.lineItems, amountDue: invoices.amountDue, amountPaid: invoices.amountPaid })
+      .from(invoices)
+      .where(and(eq(invoices.studentId, splitStudent!.id), eq(invoices.semesterId, semesterId)))
+      .limit(1)
+
+    expect(invoice).toBeDefined()
+    expect(invoice?.lineItems).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Split Primary Levy', amount: 100_000 })]),
+    )
+    expect(invoice?.lineItems).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({ name: 'Split Secondary Levy' })]),
+    )
+    expect(invoice?.amountDue).toBe(100_000)
+    expect(invoice?.amountPaid).toBe(50_000)
+    expect(primary.id).toBeTruthy()
   })
 
   it('issues semester invoices from active fee items', async () => {
