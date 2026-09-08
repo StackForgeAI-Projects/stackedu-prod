@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm'
-import { academicYears, courses, departments, semesters } from '../institution/schema/academic'
+import { academicYears, courses, departments, programmes, semesters } from '../institution/schema/academic'
 import { assessments, resultBatches, results } from '../institution/schema/assessment'
 import { notifications } from '../institution/schema/communication'
-import { invoices, payments, receipts, studentFeeAccounts } from '../institution/schema/finance'
+import { invoices, payments, receipts, studentFeeAccounts, feeItems, feeStructures } from '../institution/schema/finance'
 import { libraryResources } from '../institution/schema/library'
 import { users } from '../institution/schema/people'
 import { enrolments, studentProfiles, students } from '../institution/schema/students'
@@ -17,6 +17,7 @@ import {
   timetableSlots,
 } from '../institution/schema/teaching'
 import { getInstitutionDb } from '../connection'
+import { feeItemsApplyToStudent, invoicePayloadFromFeeItems } from '../../lib/fee-invoice'
 
 const COURSE_CATALOGUE = [
   { code: 'CSC101', name: 'Introduction to Computer Science', credits: 3, year: 1 },
@@ -381,68 +382,65 @@ export async function seedStudentPortal(institutionId: string, studentUserId: st
     .from(studentFeeAccounts)
     .where(eq(studentFeeAccounts.studentId, student.id))
     .limit(1)
-  if (!account) {
-    await db.insert(studentFeeAccounts).values({
-      studentId: student.id,
-      totalCharged: 450_000,
-      totalPaid: 405_000,
-      balance: 45_000,
-    })
+
+  // Reset demo payment history so Jean-Paul starts with a clean fee account.
+  await db.delete(receipts).where(eq(receipts.studentId, student.id))
+  await db.delete(payments).where(eq(payments.studentId, student.id))
+  await db.delete(invoices).where(eq(invoices.studentId, student.id))
+  if (account) {
+    await db.delete(studentFeeAccounts).where(eq(studentFeeAccounts.studentId, student.id))
   }
 
-  const [invoice] = await db
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(eq(invoices.studentId, student.id))
-    .limit(1)
-  if (!invoice) {
-    const [created] = await db
-      .insert(invoices)
-      .values({
-        invoiceNumber: 'INV-SFU-2026-0001',
-        studentId: student.id,
-        semesterId,
-        amountDue: 450_000,
-        amountPaid: 405_000,
-        status: 'PartiallyPaid',
-        issuedAt: new Date().toISOString(),
-        dueDate: '2026-01-31',
-        lineItems: [
-          { name: 'Tuition Fee — Semester 1', amount: 350_000 },
-          { name: 'Administrative Levy', amount: 50_000 },
-          { name: 'Student Union Fee', amount: 25_000 },
-          { name: 'Library Fee', amount: 25_000 },
-        ],
-      })
-      .returning({ id: invoices.id })
+  const feeRows = await db
+    .select({
+      itemId: feeItems.id,
+      name: feeItems.name,
+      amount: feeItems.amount,
+      dueDate: feeItems.dueDate,
+      programmeId: feeStructures.programmeId,
+      yearOfStudy: feeStructures.yearOfStudy,
+      semesterId: feeStructures.semesterId,
+    })
+    .from(feeItems)
+    .innerJoin(feeStructures, eq(feeItems.feeStructureId, feeStructures.id))
+    .where(eq(feeStructures.isActive, true))
 
-    const [payment] = await db
-      .insert(payments)
-      .values({
-        reference: 'PAY-SFU-2026-0001',
-        studentId: student.id,
-        invoiceId: created!.id,
-        amount: 405_000,
-        method: 'MoMo',
-        status: 'Completed',
-        paidAt: new Date().toISOString(),
-      })
-      .onConflictDoNothing({ target: payments.reference })
-      .returning({ id: payments.id })
+  const applicableItems = feeRows
+    .filter((row) => !row.semesterId || row.semesterId === semesterId)
+    .map((row) => ({
+      itemId: row.itemId,
+      name: row.name,
+      amount: row.amount,
+      dueDate: row.dueDate,
+      programmeId: row.programmeId,
+      yearOfStudy: row.yearOfStudy,
+    }))
 
-    if (payment) {
-      await db
-        .insert(receipts)
-        .values({
-          receiptNumber: 'RCT-2026-0001',
-          paymentId: payment.id,
-          studentId: student.id,
-          amount: 405_000,
-          issuedAt: new Date().toISOString(),
-          verificationCode: 'VR-20260001',
-        })
-        .onConflictDoNothing({ target: receipts.receiptNumber })
-    }
+  const studentItems = feeItemsApplyToStudent(applicableItems, {
+    programmeId: student.programmeId,
+    yearOfStudy: student.yearOfStudy,
+  })
+
+  if (studentItems.length && studentItems.every((item) => item.dueDate)) {
+    const { lineItems, amountDue, dueDate } = invoicePayloadFromFeeItems(studentItems)
+    await db.insert(studentFeeAccounts).values({
+      studentId: student.id,
+      totalCharged: amountDue,
+      totalPaid: 0,
+      balance: amountDue,
+    })
+
+    await db.insert(invoices).values({
+      invoiceNumber: 'INV-SFU-2026-0001',
+      studentId: student.id,
+      semesterId,
+      amountDue,
+      amountPaid: 0,
+      status: 'Issued',
+      issuedAt: new Date().toISOString(),
+      dueDate,
+      lineItems,
+    })
   }
 
   const [existingNotif] = await db

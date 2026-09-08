@@ -55,7 +55,14 @@ import {
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import { createDownloadUrl, fileNameFromStorageKey } from '../lib/storage'
-import { isIntegrationEnabled } from '../lib/integrations'
+import { feeDescriptionFromLineItems } from '../lib/fee-description'
+import { readPaymentPolicy } from '../lib/payment-policy-store'
+import { initiatePaymentGateway } from './payment-gateway'
+import {
+  classifyFeeKindFromLineItems,
+  allowsPartialPayment,
+  validatePaymentAmount,
+} from '@stackedu/shared'
 
 const MAX_CREDITS = 21
 
@@ -82,6 +89,7 @@ export async function requireStudent(institutionId: string, userId: string) {
       admittedAt: students.admittedAt,
       programmeName: programmes.name,
       programmeCode: programmes.code,
+      departmentId: departments.id,
       facultyName: faculties.name,
       firstName: studentProfiles.firstName,
       lastName: studentProfiles.lastName,
@@ -765,8 +773,10 @@ export async function getStudentTranscript(
 }
 
 export async function getStudentFees(institutionId: string, userId: string): Promise<StudentFees> {
+  const studentRow = await requireStudent(institutionId, userId)
   const profile = await getStudentProfile(institutionId, userId)
   const db = await getInstitutionDb(institutionId)
+  const policy = await readPaymentPolicy(db)
 
   const [account] = await db
     .select()
@@ -796,19 +806,35 @@ export async function getStudentFees(institutionId: string, userId: string): Pro
     .where(eq(payments.studentId, profile.studentId))
     .orderBy(desc(payments.createdAt))
 
+  const fallbackDescription = studentRow.programmeName
+    ? `${studentRow.programmeName} fees`
+    : 'Tuition and fees'
+
   return {
     totalCharged: account?.totalCharged ?? 0,
     totalPaid: account?.totalPaid ?? 0,
     balance: account?.balance ?? 0,
-    invoices: invoiceRows.map((row) => ({
-      id: row.id,
-      invoiceNumber: row.invoiceNumber,
-      amountDue: row.amountDue,
-      amountPaid: row.amountPaid,
-      status: row.status,
-      dueDate: row.dueDate,
-      lineItems: row.lineItems ?? [],
-    })),
+    invoices: invoiceRows.map((row) => {
+      const feeKind = classifyFeeKindFromLineItems(row.lineItems)
+      const outstanding = row.amountDue - row.amountPaid
+      return {
+        id: row.id,
+        invoiceNumber: row.invoiceNumber,
+        description: feeDescriptionFromLineItems(row.lineItems, fallbackDescription),
+        amountDue: row.amountDue,
+        amountPaid: row.amountPaid,
+        outstanding,
+        status: row.status,
+        dueDate: row.dueDate,
+        feeKind,
+        allowPartial: allowsPartialPayment(policy, {
+          feeKind,
+          departmentId: studentRow.departmentId,
+          yearOfStudy: studentRow.yearOfStudy,
+        }),
+        lineItems: row.lineItems ?? [],
+      }
+    }),
     payments: paymentRows,
   }
 }
@@ -818,37 +844,39 @@ export async function payStudentFees(
   userId: string,
   input: { invoiceId?: string; amount: number; method: PaymentMethod; payerPhone?: string },
 ) {
+  const studentRow = await requireStudent(institutionId, userId)
   const profile = await getStudentProfile(institutionId, userId)
   const db = await getInstitutionDb(institutionId)
+  const policy = await readPaymentPolicy(db)
   const fees = await getStudentFees(institutionId, userId)
 
   const invoice = input.invoiceId
     ? fees.invoices.find((row) => row.id === input.invoiceId)
-    : fees.invoices.find((row) => row.amountDue - row.amountPaid > 0)
+    : fees.invoices.find((row) => row.outstanding > 0)
 
   if (!invoice) throw badRequest('There is no invoice to pay.')
-  const outstanding = invoice.amountDue - invoice.amountPaid
-  if (input.amount > outstanding) throw badRequest('That amount is more than the outstanding balance.')
+  const outstanding = invoice.outstanding
+
+  const validation = validatePaymentAmount({
+    amount: input.amount,
+    outstanding,
+    policy,
+    context: {
+      feeKind: invoice.feeKind,
+      departmentId: studentRow.departmentId,
+      yearOfStudy: studentRow.yearOfStudy,
+    },
+  })
+  if (!validation.ok) throw badRequest(validation.message)
 
   if ((input.method === 'MoMo' || input.method === 'Airtel') && !input.payerPhone) {
     throw badRequest('Enter the mobile money number that will pay.')
   }
 
-  const sandboxComplete =
-    env().PAYMENT_MODE === 'sandbox' &&
-    (input.method === 'MoMo' || input.method === 'Airtel' || input.method === 'Card')
-
-  if (env().PAYMENT_MODE === 'live') {
-    if (input.method === 'MoMo' && !(await isIntegrationEnabled(institutionId, 'MTNMoMo'))) {
-      throw badRequest('MTN MoMo payments are currently turned off. Contact ICT to enable them.')
-    }
-    if (input.method === 'Airtel' && !(await isIntegrationEnabled(institutionId, 'AirtelMoney'))) {
-      throw badRequest('Airtel Money payments are currently turned off. Contact ICT to enable them.')
-    }
-  }
-
   const reference = `PAY-${profile.studentNumber}-${randomInt(1000, 9999)}`
   const now = new Date().toISOString()
+  const gateway = await initiatePaymentGateway(institutionId, input.method, reference)
+  const completeNow = gateway.completeImmediately
 
   const [payment] = await db
     .insert(payments)
@@ -858,13 +886,13 @@ export async function payStudentFees(
       invoiceId: invoice.id,
       amount: input.amount,
       method: input.method,
-      status: sandboxComplete ? 'Completed' : 'Pending',
-      gatewayReference: sandboxComplete ? `sandbox-${reference}` : null,
-      paidAt: sandboxComplete ? now : null,
+      status: completeNow ? 'Completed' : 'Pending',
+      gatewayReference: gateway.gatewayReference,
+      paidAt: completeNow ? now : null,
     })
     .returning({ id: payments.id, reference: payments.reference })
 
-  if (sandboxComplete) {
+  if (completeNow) {
     const [receipt] = await db
       .insert(receipts)
       .values({
@@ -925,9 +953,15 @@ export async function getStudentReceipt(
       amount: payments.amount,
       method: payments.method,
       paidAt: payments.paidAt,
+      verificationCode: receipts.verificationCode,
+      lineItems: invoices.lineItems,
+      programmeName: programmes.name,
     })
     .from(payments)
     .leftJoin(receipts, eq(receipts.paymentId, payments.id))
+    .leftJoin(invoices, eq(invoices.id, payments.invoiceId))
+    .innerJoin(students, eq(students.id, payments.studentId))
+    .innerJoin(programmes, eq(programmes.id, students.programmeId))
     .where(and(eq(payments.id, paymentId), eq(payments.studentId, profile.studentId)))
     .limit(1)
 
@@ -939,6 +973,8 @@ export async function getStudentReceipt(
     .where(eq(institutions.id, institutionId))
     .limit(1)
 
+  const fallback = row.programmeName ? `${row.programmeName} fees` : 'Tuition and fees'
+
   return {
     receiptNumber: row.receiptNumber ?? row.reference,
     reference: row.reference,
@@ -948,7 +984,8 @@ export async function getStudentReceipt(
     studentNumber: profile.studentNumber,
     studentName: profile.fullName,
     institutionName: institution?.name ?? 'StackEDU',
-    description: 'Tuition and fees',
+    description: feeDescriptionFromLineItems(row.lineItems, fallback),
+    verificationCode: row.verificationCode,
   }
 }
 

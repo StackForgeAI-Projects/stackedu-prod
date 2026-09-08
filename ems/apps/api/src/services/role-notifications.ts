@@ -13,6 +13,7 @@ export type InAppNotificationInput = {
   body: string
   category: string
   actionUrl?: string | null
+  metadata?: Record<string, unknown>
 }
 
 function formatCourseCode(code: string): string {
@@ -30,6 +31,7 @@ export async function notifyUsers(db: InstitutionDb, items: InAppNotificationInp
       body: item.body,
       category: item.category,
       actionUrl: item.actionUrl ?? null,
+      metadata: item.metadata ?? null,
     })),
   )
 }

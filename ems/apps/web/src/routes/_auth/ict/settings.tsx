@@ -36,6 +36,9 @@ function SystemSettingsPage() {
     location: '',
     allowEditAfterSubmit: true,
     editWindowMinutes: 60,
+    applicationFullOnly: true,
+    tuitionFullOnly: false,
+    levyFullOnly: false,
   })
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -52,6 +55,9 @@ function SystemSettingsPage() {
         location: data.location ?? '',
         allowEditAfterSubmit: data.attendancePolicy.allowEditAfterSubmit,
         editWindowMinutes: data.attendancePolicy.editWindowMinutes,
+        applicationFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'ApplicationFee')?.mode === 'FullOnly',
+        tuitionFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'TuitionFee')?.mode === 'FullOnly',
+        levyFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'Levy')?.mode === 'FullOnly',
       })
       setLogoPreview(data.logoUrl)
     }
@@ -78,6 +84,14 @@ function SystemSettingsPage() {
         attendancePolicy: {
           allowEditAfterSubmit: form.allowEditAfterSubmit,
           editWindowMinutes: form.editWindowMinutes,
+        },
+        paymentPolicy: {
+          rules: [
+            { feeKind: 'ApplicationFee', mode: form.applicationFullOnly ? 'FullOnly' : 'PartialAllowed' },
+            { feeKind: 'TuitionFee', mode: form.tuitionFullOnly ? 'FullOnly' : 'PartialAllowed' },
+            { feeKind: 'Levy', mode: form.levyFullOnly ? 'FullOnly' : 'PartialAllowed' },
+            { feeKind: 'Other', mode: 'PartialAllowed' },
+          ],
         },
       })
     },
@@ -241,6 +255,59 @@ function SystemSettingsPage() {
                   </p>
                 </div>
               ) : null}
+            </div>
+
+            <div
+              className="rounded-xl p-4 flex flex-col gap-4"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)' }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
+                  Payment collection
+                </p>
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Control whether applicants and students must pay certain fees in full or may pay in instalments.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="application-full">Application fee — full payment only</Label>
+                  <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                    Applicants must pay the entire application fee at once.
+                  </p>
+                </div>
+                <Switch
+                  id="application-full"
+                  checked={form.applicationFullOnly}
+                  onCheckedChange={(checked) => setForm({ ...form, applicationFullOnly: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="tuition-full">Tuition fees — full payment only</Label>
+                  <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                    When off, students may pay tuition in part payments (instalments).
+                  </p>
+                </div>
+                <Switch
+                  id="tuition-full"
+                  checked={form.tuitionFullOnly}
+                  onCheckedChange={(checked) => setForm({ ...form, tuitionFullOnly: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="levy-full">Levies — full payment only</Label>
+                  <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                    Library, administrative and other levies.
+                  </p>
+                </div>
+                <Switch
+                  id="levy-full"
+                  checked={form.levyFullOnly}
+                  onCheckedChange={(checked) => setForm({ ...form, levyFullOnly: checked })}
+                />
+              </div>
             </div>
 
             <Button type="submit" disabled={mutation.isPending}>

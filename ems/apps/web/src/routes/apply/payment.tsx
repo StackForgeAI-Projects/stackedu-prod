@@ -41,7 +41,7 @@ const STEPS: ApplyStep[] = [
   { id: 7, label: 'Application Fee'     },
 ]
 
-type PayMethod = 'MoMo' | 'Airtel' | 'BankTransfer'
+type PayMethod = 'MoMo' | 'Airtel' | 'Card' | 'BankTransfer'
 
 interface MethodCard {
   id:          PayMethod
@@ -51,8 +51,9 @@ interface MethodCard {
 }
 
 const METHODS: MethodCard[] = [
-  { id: 'MoMo',          name: 'MTN MoMo',      description: 'USSD push to your MTN number',    dotColor: '#F59E0B' },
-  { id: 'Airtel',        name: 'Airtel Money',  description: 'USSD push to your Airtel number', dotColor: '#DC2626' },
+  { id: 'MoMo',          name: 'MTN MoMo',      description: 'PawaPay when live keys are configured',    dotColor: '#F59E0B' },
+  { id: 'Airtel',        name: 'Airtel Money',  description: 'PawaPay when live keys are configured', dotColor: '#DC2626' },
+  { id: 'Card',          name: 'Card',          description: 'Flutterwave when live keys are configured', dotColor: '#2563EB' },
   { id: 'BankTransfer',  name: 'Bank Transfer', description: 'Direct deposit or wire transfer', dotColor: 'var(--muted-foreground)' },
 ]
 
@@ -73,6 +74,9 @@ function ApplyPaymentPage() {
   const { user } = useCurrentUser()
   const [selected, setSelected] = useState<PayMethod | null>(null)
   const [payerPhone, setPayerPhone] = useState('')
+  const [cardNumber, setCardNumber] = useState('')
+  const [cardExpiry, setCardExpiry] = useState('')
+  const [cardCvv, setCardCvv] = useState('')
   const { application, refetch } = useApplication()
 
   const alreadyPaid = application?.payment?.status === 'Completed'
@@ -137,6 +141,8 @@ function ApplyPaymentPage() {
 
   const loading = payAndSubmit.isPending || submitOnly.isPending
   const mobileSelected = selected === 'MoMo' || selected === 'Airtel'
+  const cardReady = selected !== 'Card'
+    || (cardNumber.replace(/\s/g, '').length >= 12 && cardExpiry.trim().length >= 4 && cardCvv.trim().length >= 3)
 
   return (
     <ApplyLayout
@@ -207,7 +213,7 @@ function ApplyPaymentPage() {
       {!alreadyPaid && (
         <>
           <p className="t-label mb-3" style={{ color: 'var(--muted-foreground)' }}>SELECT PAYMENT METHOD</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             {METHODS.map((m) => (
               <button
                 key={m.id}
@@ -250,6 +256,16 @@ function ApplyPaymentPage() {
               />
             )}
             {selected === 'BankTransfer' && <BankDetails />}
+            {selected === 'Card' && (
+              <CardDetails
+                cardNumber={cardNumber}
+                setCardNumber={setCardNumber}
+                cardExpiry={cardExpiry}
+                setCardExpiry={setCardExpiry}
+                cardCvv={cardCvv}
+                setCardCvv={setCardCvv}
+              />
+            )}
           </div>
         </>
       )}
@@ -269,7 +285,8 @@ function ApplyPaymentPage() {
             disabled={
               !selected ||
               loading ||
-              (mobileSelected && payerPhone.replace(/\D/g, '').length < 9)
+              (mobileSelected && payerPhone.replace(/\D/g, '').length < 9) ||
+              !cardReady
             }
             onClick={() => payAndSubmit.mutate()}
           >
@@ -335,6 +352,68 @@ function MoMoDetails({
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
+      </div>
+    </div>
+  )
+}
+
+function CardDetails({
+  cardNumber,
+  setCardNumber,
+  cardExpiry,
+  setCardExpiry,
+  cardCvv,
+  setCardCvv,
+}: {
+  cardNumber: string
+  setCardNumber: (value: string) => void
+  cardExpiry: string
+  setCardExpiry: (value: string) => void
+  cardCvv: string
+  setCardCvv: (value: string) => void
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3 p-4 rounded-lg mb-3"
+      style={{
+        backgroundColor: 'rgba(13,122,40,0.04)',
+        border: '1px solid rgba(13,122,40,0.15)',
+      }}
+    >
+      <p className="t-label" style={{ color: 'var(--muted-foreground)' }}>CARD DETAILS</p>
+      <p className="text-sm" style={{ color: 'var(--foreground)', lineHeight: 1.5 }}>
+        Enter card details. Sandbox accepts any valid-looking test card.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="card-number">Card number</Label>
+        <Input
+          id="card-number"
+          inputMode="numeric"
+          placeholder="4111 1111 1111 1111"
+          value={cardNumber}
+          onChange={(e) => setCardNumber(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="card-expiry">Expiry</Label>
+          <Input
+            id="card-expiry"
+            placeholder="MM/YY"
+            value={cardExpiry}
+            onChange={(e) => setCardExpiry(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="card-cvv">CVV</Label>
+          <Input
+            id="card-cvv"
+            inputMode="numeric"
+            placeholder="123"
+            value={cardCvv}
+            onChange={(e) => setCardCvv(e.target.value)}
+          />
+        </div>
       </div>
     </div>
   )

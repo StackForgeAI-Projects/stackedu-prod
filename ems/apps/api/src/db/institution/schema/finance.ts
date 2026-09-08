@@ -60,6 +60,8 @@ export const feeItems = pgTable(
     category: text('category').notNull(),
     amount: money('amount').notNull(),
     isMandatory: boolean('is_mandatory').notNull().default(true),
+    /** Payment deadline set by the Bursar for this fee item. */
+    dueDate: date('due_date'),
     ...timestamps(),
   },
   (t) => [index('fee_items_structure_idx').on(t.feeStructureId)],
@@ -106,7 +108,7 @@ export const invoices = pgTable(
     issuedAt: timestamp('issued_at', { withTimezone: true, mode: 'string' }),
     dueDate: date('due_date'),
     /** Snapshot of the fee items at issue time, so later price changes cannot alter an issued invoice. */
-    lineItems: jsonb('line_items').$type<Array<{ name: string; amount: number }>>(),
+    lineItems: jsonb('line_items').$type<Array<{ name: string; amount: number; dueDate: string }>>(),
     ...timestamps(),
   },
   (t) => [

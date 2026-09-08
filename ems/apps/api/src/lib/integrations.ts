@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { getInstitutionDb } from '../db/connection'
 import { integrations } from '../db/institution/schema/settings'
 
-export type IntegrationProvider = 'Resend' | 'MTNMoMo' | 'AirtelMoney'
+export type IntegrationProvider = 'Resend' | 'MTNMoMo' | 'AirtelMoney' | 'PawaPay' | 'Flutterwave' | 'Twilio'
 
 /** Whether an ICT integration toggle is on for this institution. */
 export async function isIntegrationEnabled(

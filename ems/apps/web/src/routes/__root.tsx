@@ -1,7 +1,9 @@
-import { createRootRoute, ErrorComponent, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { Toaster } from 'sonner'
 import { InactivityLogoutNotice } from '@/components/InactivityLogoutNotice'
+import { PortalErrorPanel } from '@/components/PortalErrorPanel'
+import { dashboardHrefForPath } from '@/lib/auth/portals'
 import { handleChunkLoadError, isChunkLoadError } from '@/lib/chunk-reload'
 
 export const Route = createRootRoute({
@@ -16,18 +18,25 @@ function RootError({ error }: { error: Error }) {
 
   if (isChunkLoadError(error)) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center p-6"
-        style={{ backgroundColor: 'var(--background)' }}
-      >
-        <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-          Loading the latest version…
-        </p>
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--background)' }}>
+        <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading the latest version…</p>
       </div>
     )
   }
 
-  return <ErrorComponent error={error} />
+  const dashboardHref = typeof window !== 'undefined'
+    ? dashboardHrefForPath(window.location.pathname)
+    : '/'
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: 'var(--background)' }}>
+      <PortalErrorPanel
+        error={error}
+        dashboardHref={dashboardHref}
+        onRetry={() => window.location.reload()}
+      />
+    </div>
+  )
 }
 
 function Root() {

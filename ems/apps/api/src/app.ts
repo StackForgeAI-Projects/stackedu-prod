@@ -8,6 +8,7 @@ import { createLogger } from './lib/logger'
 import { errorHandler, notFoundHandler } from './middleware/error-handler'
 import { requestContext, type RequestVariables } from './middleware/request-context'
 import type { AuthVariables } from './middleware/auth'
+import { bursarRoutes } from './routes/bursar'
 import { accountRoutes } from './routes/account'
 import { academicRoutes } from './routes/academic'
 import { admissionRoutes } from './routes/admissions'
@@ -57,6 +58,7 @@ export function createApp() {
   app.route('/', lecturerRoutes)
   app.route('/', ictRoutes)
   app.route('/', academicRoutes)
+  app.route('/', bursarRoutes)
   app.route('/', accountRoutes)
 
   app.notFound(notFoundHandler)

@@ -83,6 +83,18 @@ const envSchema = z
      */
     PAYMENT_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
 
+    /** Live card payments — Flutterwave (https://developer.flutterwave.com/docs/getting-started) */
+    FLUTTERWAVE_SECRET_KEY: z.string().min(1).optional(),
+    FLUTTERWAVE_PUBLIC_KEY: z.string().min(1).optional(),
+
+    /** Live mobile money — PawaPay (https://docs.pawapay.io/v2/docs/welcome) */
+    PAWAPAY_API_TOKEN: z.string().min(1).optional(),
+
+    /** SMS — Twilio (https://www.twilio.com/docs/messaging/api) */
+    TWILIO_ACCOUNT_SID: z.string().min(1).optional(),
+    TWILIO_AUTH_TOKEN: z.string().min(1).optional(),
+    TWILIO_FROM_NUMBER: z.string().min(1).optional(),
+
     /**
      * Transactional email (admissions submit + decision). Optional — when unset,
      * notifications are skipped and the API still succeeds.

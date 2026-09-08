@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { userRoleSchema } from '../enums'
 import { attendancePolicySchema } from '../attendance-policy'
+import { paymentPolicySchema } from '../payment-policy'
 import { emailSchema, isoDateTimeSchema, phoneSchema, uuidSchema } from '../primitives'
 
 export const ictStaffRoleSchema = z.enum([
@@ -148,6 +149,7 @@ export const ictSettingsSchema = z.object({
   location: z.string().nullable(),
   logoUrl: z.string().nullable(),
   attendancePolicy: attendancePolicySchema,
+  paymentPolicy: paymentPolicySchema,
 })
 
 export const updateIctSettingsRequestSchema = z.object({
@@ -159,6 +161,7 @@ export const updateIctSettingsRequestSchema = z.object({
   website: z.string().trim().max(500).nullable().optional(),
   location: z.string().trim().max(200).nullable().optional(),
   attendancePolicy: attendancePolicySchema.partial().optional(),
+  paymentPolicy: paymentPolicySchema.partial().optional(),
 })
 
 export const publicInstitutionBrandingSchema = z.object({
@@ -190,6 +193,8 @@ export const announcementAudienceSchema = z.object({
   includeApplicants: z.boolean().optional(),
   departmentIds: z.array(uuidSchema).max(40).optional(),
   yearsOfStudy: z.array(z.number().int().min(1).max(8)).max(8).optional(),
+  studentIds: z.array(uuidSchema).max(200).optional(),
+  courseOfferingIds: z.array(uuidSchema).max(80).optional(),
 })
 
 export const ictAnnouncementSchema = z.object({

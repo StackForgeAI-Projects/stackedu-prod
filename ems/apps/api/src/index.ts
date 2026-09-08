@@ -1,9 +1,30 @@
 import './config/load-dotenv'
 import { serve } from '@hono/node-server'
 import { createApp } from './app'
-import { closeAllConnections } from './db/connection'
+import { closeAllConnections, getInstitutionDb, getPlatformDb } from './db/connection'
+import { institutions } from './db/platform/schema'
+import { processFeeDueReminders } from './lib/fee-due-reminders'
 
 const { app, env, logger } = createApp()
+
+async function runFeeDueReminders() {
+  try {
+    const platform = getPlatformDb()
+    const rows = await platform.select({ id: institutions.id }).from(institutions)
+    for (const row of rows) {
+      const db = await getInstitutionDb(row.id)
+      const sent = await processFeeDueReminders(db)
+      if (sent > 0) logger.info('Fee due reminders sent', { institutionId: row.id, sent })
+    }
+  } catch (error) {
+    logger.error('Fee due reminder job failed', { error })
+  }
+}
+
+if (env.NODE_ENV !== 'test') {
+  void runFeeDueReminders()
+  setInterval(() => void runFeeDueReminders(), 60 * 60 * 1000).unref()
+}
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info('API listening', {

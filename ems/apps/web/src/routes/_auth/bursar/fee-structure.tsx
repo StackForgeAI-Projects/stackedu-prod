@@ -1,201 +1,221 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
-import { Pencil, Trash2, Plus, X, BookOpen } from 'lucide-react'
-import { AppShell } from '@/components/AppShell'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import type { BursarFeeItem } from '@stackedu/shared'
+import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { BursarShell } from '@/components/BursarShell'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
+import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { DataTable } from '@/components/DataTable'
 import { StatTile } from '@/components/StatTile'
-import {
-  Sheet, SheetContent,
-} from '@/components/ui/sheet'
-import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { formatCurrency, getActiveCurrency, setActiveCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateShort, getActiveCurrency, setActiveCurrency } from '@/lib/utils'
+import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 import {
-  BURSAR, BURSAR_NAV, FEE_ITEMS,
-  type FeeItem, type FeeCategory, type YearGroup,
-} from '@/data/bursar'
-import { toast } from 'sonner'
-
-// ─────────────────────────────────────────────────────────────────────────────
+  bursarFeeItemsQueryKey,
+  bursarProgrammesQueryKey,
+  createBursarFeeItem,
+  deleteBursarFeeItem,
+  issueSemesterFeeInvoices,
+  listBursarFeeItems,
+  listBursarProgrammes,
+  updateBursarFeeItem,
+} from '@/lib/api/bursar'
+import { apiErrorMessage } from '@/lib/api/client'
 
 export const Route = createFileRoute('/_auth/bursar/fee-structure')({
   component: FeeStructurePage,
 })
 
 const BASE_CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
-  Tuition: { bg: 'var(--info-bg)',    color: 'var(--info)'             },
-  Levy:    { bg: 'var(--warning-bg)', color: 'var(--warning)'          },
-  Other:   { bg: 'var(--muted)',      color: 'var(--muted-foreground)' },
+  Tuition: { bg: 'var(--info-bg)', color: 'var(--info)' },
+  Levy: { bg: 'var(--warning-bg)', color: 'var(--warning)' },
+  Other: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
 }
 
-const BASE_PROGRAMMES = ['Computer Science', 'Business Administration']
-const YEAR_GROUPS: YearGroup[] = ['All Years', 'Year 1', 'Year 2', 'Year 3', 'Year 4']
+const YEAR_GROUPS = ['All Years', 'Year 1', 'Year 2', 'Year 3', 'Year 4'] as const
 const BASE_CATEGORIES = ['Tuition', 'Levy', 'Other']
-
 const TYPE_NEW_SENTINEL = '__type_new__'
+const ALL_PROGRAMMES = '__all_programmes__'
+
+type YearGroup = (typeof YEAR_GROUPS)[number]
 
 type FormState = {
   name: string
   category: string
   amount: string
   dueDate: string
-  programme: string
+  programmeId: string
   yearGroup: YearGroup
   active: boolean
 }
 
 const DEFAULT_FORM: FormState = {
-  name: '', category: 'Tuition', amount: '', dueDate: '',
-  programme: 'Computer Science', yearGroup: 'All Years', active: true,
+  name: '',
+  category: 'Tuition',
+  amount: '',
+  dueDate: '',
+  programmeId: ALL_PROGRAMMES,
+  yearGroup: 'All Years',
+  active: true,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+function yearGroupToStudyYear(group: YearGroup): number | null {
+  if (group === 'All Years') return null
+  const match = group.match(/Year (\d+)/)
+  return match ? Number(match[1]) : null
+}
+
+function studyYearToGroup(year: number | null): YearGroup {
+  if (!year) return 'All Years'
+  return `Year ${year}` as YearGroup
+}
 
 function FeeStructurePage() {
-  const [items, setItems]             = useState<FeeItem[]>(FEE_ITEMS)
-  const [academicYear, setAcYear]     = useState('2024/2025')
-  const [currency, setCurrency]       = useState(() => getActiveCurrency())
-  const [sheetOpen, setSheetOpen]     = useState(false)
-  const [editItem, setEditItem]       = useState<FeeItem | null>(null)
-  const [deleteItem, setDeleteItem]   = useState<FeeItem | null>(null)
-  const [form, setForm]               = useState<FormState>(DEFAULT_FORM)
-
-  // 'Type new' state for category and programme
+  const queryClient = useQueryClient()
+  const [academicYear, setAcYear] = useState('2024/2025')
+  const [currency, setCurrency] = useState(() => getActiveCurrency())
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editItem, setEditItem] = useState<BursarFeeItem | null>(null)
+  const [deleteItem, setDeleteItem] = useState<BursarFeeItem | null>(null)
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [issueConfirmOpen, setIssueConfirmOpen] = useState(false)
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [customCategories, setCustomCategories] = useState<string[]>([])
-  const [customProgrammes, setCustomProgrammes] = useState<string[]>([])
   const [newCategoryInput, setNewCategoryInput] = useState('')
-  const [newProgrammeInput, setNewProgrammeInput] = useState('')
+
+  const { data: items = [], isPending, error } = useQuery({
+    queryKey: bursarFeeItemsQueryKey,
+    queryFn: listBursarFeeItems,
+  })
+
+  const { data: programmes = [] } = useQuery({
+    queryKey: bursarProgrammesQueryKey,
+    queryFn: listBursarProgrammes,
+  })
 
   const allCategories = [...BASE_CATEGORIES, ...customCategories]
-  const allProgrammes = [...BASE_PROGRAMMES, ...customProgrammes]
-
-  const categoryColors = (cat: string) =>
-    BASE_CATEGORY_COLORS[cat] ?? { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
-
-  const handleCurrencyChange = (v: string) => {
-    setCurrency(v)
-    setActiveCurrency(v)
-  }
+  const categoryColors = (cat: string) => BASE_CATEGORY_COLORS[cat] ?? { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
 
   const grouped = useMemo(() => {
-    return items.reduce<Record<string, FeeItem[]>>((acc, item) => {
-      if (!acc[item.programme]) acc[item.programme] = []
-      acc[item.programme].push(item)
+    return items.reduce<Record<string, BursarFeeItem[]>>((acc, item) => {
+      const key = item.programmeName || 'All Programmes'
+      if (!acc[key]) acc[key] = []
+      acc[key].push(item)
       return acc
     }, {})
   }, [items])
 
-  const activeItems  = items.filter((i) => i.status === 'Active')
+  const activeItems = items.filter((i) => i.isActive)
   const totalTuition = activeItems.filter((i) => i.category === 'Tuition').reduce((s, i) => s + i.amount, 0)
-  const totalLevies  = activeItems.filter((i) => i.category !== 'Tuition').reduce((s, i) => s + i.amount, 0)
-  const grandTotal   = totalTuition + totalLevies
+  const totalLevies = activeItems.filter((i) => i.category !== 'Tuition').reduce((s, i) => s + i.amount, 0)
+  const grandTotal = totalTuition + totalLevies
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const resolvedCategory = form.category === TYPE_NEW_SENTINEL ? newCategoryInput.trim() : form.category
+      const amount = parseInt(form.amount, 10)
+      if (!form.name || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim()) {
+        throw new Error('Please fill in all required fields.')
+      }
+      const payload = {
+        name: form.name.trim(),
+        category: resolvedCategory,
+        amount,
+        dueDate: form.dueDate,
+        programmeId: form.programmeId === ALL_PROGRAMMES ? undefined : form.programmeId,
+        yearOfStudy: yearGroupToStudyYear(form.yearGroup),
+        isActive: form.active,
+      }
+      if (editItem) return updateBursarFeeItem(editItem.id, payload)
+      return createBursarFeeItem({
+        name: payload.name,
+        category: payload.category,
+        amount: payload.amount,
+        dueDate: payload.dueDate,
+        programmeId: payload.programmeId,
+        yearOfStudy: payload.yearOfStudy,
+        isMandatory: true,
+      })
+    },
+    onSuccess: async (saved) => {
+      toast.success(editItem ? `Fee item "${saved.name}" updated.` : `Fee item "${saved.name}" added.`)
+      if (form.category === TYPE_NEW_SENTINEL && newCategoryInput.trim()) {
+        setCustomCategories((prev) => prev.includes(newCategoryInput.trim()) ? prev : [...prev, newCategoryInput.trim()])
+      }
+      setSheetOpen(false)
+      await queryClient.invalidateQueries({ queryKey: bursarFeeItemsQueryKey })
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not save fee item.')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (item: BursarFeeItem) => deleteBursarFeeItem(item.id),
+    onSuccess: async () => {
+      toast.success(`"${deleteItem?.name}" deleted.`)
+      setDeleteItem(null)
+      await queryClient.invalidateQueries({ queryKey: bursarFeeItemsQueryKey })
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not delete fee item.')),
+  })
+
+  const issueMutation = useMutation({
+    mutationFn: issueSemesterFeeInvoices,
+    onSuccess: (result) => {
+      toast.success(`Issued ${result.issuedCount} invoice${result.issuedCount === 1 ? '' : 's'} for ${result.semesterLabel}.`)
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not issue semester fees.')),
+  })
 
   const openAdd = () => {
     setEditItem(null)
-    setForm(DEFAULT_FORM)
+    setForm({ ...DEFAULT_FORM, programmeId: programmes[0]?.id ?? ALL_PROGRAMMES })
     setNewCategoryInput('')
-    setNewProgrammeInput('')
     setSheetOpen(true)
   }
 
-  const openEdit = (item: FeeItem) => {
+  const openEdit = (item: BursarFeeItem) => {
     setEditItem(item)
     setForm({
       name: item.name,
       category: item.category,
       amount: String(item.amount),
-      dueDate: '',
-      programme: item.programme,
-      yearGroup: item.yearGroup,
-      active: item.status === 'Active',
+      dueDate: item.dueDate ?? '',
+      programmeId: item.programmeId ?? programmes.find((p) => p.name === item.programmeName)?.id ?? ALL_PROGRAMMES,
+      yearGroup: studyYearToGroup(item.yearOfStudy),
+      active: item.isActive,
     })
     setNewCategoryInput('')
-    setNewProgrammeInput('')
     setSheetOpen(true)
   }
 
-  const handleSave = () => {
-    // Resolve 'Type new' selections
-    const resolvedCategory = form.category === TYPE_NEW_SENTINEL
-      ? newCategoryInput.trim()
-      : form.category
-    const resolvedProgramme = form.programme === TYPE_NEW_SENTINEL
-      ? newProgrammeInput.trim()
-      : form.programme
-
+  const requestSaveConfirm = () => {
+    const resolvedCategory = form.category === TYPE_NEW_SENTINEL ? newCategoryInput.trim() : form.category
     const amount = parseInt(form.amount, 10)
-    if (!form.name || isNaN(amount) || amount <= 0 || !resolvedCategory || !resolvedProgramme) {
+    if (!form.name.trim() || isNaN(amount) || amount <= 0 || !resolvedCategory || !form.dueDate.trim()) {
       toast.error('Please fill in all required fields.')
       return
     }
-
-    // Register custom category/programme for future use
-    if (form.category === TYPE_NEW_SENTINEL && resolvedCategory && !allCategories.includes(resolvedCategory)) {
-      setCustomCategories((prev) => [...prev, resolvedCategory])
-    }
-    if (form.programme === TYPE_NEW_SENTINEL && resolvedProgramme && !allProgrammes.includes(resolvedProgramme)) {
-      setCustomProgrammes((prev) => [...prev, resolvedProgramme])
-    }
-
-    if (editItem) {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === editItem.id
-            ? { ...i, name: form.name, category: resolvedCategory as FeeCategory, amount, programme: resolvedProgramme, yearGroup: form.yearGroup, status: form.active ? 'Active' : 'Inactive' }
-            : i
-        )
-      )
-      toast.success(`Fee item "${form.name}" updated.`)
-    } else {
-      const newItem: FeeItem = {
-        id: Math.max(...items.map((i) => i.id)) + 1,
-        name: form.name,
-        category: resolvedCategory as FeeCategory,
-        amount,
-        dueDate: '30 Sep 2024',
-        programme: resolvedProgramme,
-        yearGroup: form.yearGroup,
-        status: form.active ? 'Active' : 'Inactive',
-      }
-      setItems((prev) => [...prev, newItem])
-      toast.success(`Fee item "${form.name}" added.`)
-    }
-    setSheetOpen(false)
+    setSaveConfirmOpen(true)
   }
 
-  const handleDelete = () => {
-    if (!deleteItem) return
-    setItems((prev) => prev.filter((i) => i.id !== deleteItem.id))
-    toast.success(`"${deleteItem.name}" deleted.`)
-    setDeleteItem(null)
-  }
+  const saveSummaryName = form.name.trim() || 'Fee item'
+  const saveSummaryAmount = form.amount ? formatCurrency(parseInt(form.amount, 10) || 0) : formatCurrency(0)
 
   return (
-    <AppShell
-      navItems={BURSAR_NAV}
-      pageTitle="Fee Structure"
-      userName={BURSAR.fullName}
-      userRole="Bursar"
-      userInitials={BURSAR.initials}
-      unreadCount={2}
-      infoCardLabel="BURSAR"
-      infoCardValue={BURSAR.institution}
-      infoCardSubtext="Finance Office"
-    >
+    <BursarShell pageTitle="Fee Structure" guide={BURSAR_GUIDES.feeStructure}>
       <div className="page-scroll">
         <div className="page-body animate-fade-up">
-
-          {/* Section header */}
           <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
             <div>
-              <h1
-                className="t-h1"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}
-              >
+              <h1 className="t-h1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
                 Fee Structure
               </h1>
               <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
@@ -203,34 +223,32 @@ function FeeStructurePage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Currency selector */}
-              <Select value={currency} onValueChange={handleCurrencyChange}>
-                <SelectTrigger className="w-44 text-sm h-9">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={currency} onValueChange={(v) => { setCurrency(v); setActiveCurrency(v) }}>
+                <SelectTrigger className="w-44 text-sm h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="RWF">RWF — Rwandan Franc</SelectItem>
                   <SelectItem value="USD">USD — US Dollar</SelectItem>
                 </SelectContent>
               </Select>
-
-              {/* Academic year selector */}
               <Select value={academicYear} onValueChange={setAcYear}>
-                <SelectTrigger className="w-36 text-sm h-9">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-36 text-sm h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="2024/2025">2024/2025</SelectItem>
                   <SelectItem value="2023/2024">2023/2024</SelectItem>
                 </SelectContent>
               </Select>
-
+              <button
+                onClick={() => setIssueConfirmOpen(true)}
+                disabled={issueMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
+              >
+                Apply to semester
+              </button>
               <button
                 onClick={openAdd}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150"
                 style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer' }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
               >
                 <Plus style={{ width: 15, height: 15 }} />
                 Add fee item
@@ -238,252 +256,145 @@ function FeeStructurePage() {
             </div>
           </div>
 
-          {/* Summary StatTiles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            <StatTile
-              icon={BookOpen}
-              iconColor="var(--info)" iconBg="var(--info-bg)"
-              label="TOTAL TUITION (CS)"
-              value={formatCurrency(totalTuition)}
-              delta="Per student per semester"
-              deltaColor="var(--muted-foreground)"
-              animationDelay={0}
-            />
-            <StatTile
-              icon={BookOpen}
-              iconColor="var(--warning)" iconBg="var(--warning-bg)"
-              label="TOTAL LEVIES"
-              value={formatCurrency(totalLevies)}
-              delta="Active levies only"
-              deltaColor="var(--muted-foreground)"
-              animationDelay={60}
-            />
-            <StatTile
-              icon={BookOpen}
-              iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)"
-              label="GRAND TOTAL PER STUDENT"
-              value={formatCurrency(grandTotal)}
-              delta={`Academic Year ${academicYear}`}
-              deltaColor="var(--muted-foreground)"
-              animationDelay={120}
-            />
-          </div>
+          {isPending ? (
+            <p className="t-body py-8" style={{ color: 'var(--muted-foreground)' }}>Loading fee structure…</p>
+          ) : error ? (
+            <PortalErrorPanel error={error} onRetry={() => queryClient.invalidateQueries({ queryKey: bursarFeeItemsQueryKey })} />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <StatTile icon={BookOpen} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TUITION" value={formatCurrency(totalTuition)} delta="Active tuition items" deltaColor="var(--muted-foreground)" animationDelay={0} />
+                <StatTile icon={BookOpen} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="TOTAL LEVIES" value={formatCurrency(totalLevies)} delta="Active levies only" deltaColor="var(--muted-foreground)" animationDelay={60} />
+                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={`Academic Year ${academicYear}`} deltaColor="var(--muted-foreground)" animationDelay={120} />
+              </div>
 
-          {/* Fee items grouped by programme */}
-          <div className="flex flex-col gap-8">
-            {Object.entries(grouped).map(([programme, progItems]) => {
-              const progTotal = progItems.filter((i) => i.status === 'Active').reduce((s, i) => s + i.amount, 0)
-              return (
-                <div key={programme}>
-                  <div className="flex items-center gap-4 mb-4">
-                    <h3
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: '1.125rem',
-                        fontWeight: 600,
-                        color: 'var(--foreground)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {programme}
-                    </h3>
-                    <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
-                    <span className="t-caption flex-shrink-0" style={{ color: 'var(--muted-foreground)' }}>
-                      Total: {formatCurrency(progTotal)}
-                    </span>
-                  </div>
+              <div className="flex flex-col gap-8">
+                {Object.entries(grouped).map(([programme, progItems]) => {
+                  const progTotal = progItems.filter((i) => i.isActive).reduce((s, i) => s + i.amount, 0)
+                  return (
+                    <div key={programme}>
+                      <div className="flex items-center gap-4 mb-4">
+                        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.125rem', fontWeight: 600, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
+                          {programme}
+                        </h3>
+                        <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border)' }} />
+                        <span className="t-caption flex-shrink-0" style={{ color: 'var(--muted-foreground)' }}>Total: {formatCurrency(progTotal)}</span>
+                      </div>
 
-                  <DataTable
-                    rows={progItems}
-                    rowKey={(item) => String(item.id)}
-                    searchPlaceholder="Search fee items…"
-                    empty="No fee items."
-                    columns={[
-                      {
-                        id: 'name',
-                        header: 'Fee Name',
-                        value: (item) => item.name,
-                        cell: (item) => <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{item.name}</span>,
-                      },
-                      {
-                        id: 'category',
-                        header: 'Category',
-                        value: (item) => item.category,
-                        cell: (item) => {
-                          const cc = categoryColors(item.category)
-                          return <span className="t-label px-2 py-0.5" style={{ backgroundColor: cc.bg, color: cc.color, borderRadius: 'var(--radius-sm)' }}>{item.category}</span>
-                        },
-                      },
-                      {
-                        id: 'amount',
-                        header: 'Amount',
-                        value: (item) => item.amount,
-                        cell: (item) => <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{formatCurrency(item.amount)}</span>,
-                      },
-                      {
-                        id: 'dueDate',
-                        header: 'Due Date',
-                        value: (item) => item.dueDate,
-                        cell: (item) => <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>{item.dueDate}</span>,
-                      },
-                      {
-                        id: 'yearGroup',
-                        header: 'Applies To',
-                        value: (item) => item.yearGroup,
-                        cell: (item) => (
-                          <span className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)' }}>
-                            {item.yearGroup}
-                          </span>
-                        ),
-                      },
-                      {
-                        id: 'status',
-                        header: 'Status',
-                        value: (item) => item.status,
-                        cell: (item) => {
-                          const sc = item.status === 'Active'
-                            ? { bg: 'var(--success-bg)', color: 'var(--success)' }
-                            : { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
-                          return <span className="t-label px-2 py-0.5" style={{ backgroundColor: sc.bg, color: sc.color, borderRadius: 'var(--radius-sm)' }}>{item.status}</span>
-                        },
-                      },
-                      {
-                        id: 'actions',
-                        header: '',
-                        className: 'text-right',
-                        cell: (item) => (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => openEdit(item)}
-                              className="flex items-center justify-center rounded-lg transition-colors duration-150"
-                              style={{ width: 30, height: 30, color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer' }}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--muted)'; e.currentTarget.style.color = 'var(--foreground)' }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--muted-foreground)' }}
-                              title="Edit fee item"
-                            >
-                              <Pencil style={{ width: 14, height: 14 }} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteItem(item)}
-                              className="flex items-center justify-center rounded-lg transition-colors duration-150"
-                              style={{ width: 30, height: 30, color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer' }}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--error-bg)'; e.currentTarget.style.color = 'var(--error)' }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--muted-foreground)' }}
-                              title="Delete fee item"
-                            >
-                              <Trash2 style={{ width: 14, height: 14 }} />
-                            </button>
-                          </div>
-                        ),
-                      },
-                    ]}
-                  />
-                </div>
-              )
-            })}
-          </div>
-
+                      <DataTable
+                        rows={progItems}
+                        rowKey={(item) => item.id}
+                        searchPlaceholder="Search fee items…"
+                        empty="No fee items."
+                        columns={[
+                          { id: 'name', header: 'Fee Name', value: (item) => item.name, cell: (item) => <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{item.name}</span> },
+                          {
+                            id: 'category',
+                            header: 'Category',
+                            value: (item) => item.category,
+                            cell: (item) => {
+                              const cc = categoryColors(item.category)
+                              return <span className="t-label px-2 py-0.5" style={{ backgroundColor: cc.bg, color: cc.color, borderRadius: 'var(--radius-sm)' }}>{item.category}</span>
+                            },
+                          },
+                          { id: 'amount', header: 'Amount', value: (item) => item.amount, cell: (item) => <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{formatCurrency(item.amount)}</span> },
+                          {
+                            id: 'added',
+                            header: 'Date added',
+                            value: (item) => item.createdAt,
+                            cell: (item) => (
+                              <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+                                {formatDateShort(item.createdAt.slice(0, 10))}
+                              </span>
+                            ),
+                          },
+                          {
+                            id: 'dueDate',
+                            header: 'Due date',
+                            value: (item) => item.dueDate ?? '',
+                            cell: (item) => (
+                              <span className="t-caption font-medium" style={{ color: item.dueDate ? 'var(--foreground)' : 'var(--warning)' }}>
+                                {item.dueDate ? formatDateShort(item.dueDate) : 'Not set'}
+                              </span>
+                            ),
+                          },
+                          {
+                            id: 'yearGroup',
+                            header: 'Applies To',
+                            value: (item) => studyYearToGroup(item.yearOfStudy),
+                            cell: (item) => (
+                              <span className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)' }}>
+                                {studyYearToGroup(item.yearOfStudy)}
+                              </span>
+                            ),
+                          },
+                          {
+                            id: 'status',
+                            header: 'Status',
+                            value: (item) => (item.isActive ? 'Active' : 'Inactive'),
+                            cell: (item) => {
+                              const sc = item.isActive ? { bg: 'var(--success-bg)', color: 'var(--success)' } : { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
+                              return <span className="t-label px-2 py-0.5" style={{ backgroundColor: sc.bg, color: sc.color, borderRadius: 'var(--radius-sm)' }}>{item.isActive ? 'Active' : 'Inactive'}</span>
+                            },
+                          },
+                          {
+                            id: 'actions',
+                            header: '',
+                            className: 'text-right',
+                            cell: (item) => (
+                              <div className="flex items-center gap-1.5">
+                                <IconActionButton label="Edit fee item" icon={Pencil} onClick={() => openEdit(item)} />
+                                <IconActionButton label="Delete fee item" icon={Trash2} danger onClick={() => setDeleteItem(item)} />
+                              </div>
+                            ),
+                          },
+                        ]}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Add / Edit Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="overflow-y-auto sheet-lg" style={{ padding: 0 }}>
           <div style={{ padding: '28px 28px 40px' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.375rem',
-                  fontWeight: 700,
-                  color: 'var(--foreground)',
-                  letterSpacing: '-0.015em',
-                }}
-              >
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
                 {editItem ? 'Edit Fee Item' : 'Add Fee Item'}
               </h2>
-              <button
-                onClick={() => setSheetOpen(false)}
-                style={{ color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-              >
-                <X style={{ width: 18, height: 18 }} />
-              </button>
             </div>
 
             <div className="flex flex-col gap-5">
-              {/* Fee name */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Fee Name *
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Tuition Fee"
-                  className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-                  style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-                />
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Fee Name *</label>
+                <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Tuition Fee" className="w-full text-sm rounded-xl px-3 py-2.5 outline-none" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }} />
               </div>
 
-              {/* Category with 'Type new' */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Category *
-                </label>
-                <Select
-                  value={form.category}
-                  onValueChange={(v) => {
-                    setForm((f) => ({ ...f, category: v }))
-                    if (v !== TYPE_NEW_SENTINEL) setNewCategoryInput('')
-                  }}
-                >
-                  <SelectTrigger className="w-full text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Category *</label>
+                <Select value={form.category} onValueChange={(v) => { setForm((f) => ({ ...f, category: v })); if (v !== TYPE_NEW_SENTINEL) setNewCategoryInput('') }}>
+                  <SelectTrigger className="w-full text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {allCategories.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                    <SelectItem value={TYPE_NEW_SENTINEL}>
-                      <span style={{ color: 'var(--success)', fontWeight: 600 }}>+ Type new category</span>
-                    </SelectItem>
+                    {allCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    <SelectItem value={TYPE_NEW_SENTINEL}><span style={{ color: 'var(--success)', fontWeight: 600 }}>+ Type new category</span></SelectItem>
                   </SelectContent>
                 </Select>
-                {form.category === TYPE_NEW_SENTINEL && (
-                  <input
-                    type="text"
-                    value={newCategoryInput}
-                    onChange={(e) => setNewCategoryInput(e.target.value)}
-                    placeholder="Enter new category name…"
-                    autoFocus
-                    className="w-full text-sm rounded-xl px-3 py-2.5 outline-none mt-2"
-                    style={{ border: '1px solid var(--brand)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-                  />
-                )}
+                {form.category === TYPE_NEW_SENTINEL ? (
+                  <input type="text" value={newCategoryInput} onChange={(e) => setNewCategoryInput(e.target.value)} placeholder="Enter new category name…" autoFocus className="w-full text-sm rounded-xl px-3 py-2.5 outline-none mt-2" style={{ border: '1px solid var(--brand)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }} />
+                ) : null}
               </div>
 
-              {/* Amount */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Amount (RWF) *
-                </label>
-                <input
-                  type="number"
-                  value={form.amount}
-                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                  placeholder="e.g. 650000"
-                  min={0}
-                  className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-                  style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-                />
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Amount (RWF) *</label>
+                <input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="e.g. 650000" min={0} className="w-full text-sm rounded-xl px-3 py-2.5 outline-none" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }} />
               </div>
 
-              {/* Due date */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Due Date
-                </label>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment due date *</label>
                 <input
                   type="date"
                   value={form.dueDate}
@@ -491,88 +402,44 @@ function FeeStructurePage() {
                   className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
                   style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
                 />
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Students are reminded 1 week, 72 hours, 48 hours, and 24 hours before this date.
+                </p>
               </div>
 
-              {/* Programme with 'Type new' */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Programme
-                </label>
-                <Select
-                  value={form.programme}
-                  onValueChange={(v) => {
-                    setForm((f) => ({ ...f, programme: v }))
-                    if (v !== TYPE_NEW_SENTINEL) setNewProgrammeInput('')
-                  }}
-                >
-                  <SelectTrigger className="w-full text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Programme</label>
+                <Select value={form.programmeId} onValueChange={(v) => setForm((f) => ({ ...f, programmeId: v }))}>
+                  <SelectTrigger className="w-full text-sm"><SelectValue placeholder="Select programme…" /></SelectTrigger>
                   <SelectContent>
-                    {allProgrammes.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                    <SelectItem value={TYPE_NEW_SENTINEL}>
-                      <span style={{ color: 'var(--success)', fontWeight: 600 }}>+ Type new programme</span>
-                    </SelectItem>
+                    <SelectItem value={ALL_PROGRAMMES}>All Programmes</SelectItem>
+                    {programmes.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                {form.programme === TYPE_NEW_SENTINEL && (
-                  <input
-                    type="text"
-                    value={newProgrammeInput}
-                    onChange={(e) => setNewProgrammeInput(e.target.value)}
-                    placeholder="Enter new programme name…"
-                    autoFocus
-                    className="w-full text-sm rounded-xl px-3 py-2.5 outline-none mt-2"
-                    style={{ border: '1px solid var(--brand)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-                  />
-                )}
               </div>
 
-              {/* Year group */}
               <div>
-                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Year Group
-                </label>
+                <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Year Group</label>
                 <Select value={form.yearGroup} onValueChange={(v) => setForm((f) => ({ ...f, yearGroup: v as YearGroup }))}>
-                  <SelectTrigger className="w-full text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-full text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {YEAR_GROUPS.map((y) => (
-                      <SelectItem key={y} value={y}>{y}</SelectItem>
-                    ))}
+                    {YEAR_GROUPS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Active toggle */}
               <div className="flex items-center gap-3">
-                <Switch
-                  id="active-toggle"
-                  checked={form.active}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))}
-                />
+                <Switch id="active-toggle" checked={form.active} onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))} />
                 <Label htmlFor="active-toggle" className="text-sm cursor-pointer" style={{ color: 'var(--foreground)' }}>
                   {form.active ? 'Active' : 'Inactive'}
                 </Label>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleSave}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
-                  style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer' }}
-                >
+                <button onClick={requestSaveConfirm} disabled={saveMutation.isPending} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer', opacity: saveMutation.isPending ? 0.7 : 1 }}>
                   {editItem ? 'Save changes' : 'Add fee item'}
                 </button>
-                <button
-                  onClick={() => setSheetOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
-                  style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
-                >
+                <button onClick={() => setSheetOpen(false)} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}>
                   Cancel
                 </button>
               </div>
@@ -580,6 +447,53 @@ function FeeStructurePage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <ConfirmAlertDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title={editItem ? 'Save fee item changes?' : 'Add this fee item?'}
+        tone="warning"
+        headlineLabel="Confirm"
+        headline={editItem ? 'Update fee item' : 'Add fee item'}
+        summary={
+          <>
+            <strong>{saveSummaryName}</strong> ({saveSummaryAmount}) will be {editItem ? 'updated in' : 'added to'} the fee structure
+            {form.active ? ' and marked active.' : ' as inactive.'}
+          </>
+        }
+        notices={[
+          { icon: 'file', label: 'Students will only be charged after you apply fees to the semester.' },
+        ]}
+        confirmLabel={editItem ? 'Save changes' : 'Add fee item'}
+        confirmVariant="brand"
+        loading={saveMutation.isPending}
+        onConfirm={() => {
+          saveMutation.mutate(undefined, {
+            onSuccess: () => setSaveConfirmOpen(false),
+          })
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={issueConfirmOpen}
+        onOpenChange={setIssueConfirmOpen}
+        title="Apply fees to the current semester?"
+        tone="warning"
+        headlineLabel="Confirm"
+        headline="Issue semester invoices"
+        summary="Matching students will receive invoices on their Fees page based on active fee items for their programme and year group."
+        notices={[
+          { icon: 'bell', label: 'Students receive automatic reminders 1 week, 72h, 48h, and 24h before each fee due date.' },
+        ]}
+        confirmLabel="Apply to semester"
+        confirmVariant="brand"
+        loading={issueMutation.isPending}
+        onConfirm={() => {
+          issueMutation.mutate(undefined, {
+            onSuccess: () => setIssueConfirmOpen(false),
+          })
+        }}
+      />
 
       <ConfirmAlertDialog
         open={!!deleteItem}
@@ -593,8 +507,8 @@ function FeeStructurePage() {
         caution="This cannot be undone."
         confirmLabel="Delete"
         confirmVariant="destructive"
-        onConfirm={handleDelete}
+        onConfirm={() => { if (deleteItem) deleteMutation.mutate(deleteItem) }}
       />
-    </AppShell>
+    </BursarShell>
   )
 }

@@ -264,7 +264,7 @@ const enRw: StackForgeNextContent = {
       },
     ],
     copyright: "StackForgeNext, a StackForgeAI initiative. All rights reserved.",
-    madeWith: "Made with ♥ in Kigali, Rwanda",
+    madeWith: "Built for Africa",
   },
 };
 
@@ -403,7 +403,7 @@ const africaOverridesEn: Partial<StackForgeNextContent> = {
       },
     ],
     copyright: "StackForgeNext, a StackForgeAI initiative. All rights reserved.",
-    madeWith: "Made with ♥ for Africa · HQ in Kigali, Rwanda",
+    madeWith: "Built for Africa",
   },
 };
 
@@ -619,7 +619,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
         "L'initiative communautaire de StackForgeAI, offrant une formation tech gratuite aux jeunes du Rwanda. Conçu à Kigali par StackForgeAI.",
       columns: enRw.footer.columns,
       copyright: "StackForgeNext, une initiative StackForgeAI. Tous droits réservés.",
-      madeWith: "Fait avec ♥ à Kigali, Rwanda",
+      madeWith: "Conçu pour l'Afrique",
     },
   }),
   rw: mergeContent(enRw, {
@@ -790,7 +790,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
         })),
       })),
       copyright: "StackForgeNext, gahunda ya StackForgeAI. Uburenganzira bwose burabitswe.",
-      madeWith: "Byakozwe n'♥ i Kigali, Rwanda",
+      madeWith: "Yubatswe ku bw'Afrika",
     },
   }),
 };
@@ -859,7 +859,7 @@ const africaByLocale: Partial<Record<Locale, ContentOverrides>> = {
         "L'initiative communautaire de StackForgeAI, offrant une formation tech gratuite aux jeunes à travers l'Afrique. Conçu à Kigali par StackForgeAI.",
       columns: africaOverridesEn.footer!.columns,
       copyright: "StackForgeNext, une initiative StackForgeAI. Tous droits réservés.",
-      madeWith: "Fait avec ♥ pour l'Afrique · Siège à Kigali, Rwanda",
+      madeWith: "Conçu pour l'Afrique",
     },
   },
   rw: {
@@ -964,7 +964,7 @@ const africaByLocale: Partial<Record<Locale, ContentOverrides>> = {
         })),
       })),
       copyright: "StackForgeNext, gahunda ya StackForgeAI. Uburenganzira bwose burabitswe.",
-      madeWith: "Byakozwe n'♥ ku bw'Afrika · HQ i Kigali, Rwanda",
+      madeWith: "Yubatswe ku bw'Afrika",
     },
   },
 };

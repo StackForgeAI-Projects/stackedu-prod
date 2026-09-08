@@ -23,7 +23,6 @@ import {
 import { users } from '../db/institution/schema/people'
 import { programmes } from '../db/institution/schema/academic'
 import { badRequest, conflict, notFound } from '../lib/errors'
-import { isIntegrationEnabled } from '../lib/integrations'
 import { notifyApplicationSubmitted } from '../lib/admissions-email'
 import {
   assertDocumentDeleteAllowed,
@@ -39,6 +38,9 @@ import {
 } from '../lib/storage'
 import { createUser } from './users'
 import { issueApplicantEmailVerification } from './verification'
+import { initiatePaymentGateway } from './payment-gateway'
+import { readPaymentPolicy } from '../lib/payment-policy-store'
+import { validatePaymentAmount } from '@stackedu/shared'
 import { loadLatestDocumentRequest } from './admissions-read'
 import { loadAdmissionOffer } from './admissions-enrolment'
 
@@ -603,17 +605,18 @@ export async function initiatePayment(
 
   const amount = env().APPLICATION_FEE_RWF
   const reference = `PAY-${application.reference}-${randomInt(1000, 9999)}`
-  // Demo / sandbox completes every method on first initiate — no second confirm click.
-  const sandboxComplete = env().PAYMENT_MODE === 'sandbox'
+  const policy = await readPaymentPolicy(db)
 
-  if (env().PAYMENT_MODE === 'live') {
-    if (input.method === 'MoMo' && !(await isIntegrationEnabled(institutionId, 'MTNMoMo'))) {
-      throw badRequest('MTN MoMo payments are currently turned off. Contact ICT to enable them.')
-    }
-    if (input.method === 'Airtel' && !(await isIntegrationEnabled(institutionId, 'AirtelMoney'))) {
-      throw badRequest('Airtel Money payments are currently turned off. Contact ICT to enable them.')
-    }
-  }
+  const validation = validatePaymentAmount({
+    amount,
+    outstanding: amount,
+    policy,
+    context: { feeKind: 'ApplicationFee' },
+  })
+  if (!validation.ok) throw badRequest(validation.message)
+
+  const gateway = await initiatePaymentGateway(institutionId, input.method, reference)
+  const completeNow = gateway.completeImmediately
 
   const [row] = await db
     .insert(applicationPayments)
@@ -622,9 +625,9 @@ export async function initiatePayment(
       reference,
       amount,
       method: input.method,
-      status: sandboxComplete ? 'Completed' : 'Pending',
-      gatewayReference: sandboxComplete ? `sandbox-${reference}` : null,
-      paidAt: sandboxComplete ? new Date().toISOString() : null,
+      status: completeNow ? 'Completed' : 'Pending',
+      gatewayReference: gateway.gatewayReference,
+      paidAt: completeNow ? new Date().toISOString() : null,
     })
     .returning({
       id: applicationPayments.id,

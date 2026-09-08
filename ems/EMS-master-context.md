@@ -552,17 +552,21 @@ Every screen grouped by role. Total count is an estimate; some screens may be sp
 | Performance Analytics     | Course-level charts: grade distributions, attendance trends, at-risk overview          | View or export report                |
 | At-Risk Alerts            | AI-generated list of students flagged for academic distress with supporting data       | Initiate follow-up or dismiss        |
 
-## **C3.3 Bursar (7 screens)**
+## **C3.3 Bursar (9 screens + notifications)**
 
 | **Screen**                  | **Purpose**                                                                                | **Primary Action**                |
 | --------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------- |
 | Bursar Dashboard            | Financial KPIs: total collected, outstanding balances, payment channel breakdown           | Navigate to priority task         |
-| Fee Structure Configuration | Define and update tuition fees, levies, and payment deadlines per programme and year group | Save fee structure                |
+| Fee Structure Configuration | Define tuition fees and levies by programme/year; apply to current semester as invoices    | Add fee item / Apply to semester  |
 | Payment Ledger              | Full searchable record of all transactions across all students and payment channels        | Search or export transactions     |
-| Student Fee Account         | Per-student view: total owed, amount paid, outstanding balance, full transaction history   | Apply hold or issue receipt       |
-| Receipt Management          | Issue, reprint, or void payment receipts for any transaction                               | Issue or void receipt             |
-| Financial Reports           | Generate and export reports by date range, programme, payment channel, or student cohort   | Generate and download report      |
-| Payment Reconciliation      | Review and reconcile payments flagged as pending or failed by the payment gateway          | Reconcile or escalate transaction |
+| Student Fee Accounts        | Per-student balances, holds, and payment history                                           | Open account / record payment     |
+| Receipt Management          | Issue, reprint, or void payment receipts for any transaction                               | Void receipt                      |
+| Fee Messages                | Send fee reminders to all students, departments, years, courses, or selected students      | Send in-app notification          |
+| Financial Reports           | Generate collection summaries by day, month, semester, or year                             | Generate report                   |
+| Payment Reconciliation      | Review and reconcile gateway transactions that are pending or mismatched                   | Reconcile transaction             |
+| Notifications               | In-app alerts for fee events, reconciliation items, and system messages                    | Mark read                         |
+
+**Implementation status (Sep 2026):** Bursar portal is API-backed against the finance database. Fee structure items can be applied to the current semester to create student invoices visible on the student Fees page.
 
 ## **C3.4 Academic Admin (13 screens)**
 

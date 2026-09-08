@@ -1,8 +1,15 @@
 import { redirect } from '@tanstack/react-router'
 import type { SessionUser } from '@stackedu/shared'
 import { getSession, sessionQueryKey } from '@/lib/api/auth'
+import { ApiClientError } from '@/lib/api/client'
 import { queryClient } from '@/lib/query-client'
 import { dashboardFor } from './portals'
+
+function cachedSession(): SessionUser | null | undefined {
+  const state = queryClient.getQueryState<SessionUser | null>(sessionQueryKey)
+  if (!state || state.dataUpdatedAt <= 0) return undefined
+  return state.data ?? null
+}
 
 /**
  * Reads the session inside a route guard.
@@ -12,11 +19,22 @@ import { dashboardFor } from './portals'
  * later asks who the user is.
  */
 export async function loadSession(): Promise<SessionUser | null> {
-  return queryClient.ensureQueryData({
-    queryKey: sessionQueryKey,
-    queryFn: getSession,
-    revalidateIfStale: true,
-  })
+  try {
+    return await queryClient.ensureQueryData({
+      queryKey: sessionQueryKey,
+      queryFn: getSession,
+      revalidateIfStale: true,
+    })
+  } catch (error) {
+    // A brief connection loss should not tear down the whole portal shell.
+    // Reuse the last known session when the API cannot be reached.
+    if (error instanceof ApiClientError && error.code === 'NETWORK_ERROR') {
+      const cached = cachedSession()
+      if (cached !== undefined) return cached
+      return null
+    }
+    throw error
+  }
 }
 
 /**

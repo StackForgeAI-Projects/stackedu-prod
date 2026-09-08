@@ -6,6 +6,7 @@ import { studentProfiles, students } from '../db/institution/schema/students'
 import { badRequest, tooManyRequests } from '../lib/errors'
 import { sendApplicantEmailVerification } from '../lib/admissions-email'
 import { createLogger } from '../lib/logger'
+import { sendSmsMessage } from '../lib/sms'
 import { env } from '../config/env'
 
 const log = createLogger('info', { service: 'stackedu-api', component: 'verification' })
@@ -202,7 +203,7 @@ export async function resendApplicantEmailVerification(input: {
   })
 }
 
-/** Sends a six-digit code for phone number verification. SMS delivery is not wired yet. */
+/** Sends a six-digit code for phone number verification via Twilio when configured. */
 export async function issuePhoneVerification(input: {
   institutionId: string
   userId: string
@@ -219,7 +220,13 @@ export async function issuePhoneVerification(input: {
     expiresAt,
   })
 
-  if (env().NODE_ENV !== 'production') {
+  const sent = await sendSmsMessage(
+    input.institutionId,
+    input.phone,
+    `Your StackEDU verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`,
+  )
+
+  if (!sent && env().NODE_ENV !== 'production') {
     log.info('Phone verification code (SMS not sent)', {
       userId: input.userId,
       phone: input.phone,

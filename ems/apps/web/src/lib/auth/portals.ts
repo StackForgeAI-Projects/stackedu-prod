@@ -48,3 +48,16 @@ export function roleForPath(pathname: string): UserRole | null {
   )
   return portal?.role ?? null
 }
+
+/** Home dashboard for the portal section the user is currently in. */
+export function dashboardHrefForPath(pathname: string): string {
+  const portal = PORTALS.find(
+    (candidate) => pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`),
+  )
+  return portal?.home ?? '/'
+}
+
+export function normalizePath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, '')
+  return trimmed || '/'
+}

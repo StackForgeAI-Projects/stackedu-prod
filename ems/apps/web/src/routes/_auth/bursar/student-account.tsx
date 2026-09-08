@@ -1,25 +1,43 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import type { BursarStudentAccountDetail, PaymentMethod } from '@stackedu/shared'
 import {
-  ChevronLeft, Lock, Unlock, Receipt, CreditCard, AlertCircle, Download, X,
+  AlertCircle, ChevronLeft, CreditCard, Download, Lock, Receipt, Unlock,
 } from 'lucide-react'
-import { AppShell } from '@/components/AppShell'
+import { toast } from 'sonner'
+import { BursarShell } from '@/components/BursarShell'
+import { PortalErrorPanel } from '@/components/PortalErrorPanel'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { DataTable } from '@/components/DataTable'
+import { IconActionButton } from '@/components/IconActionButton'
 import { StatTile } from '@/components/StatTile'
-import {
-  Sheet, SheetContent,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateShort } from '@/lib/utils'
 import {
-  BURSAR, BURSAR_NAV, BURSAR_STUDENTS, methodColors, statusColors,
-  type BursarStudent, type StudentPayment, type PaymentMethod,
-} from '@/data/bursar'
-import { toast } from 'sonner'
-
-// ─────────────────────────────────────────────────────────────────────────────
+  accountStatusColors,
+  paymentMethodColors,
+  paymentMethodLabel,
+  paymentStatusLabel,
+  uiMethodToApi,
+} from '@/lib/bursar-display'
+import {
+  bursarDashboardQueryKey,
+  bursarProfileQueryKey,
+  bursarStudentAccountQueryKey,
+  bursarStudentAccountsQueryKey,
+  getBursarProfile,
+  getBursarStudentAccount,
+  recordBursarManualPayment,
+  releaseBursarFeeHold,
+  setBursarFeeHold,
+} from '@/lib/api/bursar'
+import { apiErrorMessage } from '@/lib/api/client'
+import { downloadReceiptDocument } from '@/lib/receipt-download'
+import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 
 export const Route = createFileRoute('/_auth/bursar/student-account')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -28,153 +46,161 @@ export const Route = createFileRoute('/_auth/bursar/student-account')({
   component: StudentAccountPage,
 })
 
-const TYPE_NEW_SENTINEL = '__type_new__'
-
-const FEE_DESCRIPTIONS = [
-  'Semester 1 Tuition Fee',
-  'Semester 1 Partial Payment',
-  'Semester 1 Remaining Balance',
-  'Administrative Levy',
-  'Student Union Fee',
-  'Library Fee',
-  'ICT Fee',
-  'Levies & Fees Bundle',
-  'Registration Deposit',
-  'Other Payment',
-]
-
-const FEE_AMOUNTS: Record<string, number> = {
-  'Semester 1 Tuition Fee':       650000,
-  'Semester 1 Partial Payment':   325000,
-  'Semester 1 Remaining Balance': 325000,
-  'Administrative Levy':           50000,
-  'Student Union Fee':             25000,
-  'Library Fee':                   15000,
-  'ICT Fee':                       20000,
-  'Levies & Fees Bundle':         110000,
-  'Registration Deposit':         110000,
-  'Other Payment':                      0,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+const PAYMENT_METHOD_OPTIONS = [
+  { label: 'MTN MoMo', value: 'MTN MoMo' },
+  { label: 'Airtel Money', value: 'Airtel Money' },
+  { label: 'Card', value: 'Card' },
+  { label: 'Bank Transfer', value: 'Bank Transfer' },
+] as const
 
 function StudentAccountPage() {
   const { id } = Route.useSearch()
-  const base = BURSAR_STUDENTS.find((s) => s.id === id)
+  const { data, isPending, error, refetch } = useQuery({
+    queryKey: bursarStudentAccountQueryKey(id),
+    queryFn: () => getBursarStudentAccount(id),
+    enabled: Boolean(id),
+  })
 
-  if (!base) {
+  if (!id) {
     return (
-      <AppShell
-        navItems={BURSAR_NAV}
-        pageTitle="Student Account"
-        userName={BURSAR.fullName}
-        userRole="Bursar"
-        userInitials={BURSAR.initials}
-        infoCardLabel="BURSAR"
-        infoCardValue={BURSAR.institution}
-        infoCardSubtext="Finance Office"
-      >
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <AlertCircle style={{ width: 40, height: 40, color: 'var(--muted-foreground)' }} />
-          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Student not found.</p>
-          <Link to="/bursar/student-accounts" style={{ color: 'var(--success)', fontSize: '0.875rem', fontWeight: 600 }}>
-            ← Back to Student Accounts
-          </Link>
-        </div>
-      </AppShell>
+      <BursarShell pageTitle="Student Account" guide={BURSAR_GUIDES.studentAccount}>
+        <StudentNotFound />
+      </BursarShell>
     )
   }
 
-  return <StudentAccountInner base={base} />
+  if (isPending) {
+    return (
+      <BursarShell pageTitle="Student Account" guide={BURSAR_GUIDES.studentAccount}>
+        <p className="t-body px-4 sm:px-8 py-8" style={{ color: 'var(--muted-foreground)' }}>Loading student account…</p>
+      </BursarShell>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <BursarShell pageTitle="Student Account" guide={BURSAR_GUIDES.studentAccount}>
+        {error ? (
+          <PortalErrorPanel error={error} onRetry={() => refetch()} />
+        ) : (
+          <StudentNotFound />
+        )}
+      </BursarShell>
+    )
+  }
+
+  return <StudentAccountInner account={data} studentId={id} />
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+function StudentNotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <AlertCircle style={{ width: 40, height: 40, color: 'var(--muted-foreground)' }} />
+      <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Student not found.</p>
+      <Link to="/bursar/student-accounts" style={{ color: 'var(--success)', fontSize: '0.875rem', fontWeight: 600 }}>
+        ← Back to Student Accounts
+      </Link>
+    </div>
+  )
+}
 
-function StudentAccountInner({ base }: { base: BursarStudent }) {
-  const [student, setStudent] = useState<BursarStudent>(base)
-  const [payments, setPayments] = useState<(StudentPayment & { isManual?: boolean })[]>(base.payments)
-  const [issueSheetOpen, setIssueSheetOpen]   = useState(false)
+function StudentAccountInner({ account, studentId }: { account: BursarStudentAccountDetail; studentId: string }) {
+  const queryClient = useQueryClient()
+  const { data: profile } = useQuery({
+    queryKey: bursarProfileQueryKey,
+    queryFn: getBursarProfile,
+  })
   const [manualSheetOpen, setManualSheetOpen] = useState(false)
+  const [holdDialogOpen, setHoldDialogOpen] = useState(false)
+  const [holdReason, setHoldReason] = useState('')
 
-  const toggleHold = () => {
-    const newHold    = !student.hasHold
-    const newStatus  = newHold ? 'On Hold' : student.outstanding > 0 ? 'Outstanding' : 'Paid'
-    setStudent((s) => ({ ...s, hasHold: newHold, status: newStatus as BursarStudent['status'] }))
-    toast[newHold ? 'error' : 'success'](
-      newHold ? `Fee hold applied to ${student.name}.` : `Fee hold removed for ${student.name}.`
-    )
+  const handleReceiptDownload = async (pmt: BursarStudentAccountDetail['payments'][number]) => {
+    if (!pmt.receiptNumber || !profile) return
+    try {
+      await downloadReceiptDocument({
+        receiptNumber: pmt.receiptNumber,
+        reference: pmt.reference,
+        amount: pmt.amount,
+        method: pmt.method,
+        paidAt: pmt.paidAt,
+        studentName: account.name,
+        studentNumber: account.studentNumber,
+        description: pmt.description,
+        institutionName: profile.institutionName,
+        verificationCode: pmt.verificationCode,
+        status: pmt.status === 'Voided' ? 'Voided' : 'Valid',
+      })
+      toast.success(`Receipt ${pmt.receiptNumber} downloaded.`)
+    } catch {
+      toast.error('Could not download receipt.')
+    }
   }
 
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: bursarStudentAccountQueryKey(studentId) })
+    await queryClient.invalidateQueries({ queryKey: bursarStudentAccountsQueryKey })
+    await queryClient.invalidateQueries({ queryKey: bursarDashboardQueryKey })
+  }
+
+  const holdMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      if (account.hasHold) return releaseBursarFeeHold(studentId, reason)
+      return setBursarFeeHold(studentId, { reason })
+    },
+    onSuccess: async () => {
+      toast.success(account.hasHold ? `Fee hold removed for ${account.name}.` : `Fee hold applied to ${account.name}.`)
+      setHoldDialogOpen(false)
+      setHoldReason('')
+      await invalidate()
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not update fee hold.')),
+  })
+
   return (
-    <AppShell
-      navItems={BURSAR_NAV}
-      pageTitle={student.name}
-      userName={BURSAR.fullName}
-      userRole="Bursar"
-      userInitials={BURSAR.initials}
-      unreadCount={2}
-      infoCardLabel="BURSAR"
-      infoCardValue={BURSAR.institution}
-      infoCardSubtext="Finance Office"
-    >
+    <BursarShell pageTitle={account.name} guide={BURSAR_GUIDES.studentAccount}>
       <div className="page-scroll">
         <div className="page-body animate-fade-up">
-
-          {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 mb-6 t-caption" style={{ color: 'var(--muted-foreground)' }}>
-            <Link
-              to="/bursar/student-accounts"
-              className="flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--muted-foreground)' }}
-            >
+            <Link to="/bursar/student-accounts" className="flex items-center gap-1 hover:underline" style={{ color: 'var(--muted-foreground)' }}>
               <ChevronLeft style={{ width: 12, height: 12 }} />
               Student Accounts
             </Link>
             <span style={{ color: 'var(--border)' }}>›</span>
-            <span style={{ color: 'var(--foreground)' }}>{student.name}</span>
+            <span style={{ color: 'var(--foreground)' }}>{account.name}</span>
           </nav>
 
-          {/* Section header */}
           <div className="mb-6">
-            <h1
-              className="t-h1 mb-1"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}
-            >
-              {student.name}
+            <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
+              {account.name}
             </h1>
             <div className="flex items-center gap-3">
-              <span
-                className="t-mono"
-                style={{ color: 'var(--muted-foreground)', fontSize: 13 }}
-              >
-                {student.id}
-              </span>
+              <span className="t-mono" style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>{account.studentNumber}</span>
               <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-                · {student.programme} · Year {student.year}
+                · {account.programme} · Year {account.yearOfStudy}
               </span>
             </div>
           </div>
 
-          {/* Fee hold alert */}
-          {student.hasHold && (
-            <div
-              className="flex items-start gap-3 p-4 mb-6 rounded-xl animate-fade-up"
-              style={{ backgroundColor: 'var(--error-bg)', border: '1px solid rgba(220,38,38,0.2)' }}
-            >
+          {account.hasHold ? (
+            <div className="flex items-start gap-3 p-4 mb-6 rounded-xl animate-fade-up" style={{ backgroundColor: 'var(--error-bg)', border: '1px solid rgba(220,38,38,0.2)' }}>
               <AlertCircle style={{ width: 18, height: 18, color: 'var(--error)', flexShrink: 0, marginTop: 1 }} />
-              <p className="text-sm" style={{ color: 'var(--error)', lineHeight: 1.5 }}>
-                This student has an active fee hold. They cannot register for courses or view results.
-              </p>
+              <div>
+                <p className="text-sm" style={{ color: 'var(--error)', lineHeight: 1.5 }}>
+                  This student has an active fee hold. They cannot register for courses or view results.
+                </p>
+                {account.holdReason ? (
+                  <p className="t-caption mt-1" style={{ color: 'var(--error)' }}>Reason: {account.holdReason}</p>
+                ) : null}
+              </div>
             </div>
-          )}
+          ) : null}
 
-          {/* StatTiles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             <StatTile
               icon={CreditCard}
               iconColor="var(--info)" iconBg="var(--info-bg)"
               label="TOTAL FEES"
-              value={formatCurrency(student.totalFees)}
+              value={formatCurrency(account.totalCharged)}
               delta="This semester"
               deltaColor="var(--muted-foreground)"
               animationDelay={0}
@@ -183,35 +209,30 @@ function StudentAccountInner({ base }: { base: BursarStudent }) {
               icon={Receipt}
               iconColor="var(--success)" iconBg="var(--success-bg)"
               label="AMOUNT PAID"
-              value={formatCurrency(student.amountPaid)}
+              value={formatCurrency(account.totalPaid)}
               delta="Confirmed payments"
               deltaColor="var(--success)"
               animationDelay={60}
             />
             <StatTile
               icon={AlertCircle}
-              iconColor={student.outstanding > 0 ? 'var(--warning)' : 'var(--success)'}
-              iconBg={student.outstanding > 0 ? 'var(--warning-bg)' : 'var(--success-bg)'}
+              iconColor={account.outstanding > 0 ? 'var(--warning)' : 'var(--success)'}
+              iconBg={account.outstanding > 0 ? 'var(--warning-bg)' : 'var(--success-bg)'}
               label="OUTSTANDING BALANCE"
-              value={formatCurrency(student.outstanding)}
-              delta={student.outstanding > 0 ? 'Balance remaining' : 'Fully paid'}
-              deltaColor={student.outstanding > 0 ? 'var(--warning)' : 'var(--success)'}
+              value={formatCurrency(account.outstanding)}
+              delta={account.outstanding > 0 ? 'Balance remaining' : 'Fully paid'}
+              deltaColor={account.outstanding > 0 ? 'var(--warning)' : 'var(--success)'}
               animationDelay={120}
             />
           </div>
 
-          {/* Payment history */}
           <div className="mb-6">
-            <h2
-              className="t-h3 mb-4"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}
-            >
+            <h2 className="t-h3 mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
               Payment History
             </h2>
-
             <DataTable
-              rows={payments}
-              rowKey={(pmt) => `${pmt.date}|${pmt.description}|${pmt.amount}|${pmt.receiptNo ?? ''}|${pmt.method}`}
+              rows={account.payments}
+              rowKey={(pmt) => pmt.id}
               searchPlaceholder="Search payments…"
               empty="No payments recorded yet."
               defaultPageSize={10}
@@ -219,26 +240,18 @@ function StudentAccountInner({ base }: { base: BursarStudent }) {
                 {
                   id: 'date',
                   header: 'Date',
-                  value: (pmt) => pmt.date,
-                  cell: (pmt) => <span className="t-caption whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>{pmt.date}</span>,
+                  value: (pmt) => pmt.paidAt ?? '',
+                  cell: (pmt) => (
+                    <span className="t-caption whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>
+                      {pmt.paidAt ? formatDateShort(pmt.paidAt) : '—'}
+                    </span>
+                  ),
                 },
                 {
                   id: 'description',
                   header: 'Description',
                   value: (pmt) => pmt.description,
-                  cell: (pmt) => (
-                    <span className="text-sm" style={{ color: 'var(--foreground)' }}>
-                      {pmt.description}
-                      {pmt.isManual && (
-                        <span
-                          className="t-label px-1.5 py-0.5 ml-2"
-                          style={{ backgroundColor: 'var(--info-bg)', color: 'var(--info)', borderRadius: 'var(--radius-sm)', fontSize: 9 }}
-                        >
-                          MANUAL
-                        </span>
-                      )}
-                    </span>
-                  ),
+                  cell: (pmt) => <span className="text-sm" style={{ color: 'var(--foreground)' }}>{pmt.description}</span>,
                 },
                 {
                   id: 'amount',
@@ -249,36 +262,32 @@ function StudentAccountInner({ base }: { base: BursarStudent }) {
                 {
                   id: 'method',
                   header: 'Method',
-                  value: (pmt) => pmt.method,
+                  value: (pmt) => paymentMethodLabel(pmt.method),
                   cell: (pmt) => {
-                    const mc = methodColors(pmt.method)
-                    return <span className="t-label px-2 py-0.5" style={{ backgroundColor: mc.bg, color: mc.color, borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap', fontSize: 10 }}>{pmt.method}</span>
+                    const mc = paymentMethodColors(pmt.method)
+                    return <span className="t-label px-2 py-0.5" style={{ backgroundColor: mc.bg, color: mc.color, borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap', fontSize: 10 }}>{paymentMethodLabel(pmt.method)}</span>
                   },
                 },
                 {
                   id: 'status',
                   header: 'Status',
-                  value: (pmt) => pmt.status,
+                  value: (pmt) => paymentStatusLabel(pmt.status),
                   cell: (pmt) => {
-                    const sc2 = statusColors(pmt.status)
-                    return <span className="t-label px-2 py-0.5" style={{ backgroundColor: sc2.bg, color: sc2.color, borderRadius: 'var(--radius-sm)' }}>{pmt.status}</span>
+                    const sc = accountStatusColors(pmt.status)
+                    return <span className="t-label px-2 py-0.5" style={{ backgroundColor: sc.bg, color: sc.color, borderRadius: 'var(--radius-sm)' }}>{paymentStatusLabel(pmt.status)}</span>
                   },
                 },
                 {
                   id: 'receipt',
                   header: 'Receipt',
-                  value: (pmt) => pmt.receiptNo,
-                  cell: (pmt) => pmt.receiptNo ? (
-                    <button
-                      onClick={() => toast.success(`Receipt ${pmt.receiptNo} download started.`)}
-                      className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all duration-150"
-                      style={{ border: '1px solid var(--border)', color: 'var(--foreground)', background: 'var(--card)', cursor: 'pointer' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--muted)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--card)' }}
-                    >
-                      <Download style={{ width: 12, height: 12 }} />
-                      Download
-                    </button>
+                  value: (pmt) => pmt.receiptNumber ?? '',
+                  cell: (pmt) => pmt.receiptNumber ? (
+                    <IconActionButton
+                      label="Download receipt"
+                      icon={Download}
+                      onClick={() => void handleReceiptDownload(pmt)}
+                      disabled={!profile}
+                    />
                   ) : (
                     <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>—</span>
                   ),
@@ -287,443 +296,253 @@ function StudentAccountInner({ base }: { base: BursarStudent }) {
             />
           </div>
 
-          {/* Action buttons */}
           <div className="flex flex-wrap gap-3">
-            {/* Hold toggle */}
             <button
-              onClick={toggleHold}
+              onClick={() => { setHoldReason(''); setHoldDialogOpen(true) }}
+              disabled={holdMutation.isPending}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
               style={{
                 backgroundColor: 'transparent',
-                color: student.hasHold ? 'var(--success)' : 'var(--error)',
-                border: `1px solid ${student.hasHold ? 'var(--success)' : 'var(--error)'}`,
-                cursor: 'pointer',
+                color: account.hasHold ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${account.hasHold ? 'var(--success)' : 'var(--error)'}`,
+                cursor: holdMutation.isPending ? 'not-allowed' : 'pointer',
+                opacity: holdMutation.isPending ? 0.7 : 1,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8' }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
             >
-              {student.hasHold
-                ? <Unlock style={{ width: 15, height: 15 }} />
-                : <Lock style={{ width: 15, height: 15 }} />}
-              {student.hasHold ? 'Remove fee hold' : 'Apply fee hold'}
+              {account.hasHold ? <Unlock style={{ width: 15, height: 15 }} /> : <Lock style={{ width: 15, height: 15 }} />}
+              {account.hasHold ? 'Remove fee hold' : 'Apply fee hold'}
             </button>
 
-            {/* Issue receipt */}
             <button
-              onClick={() => setIssueSheetOpen(true)}
+              onClick={() => toast.info('Issue receipt from the Receipts page after a payment is recorded.')}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
               style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
             >
               <Receipt style={{ width: 15, height: 15 }} />
               Issue receipt
             </button>
 
-            {/* Record manual payment */}
             <button
               onClick={() => setManualSheetOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
               style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--muted)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
             >
               <CreditCard style={{ width: 15, height: 15 }} />
               Record manual payment
             </button>
           </div>
-
         </div>
       </div>
 
-      {/* Issue Receipt Sheet */}
-      <Sheet open={issueSheetOpen} onOpenChange={setIssueSheetOpen}>
-        <SheetContent className="overflow-y-auto sheet-lg" style={{ padding: 0 }}>
-          <IssueReceiptSheet
-            student={student}
-            onClose={() => setIssueSheetOpen(false)}
-            onIssued={(receiptNo, description, amount, method) => {
-              const newPayment: StudentPayment & { isManual?: boolean } = {
-                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                description,
-                amount,
-                method,
-                status: 'Paid',
-                receiptNo,
-              }
-              setPayments((prev) => [newPayment, ...prev])
-              setIssueSheetOpen(false)
-              toast.success(`Receipt ${receiptNo} issued successfully.`)
-            }}
-          />
-        </SheetContent>
-      </Sheet>
-
-      {/* Manual Payment Sheet */}
       <Sheet open={manualSheetOpen} onOpenChange={setManualSheetOpen}>
         <SheetContent className="overflow-y-auto sheet-lg" style={{ padding: 0 }}>
           <ManualPaymentSheet
-            student={student}
+            account={account}
+            studentId={studentId}
             onClose={() => setManualSheetOpen(false)}
-            onRecorded={(description, amount, method, proofRef) => {
-              const newPayment: StudentPayment & { isManual?: boolean } = {
-                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                description,
-                amount,
-                method,
-                status: 'Paid',
-                receiptNo: '',
-                isManual: true,
-              }
-              setPayments((prev) => [newPayment, ...prev])
-              setStudent((s) => ({
-                ...s,
-                amountPaid: s.amountPaid + amount,
-                outstanding: Math.max(0, s.outstanding - amount),
-                status: s.outstanding - amount <= 0 ? 'Paid' : s.status,
-              }))
+            onSuccess={async () => {
               setManualSheetOpen(false)
-              toast.success(`Manual payment of ${formatCurrency(amount)} recorded for ${student.name}.`)
+              await invalidate()
             }}
           />
         </SheetContent>
       </Sheet>
-    </AppShell>
+
+      <ConfirmAlertDialog
+        open={holdDialogOpen}
+        onOpenChange={(open) => { if (!open) { setHoldDialogOpen(false); setHoldReason('') } }}
+        title={account.hasHold ? `Remove fee hold for ${account.name}?` : `Apply fee hold to ${account.name}?`}
+        tone={account.hasHold ? 'success' : 'destructive'}
+        headlineLabel="Action"
+        headline={account.hasHold ? 'Remove fee hold' : 'Apply fee hold'}
+        summary={account.hasHold
+          ? 'The student will regain access to registration and results once the hold is removed.'
+          : 'The student will be blocked from registration and viewing results until the hold is lifted.'}
+        notices={[
+          { icon: 'shield', label: 'This action is logged in the audit trail.' },
+          { icon: 'file', label: 'Provide a clear reason for compliance.' },
+        ]}
+        confirmLabel={account.hasHold ? 'Remove hold' : 'Apply hold'}
+        confirmVariant={account.hasHold ? 'default' : 'destructive'}
+        onCancel={() => setHoldReason('')}
+        onConfirm={() => {
+          if (!holdReason.trim()) {
+            toast.error('Please provide a reason.')
+            return
+          }
+          holdMutation.mutate(holdReason.trim())
+        }}
+      >
+        <textarea
+          placeholder={account.hasHold ? 'Reason for removing the hold…' : 'Reason for applying the hold…'}
+          value={holdReason}
+          onChange={(e) => setHoldReason(e.target.value)}
+          rows={3}
+          className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none"
+          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
+        />
+      </ConfirmAlertDialog>
+    </BursarShell>
   )
 }
-
-// ── Issue Receipt Sheet ───────────────────────────────────────────────────────
-
-function IssueReceiptSheet({
-  student,
-  onClose,
-  onIssued,
-}: {
-  student: BursarStudent
-  onClose: () => void
-  onIssued: (receiptNo: string, description: string, amount: number, method: PaymentMethod) => void
-}) {
-  const [description, setDescription]   = useState('')
-  const [customDesc, setCustomDesc]     = useState('')
-  const [amount, setAmount]             = useState('')
-  const [method, setMethod]             = useState<PaymentMethod>('MTN MoMo')
-  const [date, setDate]                 = useState('')
-
-  const handleDescChange = (v: string) => {
-    setDescription(v)
-    if (v !== TYPE_NEW_SENTINEL) {
-      const auto = FEE_AMOUNTS[v]
-      if (auto !== undefined) setAmount(String(auto))
-    } else {
-      setAmount('')
-    }
-  }
-
-  const handleIssue = () => {
-    const resolvedDesc = description === TYPE_NEW_SENTINEL ? customDesc.trim() : description
-    const resolvedAmount = parseInt(amount, 10)
-    if (!resolvedDesc || isNaN(resolvedAmount) || resolvedAmount <= 0) {
-      toast.error('Please fill in all required fields.')
-      return
-    }
-    const receiptNo = `RCT-2025-${String(Math.floor(Math.random() * 9000) + 1000)}`
-    onIssued(receiptNo, resolvedDesc, resolvedAmount, method)
-  }
-
-  return (
-    <div style={{ padding: '28px 28px 40px' }}>
-      <div className="flex items-center justify-between mb-6">
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.375rem',
-            fontWeight: 700,
-            color: 'var(--foreground)',
-            letterSpacing: '-0.015em',
-          }}
-        >
-          Issue Receipt
-        </h2>
-        <button onClick={onClose} style={{ color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          <X style={{ width: 18, height: 18 }} />
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-5">
-        {/* Student name — read only */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Student</label>
-          <input
-            type="text"
-            value={student.name}
-            readOnly
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
-          />
-          <p className="t-mono mt-1" style={{ color: 'var(--muted-foreground)', fontSize: 12 }}>{student.id}</p>
-        </div>
-
-        {/* Fee description with 'Type new' */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Fee Description *</label>
-          <Select value={description} onValueChange={handleDescChange}>
-            <SelectTrigger className="w-full text-sm">
-              <SelectValue placeholder="Select description…" />
-            </SelectTrigger>
-            <SelectContent>
-              {FEE_DESCRIPTIONS.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
-              ))}
-              <SelectItem value={TYPE_NEW_SENTINEL}>
-                <span style={{ color: 'var(--success)', fontWeight: 600 }}>+ Type new description</span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {description === TYPE_NEW_SENTINEL && (
-            <input
-              type="text"
-              value={customDesc}
-              onChange={(e) => setCustomDesc(e.target.value)}
-              placeholder="Enter custom description…"
-              autoFocus
-              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none mt-2"
-              style={{ border: '1px solid var(--brand)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-            />
-          )}
-        </div>
-
-        {/* Amount */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Amount (RWF) *</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="e.g. 325000"
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-          {amount && !isNaN(parseInt(amount, 10)) && (
-            <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              {formatCurrency(parseInt(amount, 10))}
-            </p>
-          )}
-        </div>
-
-        {/* Payment method */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment Method</label>
-          <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-            <SelectTrigger className="w-full text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MTN MoMo">MTN MoMo</SelectItem>
-              <SelectItem value="Airtel Money">Airtel Money</SelectItem>
-              <SelectItem value="Card">Card</SelectItem>
-              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Payment date */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleIssue}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
-            style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer' }}
-          >
-            <Receipt style={{ width: 15, height: 15 }} />
-            Issue receipt
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-            style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Manual Payment Sheet ──────────────────────────────────────────────────────
 
 function ManualPaymentSheet({
-  student,
+  account,
+  studentId,
   onClose,
-  onRecorded,
+  onSuccess,
 }: {
-  student: BursarStudent
+  account: BursarStudentAccountDetail
+  studentId: string
   onClose: () => void
-  onRecorded: (description: string, amount: number, method: PaymentMethod, proofRef: string) => void
+  onSuccess: () => void | Promise<void>
 }) {
+  const queryClient = useQueryClient()
   const [description, setDescription] = useState('')
-  const [amount, setAmount]           = useState('')
-  const [method, setMethod]           = useState<PaymentMethod>('Bank Transfer')
-  const [date, setDate]               = useState('')
-  const [proofRef, setProofRef]       = useState('')
-  const [notes, setNotes]             = useState('')
+  const [amount, setAmount] = useState('')
+  const [methodLabel, setMethodLabel] = useState<(typeof PAYMENT_METHOD_OPTIONS)[number]['value']>('Bank Transfer')
+  const [notes, setNotes] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const parsed = parseInt(amount, 10)
+      const method = uiMethodToApi(methodLabel) as PaymentMethod
+      if (!description.trim() || isNaN(parsed) || parsed <= 0 || !notes.trim() || !method) {
+        throw new Error('Please fill in all required fields including notes.')
+      }
+      return recordBursarManualPayment(studentId, {
+        amount: parsed,
+        method,
+        description: description.trim(),
+        notes: notes.trim(),
+      })
+    },
+    onSuccess: async () => {
+      toast.success(`Manual payment of ${formatCurrency(parseInt(amount, 10))} recorded for ${account.name}.`)
+      setConfirmOpen(false)
+      await queryClient.invalidateQueries({ queryKey: bursarStudentAccountQueryKey(studentId) })
+      await onSuccess()
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not record payment.')),
+  })
 
   const handleRecord = () => {
-    const resolvedAmount = parseInt(amount, 10)
-    if (!description || isNaN(resolvedAmount) || resolvedAmount <= 0 || !notes.trim()) {
+    const parsed = parseInt(amount, 10)
+    if (!description.trim() || isNaN(parsed) || parsed <= 0 || !notes.trim()) {
       toast.error('Please fill in all required fields including notes.')
       return
     }
-    onRecorded(description, resolvedAmount, method, proofRef)
+    setConfirmOpen(true)
   }
 
   return (
-    <div style={{ padding: '28px 28px 40px' }}>
-      <div className="flex items-center justify-between mb-6">
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.375rem',
-            fontWeight: 700,
-            color: 'var(--foreground)',
-            letterSpacing: '-0.015em',
-          }}
-        >
-          Record Manual Payment
-        </h2>
-        <button onClick={onClose} style={{ color: 'var(--muted-foreground)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          <X style={{ width: 18, height: 18 }} />
-        </button>
-      </div>
-
-      {/* Warning alert */}
-      <div
-        className="flex items-start gap-3 p-4 mb-6 rounded-xl"
-        style={{ backgroundColor: 'var(--warning-bg)', border: '1px solid rgba(202,138,4,0.25)' }}
-      >
-        <AlertCircle style={{ width: 18, height: 18, color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
-        <p className="text-sm" style={{ color: 'var(--warning)', lineHeight: 1.6 }}>
-          Manual payments bypass the payment gateway. Ensure you have physical proof of payment before recording.
-          This action will be logged in the audit trail.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-5">
-        {/* Description */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Description *</label>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g. Semester 1 Partial Payment"
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
+    <>
+      <div style={{ padding: '28px 28px 40px' }}>
+        <div className="mb-6">
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
+            Record Manual Payment
+          </h2>
         </div>
 
-        {/* Amount */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Amount (RWF) *</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="e.g. 325000"
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-          {amount && !isNaN(parseInt(amount, 10)) && (
-            <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              {formatCurrency(parseInt(amount, 10))}
-            </p>
-          )}
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl" style={{ backgroundColor: 'var(--warning-bg)', border: '1px solid rgba(202,138,4,0.25)' }}>
+          <AlertCircle style={{ width: 18, height: 18, color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
+          <p className="text-sm" style={{ color: 'var(--warning)', lineHeight: 1.6 }}>
+            Manual payments bypass the payment gateway. Ensure you have physical proof of payment before recording.
+            This action will be logged in the audit trail.
+          </p>
         </div>
 
-        {/* Payment method */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment Method</label>
-          <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-            <SelectTrigger className="w-full text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MTN MoMo">MTN MoMo</SelectItem>
-              <SelectItem value="Airtel Money">Airtel Money</SelectItem>
-              <SelectItem value="Card">Card</SelectItem>
-              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="flex flex-col gap-5">
+          <div>
+            <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Description *</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Semester 1 Partial Payment"
+              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
+            />
+          </div>
 
-        {/* Payment date */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-        </div>
+          <div>
+            <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Amount (RWF) *</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 325000"
+              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
+            />
+            {amount && !isNaN(parseInt(amount, 10)) ? (
+              <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{formatCurrency(parseInt(amount, 10))}</p>
+            ) : null}
+          </div>
 
-        {/* Proof reference */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-            Proof Reference (e.g. bank slip number)
-          </label>
-          <input
-            type="text"
-            value={proofRef}
-            onChange={(e) => setProofRef(e.target.value)}
-            placeholder="e.g. BNK-SLIP-20250122-001"
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-        </div>
+          <div>
+            <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Payment Method</label>
+            <Select value={methodLabel} onValueChange={(v) => setMethodLabel(v as typeof methodLabel)}>
+              <SelectTrigger className="w-full text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHOD_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Notes — mandatory */}
-        <div>
-          <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
-            Notes * <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(required)</span>
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Describe why this payment is being recorded manually…"
-            rows={3}
-            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
-          />
-        </div>
+          <div>
+            <label className="t-label block mb-1.5" style={{ color: 'var(--muted-foreground)' }}>
+              Notes * <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(required)</span>
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Describe why this payment is being recorded manually…"
+              rows={3}
+              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', color: 'var(--foreground)' }}
+            />
+          </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleRecord}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
-            style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer' }}
-          >
-            <CreditCard style={{ width: 15, height: 15 }} />
-            Record payment
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-            style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
-          >
-            Cancel
-          </button>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleRecord}
+              disabled={mutation.isPending}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
+              style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer', opacity: mutation.isPending ? 0.7 : 1 }}
+            >
+              <CreditCard style={{ width: 15, height: 15 }} />
+              Record payment
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+              style={{ backgroundColor: 'transparent', color: 'var(--foreground)', border: '1px solid var(--border)', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <ConfirmAlertDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Record manual payment?"
+        tone="warning"
+        headlineLabel="Action"
+        headline="Record manual payment"
+        summary={`A payment of ${amount && !isNaN(parseInt(amount, 10)) ? formatCurrency(parseInt(amount, 10)) : '—'} will be recorded for ${account.name}.`}
+        notices={[
+          { icon: 'shield', label: 'This bypasses the payment gateway and is permanently logged.' },
+          { icon: 'file', label: 'Ensure you have verified proof of payment.' },
+        ]}
+        confirmLabel="Confirm payment"
+        onConfirm={() => mutation.mutate()}
+      />
+    </>
   )
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { Heart } from "lucide-react";
 import Link from "next/link";
 import { LOGO_CLASS, STACKFORGENEXT } from "@/lib/assets";
 import { useLocale } from "@/lib/i18n";
@@ -57,10 +56,7 @@ export function SiteFooter() {
             <Link href="/terms" className="hover:text-primary transition-colors">
               {t.footer.termsAndConditions}
             </Link>
-            <span className="inline-flex items-center gap-1.5">
-              <Heart className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden />
-              {c.madeWith}
-            </span>
+            <span>{c.madeWith}</span>
           </div>
         </div>
       </div>

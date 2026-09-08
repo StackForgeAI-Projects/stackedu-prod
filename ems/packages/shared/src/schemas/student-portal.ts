@@ -10,6 +10,8 @@ import {
   registrationStatusSchema,
   resourceTypeSchema,
 } from '../enums'
+import { paymentFeeKindSchema } from '../payment-policy'
+import { invoiceLineItemSchema } from '../invoice-line-items'
 import { isoDateSchema, isoDateTimeSchema, uuidSchema } from '../primitives'
 
 export const studentProfileSchema = z.object({
@@ -169,11 +171,15 @@ export const studentTranscriptSchema = z.object({
 export const studentInvoiceSchema = z.object({
   id: uuidSchema,
   invoiceNumber: z.string(),
+  description: z.string(),
   amountDue: z.number().int(),
   amountPaid: z.number().int(),
+  outstanding: z.number().int(),
   status: z.string(),
   dueDate: isoDateSchema.nullable(),
-  lineItems: z.array(z.object({ name: z.string(), amount: z.number() })),
+  feeKind: paymentFeeKindSchema,
+  allowPartial: z.boolean(),
+  lineItems: z.array(invoiceLineItemSchema),
 })
 
 export const studentPaymentRowSchema = z.object({
@@ -212,6 +218,7 @@ export const studentReceiptSchema = z.object({
   studentName: z.string(),
   institutionName: z.string(),
   description: z.string(),
+  verificationCode: z.string().nullable(),
 })
 
 export const studentNotificationSchema = z.object({

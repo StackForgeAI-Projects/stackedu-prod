@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { AppShell } from '@/components/AppShell'
+import { BursarShell } from '@/components/BursarShell'
 import { AccountSettingsView } from '@/components/account/AccountSettingsView'
-import { BURSAR, BURSAR_NAV } from '@/data/bursar'
+import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 
 export const Route = createFileRoute('/_auth/bursar/settings')({
   component: BursarSettingsPage,
@@ -9,16 +9,7 @@ export const Route = createFileRoute('/_auth/bursar/settings')({
 
 function BursarSettingsPage() {
   return (
-    <AppShell
-      navItems={BURSAR_NAV}
-      pageTitle="Account Settings"
-      userName={BURSAR.fullName}
-      userRole="Bursar"
-      userInitials={BURSAR.initials}
-      infoCardLabel="BURSAR"
-      infoCardValue={BURSAR.institution}
-      infoCardSubtext={BURSAR.office}
-    >
+    <BursarShell pageTitle="Account Settings" guide={BURSAR_GUIDES.settings}>
       <AccountSettingsView
         breadcrumb="Bursar"
         notificationPrefs={[
@@ -28,6 +19,6 @@ function BursarSettingsPage() {
           { key: 'system', label: 'System announcements', email: true, sms: false, inapp: false },
         ]}
       />
-    </AppShell>
+    </BursarShell>
   )
 }

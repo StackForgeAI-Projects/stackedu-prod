@@ -1,9 +1,6 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_auth/bursar/')({
-  component: BursarDashboardPlaceholder,
+  beforeLoad: () => { throw redirect({ to: '/bursar/dashboard' }) },
+  component: () => null,
 })
-
-function BursarDashboardPlaceholder() {
-  return <div className="p-8 t-h2">Bursar dashboard — coming soon.</div>
-}

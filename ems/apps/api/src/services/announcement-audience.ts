@@ -4,7 +4,8 @@ import { userRoleSchema } from '@stackedu/shared/enums'
 import { getInstitutionDb } from '../db/connection'
 import { departments, programmes } from '../db/institution/schema/academic'
 import { users } from '../db/institution/schema/people'
-import { students } from '../db/institution/schema/students'
+import { studentProfiles, students } from '../db/institution/schema/students'
+import { courseOfferings, courseRegistrations } from '../db/institution/schema/teaching'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   Applicant: 'Applicants',
@@ -26,18 +27,22 @@ export function encodeAudience(audience: AnnouncementAudience | undefined, fallb
   if (audience.includeApplicants) tokens.add('applicants')
   for (const id of audience.departmentIds ?? []) tokens.add(`dept:${id}`)
   for (const year of audience.yearsOfStudy ?? []) tokens.add(`year:${year}`)
+  for (const id of audience.studentIds ?? []) tokens.add(`student:${id}`)
+  for (const id of audience.courseOfferingIds ?? []) tokens.add(`course:${id}`)
   return tokens.size ? [...tokens] : ['none']
 }
 
 export function decodeAudience(tokens: string[]): AnnouncementAudience {
   if (tokens.includes('none')) {
-    return { everyone: false, roles: [], includeEnrolledStudents: false, includeApplicants: false, departmentIds: [], yearsOfStudy: [] }
+    return { everyone: false, roles: [], includeEnrolledStudents: false, includeApplicants: false, departmentIds: [], yearsOfStudy: [], studentIds: [], courseOfferingIds: [] }
   }
   if (tokens.includes('*') || tokens.length === 0) return { everyone: true }
 
   const roles: UserRole[] = []
   const departmentIds: string[] = []
   const yearsOfStudy: number[] = []
+  const studentIds: string[] = []
+  const courseOfferingIds: string[] = []
   let includeEnrolledStudents = false
   let includeApplicants = false
 
@@ -52,7 +57,8 @@ export function decodeAudience(tokens: string[]): AnnouncementAudience {
     else if (token.startsWith('year:')) {
       const year = Number(token.slice(5))
       if (Number.isInteger(year)) yearsOfStudy.push(year)
-    }
+    } else if (token.startsWith('student:')) studentIds.push(token.slice(8))
+    else if (token.startsWith('course:')) courseOfferingIds.push(token.slice(6))
   }
 
   return {
@@ -62,12 +68,32 @@ export function decodeAudience(tokens: string[]): AnnouncementAudience {
     includeApplicants,
     departmentIds,
     yearsOfStudy,
+    studentIds,
+    courseOfferingIds,
   }
 }
 
 export async function audienceLabel(institutionId: string, tokens: string[]): Promise<string> {
   const audience = decodeAudience(tokens)
   if (audience.everyone || tokens.length === 0) return 'Everyone at the institution'
+
+  if (audience.studentIds?.length === 1) {
+    const db = await getInstitutionDb(institutionId)
+    const [row] = await db
+      .select({
+        firstName: studentProfiles.firstName,
+        lastName: studentProfiles.lastName,
+        fullName: users.fullName,
+      })
+      .from(students)
+      .innerJoin(users, eq(users.id, students.userId))
+      .leftJoin(studentProfiles, eq(studentProfiles.studentId, students.id))
+      .where(eq(students.id, audience.studentIds[0]!))
+      .limit(1)
+    if (row) {
+      return row.firstName && row.lastName ? `${row.firstName} ${row.lastName}` : row.fullName
+    }
+  }
 
   const parts: string[] = []
   const roles = audience.roles ?? []
@@ -79,23 +105,38 @@ export async function audienceLabel(institutionId: string, tokens: string[]): Pr
   const wantsApplicants = audience.includeApplicants || roles.includes('Applicant')
 
   if (wantsStudents) {
-    const studentBits = ['Enrolled students']
-    if (audience.departmentIds?.length) {
-      const db = await getInstitutionDb(institutionId)
-      const rows = await db
-        .select({ id: departments.id, name: departments.name })
-        .from(departments)
-        .where(inArray(departments.id, audience.departmentIds))
-      const names = rows.map((row) => row.name)
-      if (names.length) studentBits.push(`in ${names.join(', ')}`)
+    if (
+      !audience.includeEnrolledStudents
+      && !roles.includes('Student')
+      && audience.yearsOfStudy?.length
+      && !(audience.departmentIds?.length)
+    ) {
+      parts.push(`Year ${audience.yearsOfStudy.sort((a, b) => a - b).join(', ')} students`)
+    } else {
+      const studentBits = ['Enrolled students']
+      if (audience.departmentIds?.length) {
+        const db = await getInstitutionDb(institutionId)
+        const rows = await db
+          .select({ id: departments.id, name: departments.name })
+          .from(departments)
+          .where(inArray(departments.id, audience.departmentIds))
+        const names = rows.map((row) => row.name)
+        if (names.length) studentBits.push(`in ${names.join(', ')}`)
+      }
+      if (audience.yearsOfStudy?.length) {
+        studentBits.push(`year ${audience.yearsOfStudy.sort((a, b) => a - b).join(', ')}`)
+      }
+      parts.push(studentBits.join(' · '))
     }
-    if (audience.yearsOfStudy?.length) {
-      studentBits.push(`year ${audience.yearsOfStudy.sort((a, b) => a - b).join(', ')}`)
-    }
-    parts.push(studentBits.join(' · '))
   }
 
   if (wantsApplicants) parts.push('Applicants')
+  if (audience.studentIds?.length && audience.studentIds.length > 1) {
+    parts.push(`${audience.studentIds.length} selected students`)
+  }
+  if (audience.courseOfferingIds?.length) {
+    parts.push(`${audience.courseOfferingIds.length} selected course${audience.courseOfferingIds.length === 1 ? '' : 's'}`)
+  }
   return parts.join(' · ') || 'Selected users'
 }
 
@@ -146,6 +187,31 @@ export async function resolveAudienceUserIds(
       .innerJoin(departments, eq(departments.id, programmes.departmentId))
       .where(and(...conditions))
 
+    for (const row of rows) ids.add(row.id)
+  }
+
+  if (audience.studentIds?.length) {
+    const rows = await db
+      .select({ id: users.id })
+      .from(students)
+      .innerJoin(users, eq(students.userId, users.id))
+      .where(and(eq(users.isActive, true), inArray(students.id, audience.studentIds)))
+    for (const row of rows) ids.add(row.id)
+  }
+
+  if (audience.courseOfferingIds?.length) {
+    const rows = await db
+      .select({ id: users.id })
+      .from(courseRegistrations)
+      .innerJoin(students, eq(students.id, courseRegistrations.studentId))
+      .innerJoin(users, eq(users.id, students.userId))
+      .where(
+        and(
+          eq(users.isActive, true),
+          inArray(courseRegistrations.courseOfferingId, audience.courseOfferingIds),
+          eq(courseRegistrations.status, 'Approved'),
+        ),
+      )
     for (const row of rows) ids.add(row.id)
   }
 

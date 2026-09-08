@@ -45,17 +45,85 @@ export class ApiClientError extends Error {
  * A validation failure's summary ("Some fields need your attention") tells them
  * nothing, so the first field message is preferred when there is one.
  */
-export function apiErrorMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiClientError)) return fallback
+export type ApiBreakCategory = 'connection' | 'backend' | 'database'
 
-  const detail = firstValidationDetail(error.details)
-  if (detail) return detail
+export interface ApiErrorDiagnosis {
+  /** Present only for API / backend / database breaks — not validation or auth. */
+  breakCategory?: ApiBreakCategory
+  label: string
+  message: string
+  requestId?: string
+}
 
-  if (error.code === 'VALIDATION_FAILED') {
-    return 'Please check the form and fix the highlighted fields.'
+function isApiBreak(error: ApiClientError): boolean {
+  return (
+    error.code === 'NETWORK_ERROR'
+    || error.code === 'SERVICE_UNAVAILABLE'
+    || error.status >= 500
+  )
+}
+
+/**
+ * Explains infrastructure failures in plain language so support can tell
+ * whether the API, backend, or database is at fault.
+ */
+export function apiErrorDiagnosis(error: unknown, fallback = 'We could not load this page. Please try again.'): ApiErrorDiagnosis {
+  if (!(error instanceof ApiClientError)) {
+    return { label: 'Something went wrong', message: fallback }
   }
 
-  return error.message
+  const detail = firstValidationDetail(error.details)
+  if (detail) {
+    return { label: 'Check your input', message: detail }
+  }
+
+  if (error.code === 'VALIDATION_FAILED') {
+    return {
+      label: 'Check your input',
+      message: 'Please check the form and fix the highlighted fields.',
+    }
+  }
+
+  if (error.code === 'NETWORK_ERROR') {
+    return {
+      breakCategory: 'connection',
+      label: 'Connection problem',
+      message: 'We could not connect to StackEDU. Please check your internet connection and try again.',
+      ...(error.requestId ? { requestId: error.requestId } : {}),
+    }
+  }
+
+  if (error.code === 'SERVICE_UNAVAILABLE' || error.status === 503) {
+    return {
+      breakCategory: 'database',
+      label: 'Service unavailable',
+      message: 'StackEDU is temporarily unavailable. Please try again in a few minutes.',
+      ...(error.requestId ? { requestId: error.requestId } : {}),
+    }
+  }
+
+  if (error.status >= 500 || error.code === 'INTERNAL_ERROR') {
+    return {
+      breakCategory: 'backend',
+      label: 'Server error',
+      message: 'Something went wrong on our servers. Please try again shortly.',
+      ...(error.requestId ? { requestId: error.requestId } : {}),
+    }
+  }
+
+  return {
+    label: 'Request failed',
+    message: error.message,
+    ...(error.requestId ? { requestId: error.requestId } : {}),
+  }
+}
+
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  return apiErrorDiagnosis(error, fallback).message
+}
+
+export function isApiBreakError(error: unknown): error is ApiClientError {
+  return error instanceof ApiClientError && isApiBreak(error)
 }
 
 export interface RequestOptions {

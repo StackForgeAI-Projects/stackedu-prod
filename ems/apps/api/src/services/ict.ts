@@ -31,11 +31,14 @@ import {
   attendancePolicySchema,
   auditSummary,
   DEFAULT_ATTENDANCE_POLICY,
+  DEFAULT_PAYMENT_POLICY,
+  paymentPolicySchema,
   titleAndFirstName,
 } from '@stackedu/shared'
 import { env } from '../config/env'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { readInstitutionSetting, upsertInstitutionSetting } from '../lib/institution-settings'
+import { readPaymentPolicy, writePaymentPolicy } from '../lib/payment-policy-store'
 import { writeInstitutionLogo } from '../lib/storage'
 import { institutions, userDirectory } from '../db/platform/schema'
 import { programmes } from '../db/institution/schema/academic'
@@ -66,8 +69,11 @@ import {
 } from './announcement-audience'
 
 const DEFAULT_INTEGRATIONS = [
-  { provider: 'MTNMoMo', displayName: 'MTN MoMo' },
-  { provider: 'AirtelMoney', displayName: 'Airtel Money' },
+  { provider: 'MTNMoMo', displayName: 'MTN MoMo (PawaPay)' },
+  { provider: 'AirtelMoney', displayName: 'Airtel Money (PawaPay)' },
+  { provider: 'PawaPay', displayName: 'PawaPay' },
+  { provider: 'Flutterwave', displayName: 'Flutterwave (Card)' },
+  { provider: 'Twilio', displayName: 'Twilio SMS' },
   { provider: 'Resend', displayName: 'Resend Email' },
 ] as const
 
@@ -270,10 +276,29 @@ function integrationHealthMessage(provider: string, isEnabled: boolean): string 
       ? 'Email service is configured on the server'
       : 'Email API key or sender address is missing on the server'
   }
+  if (provider === 'PawaPay') {
+    return settings.PAWAPAY_API_TOKEN
+      ? settings.PAYMENT_MODE === 'sandbox'
+        ? 'PawaPay token set — sandbox still completes payments instantly'
+        : 'PawaPay is configured for live mobile money'
+      : 'Add PAWAPAY_API_TOKEN on the server'
+  }
+  if (provider === 'Flutterwave') {
+    return settings.FLUTTERWAVE_SECRET_KEY
+      ? settings.PAYMENT_MODE === 'sandbox'
+        ? 'Flutterwave keys set — sandbox still completes card payments instantly'
+        : 'Flutterwave is configured for live card payments'
+      : 'Add FLUTTERWAVE_SECRET_KEY on the server'
+  }
+  if (provider === 'Twilio') {
+    return settings.TWILIO_ACCOUNT_SID && settings.TWILIO_AUTH_TOKEN && settings.TWILIO_FROM_NUMBER
+      ? 'Twilio SMS is configured on the server'
+      : 'Twilio credentials are missing on the server'
+  }
   if (provider === 'MTNMoMo' || provider === 'AirtelMoney') {
     return settings.PAYMENT_MODE === 'sandbox'
       ? 'Sandbox mode — payments complete instantly for testing'
-      : 'Live mode — payment gateway credentials must be set on the server'
+      : 'Live mode — enable PawaPay and set credentials on the server'
   }
   return 'Configuration looks ready'
 }
@@ -903,7 +928,8 @@ export async function getIctSettings(institutionId: string): Promise<IctSettings
     attendancePolicySchema,
     DEFAULT_ATTENDANCE_POLICY,
   )
-  return mapIctSettings(row, attendancePolicy)
+  const paymentPolicy = await readPaymentPolicy(db)
+  return mapIctSettings(row, attendancePolicy, paymentPolicy)
 }
 
 function publicLogoUrl(slug: string, logoFileKey: string | null): string | null {
@@ -924,6 +950,7 @@ function mapIctSettings(
     logoFileKey: string | null
   },
   attendancePolicy = DEFAULT_ATTENDANCE_POLICY,
+  paymentPolicy = DEFAULT_PAYMENT_POLICY,
 ): IctSettings {
   return {
     name: row.name,
@@ -936,6 +963,7 @@ function mapIctSettings(
     location: row.location,
     logoUrl: publicLogoUrl(row.slug, row.logoFileKey),
     attendancePolicy,
+    paymentPolicy,
   }
 }
 
@@ -987,6 +1015,15 @@ export async function updateIctSettings(
       },
       actor.id,
     )
+  }
+
+  if (input.paymentPolicy) {
+    const db = await getInstitutionDb(institutionId)
+    const nextPolicy = paymentPolicySchema.parse({
+      ...current.paymentPolicy,
+      ...input.paymentPolicy,
+    })
+    await writePaymentPolicy(db, nextPolicy, actor.id)
   }
 
   await writeAudit({
