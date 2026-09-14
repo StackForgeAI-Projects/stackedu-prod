@@ -213,7 +213,7 @@ function faqSchema(market: Market): JsonLd {
       },
       {
         "@type": "Question",
-        name: "How do students join and pay fees on StackEDU?",
+        name: "How do students apply for admissions and pay fees on StackEDU?",
         acceptedAnswer: {
           "@type": "Answer",
           text: joinAndPay,

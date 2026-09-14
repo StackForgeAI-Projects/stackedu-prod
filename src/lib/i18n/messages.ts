@@ -193,7 +193,7 @@ const en = {
         a: "StackEDU is built for universities, polytechnics and colleges in Rwanda — large or small. It is an all-in-one education platform for admissions, student records, fees, teaching, the library and an institutional repository, so your campus works from one place.",
       },
       {
-        q: "How do students join and pay fees?",
+        q: "How do students apply for admissions and pay fees?",
         a: "Students apply themselves. They create an account on your admissions portal, verify their email, complete the application and pay the application fee with MTN MoMo, Airtel Money, card or bank transfer. After your admissions team accepts them, they accept the offer online, receive a student number and use the same login in the student portal. Semester fees then appear on their fee statement when your bursar applies the fee structure. Students pay invoices from the portal with those same methods and receive a receipt when payment is confirmed. Bank transfers may stay pending until your finance office confirms them.",
       },
       {
@@ -491,7 +491,7 @@ const fr = {
         a: "StackEDU est conçu pour les universités, instituts et collèges du Rwanda — grands ou petits. C'est une plateforme éducative tout-en-un pour les admissions, les dossiers, les frais, l'enseignement, la bibliothèque et un dépôt institutionnel, afin que votre campus travaille depuis un seul endroit.",
       },
       {
-        q: "Comment les étudiants rejoignent-ils la plateforme et paient-ils ?",
+        q: "Comment les étudiants candidatent-ils aux admissions et paient-ils les frais ?",
         a: "Les étudiants posent eux-mêmes leur candidature. Ils créent un compte sur votre portail d'admission, vérifient leur e-mail, remplissent le dossier et paient les frais de candidature via MTN MoMo, Airtel Money, carte ou virement. Une fois acceptés par votre équipe, ils acceptent l'offre en ligne, reçoivent un numéro d'étudiant et utilisent le même identifiant sur le portail étudiant. Les frais de semestre apparaissent ensuite sur leur relevé lorsque le bursar applique la structure tarifaire. Ils règlent les factures depuis le portail et reçoivent un reçu une fois le paiement confirmé. Un virement peut rester en attente jusqu'à confirmation par votre service financier.",
       },
       {
@@ -789,7 +789,7 @@ const rw = {
         a: "StackEDU yubatswe ku kaminuza, amashuri y'ubumenyi n'amakollegi mu Rwanda — nto cyangwa nini. Ni urubuga rumwe rw'uburezi rwo kwiyandikisha, inyandiko, amafaranga, kwigisha, ububiko bw'ibitabo n'ububiko bw'ubushakashatsi, kugira ngo ishuri ryawe rikore ahantu hamwe.",
       },
       {
-        q: "Abanyeshuri binjira batya kandi bishyura batya?",
+        q: "Abanyeshuri basaba kwiyandikisha batya kandi bishyura amafaranga batya?",
         a: "Abanyeshuri bishyiramo ubwabo. Bashyiraho konti ku rubuga rwo kwiyandikisha, bemeza email, buzuza dosiye kandi bishyura amafaranga yo gusaba binyuze muri MTN MoMo, Airtel Money, ikarita cyangwa banki. Nyuma y'uko itsinda ryawe ryemeye, bemera itangwa kuri interineti, bahabwa nimero y'umunyeshuri kandi bakoresha iyo konti ku rubuga rw'abanyeshuri. Amafaranga y'icyiciro agaragara ku nyandiko y'amafaranga iyo umuyobozi w'amafaranga ashyizeho gahunda. Bishyura fagitire ku rubuga kandi bahabwa recu iyo kwishyura byemejwe. Kohereza muri banki bishobora gukomeza gutegereza kugeza serivisi y'amafaranga byemeza.",
       },
       {
