@@ -69,10 +69,27 @@ const SHARED_KEYWORDS = [
   "digital skills training",
   "academy management",
   "training management system",
+  "institutional repository",
+  "institutional repository development",
+  "university institutional repository",
+  "IR institutional repository",
 ] as const;
 
 /** StackEDU primary keyword targets — shared across both markets. */
 const STACKEDU_KEYWORDS_SHARED = [
+  "institutional repository",
+  "institutional repository development",
+  "university institutional repository",
+  "IR institutional repository",
+  "higher education institutional repository",
+  "digital institutional repository",
+  "research repository software",
+  "open access institutional repository",
+  "university research repository",
+  "theses repository",
+  "scholarly repository",
+  "build institutional repository",
+  "academic institutional repository",
   "StackEDU",
   "Academic records management software",
   "Student data management system",
@@ -135,6 +152,11 @@ const STACKEDU_KEYWORDS_RW = [
   "polytechnic management software Rwanda",
   "university management information system Rwanda",
   "automated school reporting Rwanda",
+  "institutional repository Rwanda",
+  "university institutional repository Kigali",
+  "IR development Rwanda",
+  "higher education institutional repository Rwanda",
+  "research repository Rwanda",
 ] as const;
 
 /** Africa-only keyword targets for stackedu.africa. */
@@ -156,6 +178,12 @@ const STACKEDU_KEYWORDS_AFRICA = [
   "polytechnic management system Africa",
   "tertiary institution ERP Africa",
   "national EMIS platform Africa",
+  "institutional repository Africa",
+  "university institutional repository Africa",
+  "IR development Africa",
+  "higher education institutional repository Africa",
+  "research repository Africa",
+  "polytechnic institutional repository Africa",
 ] as const;
 
 const RW_SUPPLEMENTAL_KEYWORDS = [
@@ -225,7 +253,7 @@ const profiles: Record<Market, MarketSeoProfile> = {
       "StackEDU Rwanda — School & University Management Software in Kigali",
     titleTemplate: "%s | StackEDU Rwanda",
     description:
-      "StackEDU is Rwanda's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library — built in Kigali by StackForgeAI.",
+      "StackEDU is Rwanda's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library, and build an institutional repository that helps your research get cited worldwide — built in Kigali by StackForgeAI.",
     keywords: [...RW_KEYWORDS],
     ogImage: "/images/stackedu-hero.webp",
     ogImageAlt: "StackEDU platform for Rwandan tertiary institutions",
@@ -246,7 +274,7 @@ const profiles: Record<Market, MarketSeoProfile> = {
       "StackEDU — School & University Management Software Across Africa",
     titleTemplate: "%s | StackEDU Africa",
     description:
-      "StackEDU is Africa's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library — built by StackForgeAI.",
+      "StackEDU is Africa's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library, and build an institutional repository that helps your research get cited worldwide — built by StackForgeAI.",
     keywords: [...AFRICA_KEYWORDS],
     ogImage: "/images/stackedu-hero.webp",
     ogImageAlt: "StackEDU platform for African tertiary institutions",

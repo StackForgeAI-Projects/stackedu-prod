@@ -9,8 +9,11 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-24 bg-surface-alt">
-      <div className="mx-auto max-w-3xl px-6">
+    <section id="faq" className="relative overflow-hidden py-24 bg-secondary">
+      <div className="pointer-events-none absolute inset-0 dotted-pattern opacity-[0.16]" />
+      <div className="pointer-events-none absolute -top-28 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 right-[-4rem] size-[20rem] rounded-full bg-accent blur-3xl" />
+      <div className="relative mx-auto max-w-3xl px-6">
         <div className="reveal text-center mb-12">
           <div className="eyebrow text-primary mb-3">
             {t.faq.eyebrow}
@@ -25,8 +28,10 @@ export function FAQ() {
             return (
               <div
                 key={f.q}
-                className={`rounded-2xl border bg-white transition-colors ${
-                  active ? "border-primary/30 shadow-soft" : "border-border"
+                className={`rounded-2xl border backdrop-blur-sm transition-colors ${
+                  active
+                    ? "border-primary/25 bg-surface/80 shadow-soft"
+                    : "border-border/80 bg-surface/55"
                 }`}
               >
                 <button
@@ -37,7 +42,7 @@ export function FAQ() {
                   <span className="font-bold text-ink">{f.q}</span>
                   <span
                     className={`grid place-items-center size-7 rounded-full shrink-0 transition-colors ${
-                      active ? "bg-primary text-white" : "bg-secondary text-ink"
+                      active ? "bg-primary text-white" : "bg-primary/10 text-ink"
                     }`}
                   >
                     {active ? <Minus className="size-4" /> : <Plus className="size-4" />}

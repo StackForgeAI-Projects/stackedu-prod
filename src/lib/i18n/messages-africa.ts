@@ -111,11 +111,19 @@ export const africaMessagesEn: AfricaOverrides = {
     items: [
       {
         q: "Who is StackEDU for?",
-        a: "StackEDU is built for universities, polytechnics and colleges across Africa — big or small. If you still run admissions, fees, grades, e-learning or the library on separate tools, StackEDU brings everything together so your team works from one place.",
+        a: "StackEDU is built for universities, polytechnics and colleges across Africa — large or small. It is an all-in-one education platform for admissions, student records, fees, teaching, the library and an institutional repository, so your campus works from one place.",
       },
       {
         q: "How do students join and pay fees?",
-        a: "Your institution creates student accounts when they enroll. Students log in with the details you send them and pay fees with mobile money, card or bank transfer — the channels your campus already uses.",
+        a: "Students apply themselves. They create an account on your admissions portal, verify their email, complete the application and pay the application fee with mobile money (including M-Pesa where available), card or bank transfer. After your admissions team accepts them, they accept the offer online, receive a student number and use the same login in the student portal. Semester fees then appear on their fee statement when your bursar applies the fee structure. Students pay invoices from the portal with those same methods and receive a receipt when payment is confirmed. Bank transfers may stay pending until your finance office confirms them.",
+      },
+      {
+        q: "Will StackEDU replace our existing systems and IT team?",
+        a: "No. We do not scrap your current systems or replace your technology team. We partner with your ICT staff to upgrade what you already run — making operations more efficient and bringing admissions, records, fees, teaching and the library into one central platform. Your team stays in charge. We work alongside them.",
+      },
+      {
+        q: "Can you help us build an institutional repository?",
+        a: "Yes. An institutional repository (IR) is the public home for your institution's research, theses and scholarly work, so other universities and scholars can find, cite and reference it. StackEDU helps universities, polytechnics and colleges build and improve that repository — properly indexed and open to the world — so your research is easier to discover and your institution ranks higher in Africa and globally.",
       },
       {
         q: "Is our data safe?",
@@ -123,11 +131,11 @@ export const africaMessagesEn: AfricaOverrides = {
       },
       {
         q: "Does it work when internet is slow?",
-        a: "Yes. Students and lecturers can still use the app for many tasks without internet. When connection returns, everything updates automatically — so work does not stop on campus.",
+        a: "Yes. StackEDU is built for campuses where the connection is not always strong. The platform is mobile-first and designed to stay usable on slow networks. Saving records and payments still need a connection — when the network is back, you continue from where you left off.",
       },
       {
-        q: "What help do we get after we start?",
-        a: "You get support six days a week, a dedicated contact person, and training for your team. Most institutions are live within 2 - 4 weeks. Book a demo and we will walk you through a plan that fits your calendar.",
+        q: "What support do we get after we start?",
+        a: "Support is 24/7, round the clock, with a dedicated contact person for your institution. After go-live we continue working with your campus IT team — training staff, keeping the platform healthy, and helping you scale the school technically as it grows.",
       },
     ],
   },
@@ -189,6 +197,38 @@ export const africaMessagesFr: AfricaOverrides = {
   modules: {
     title: "Tout ce dont une institution tertiaire africaine a besoin.",
   },
+  faq: {
+    items: [
+      {
+        q: "Pour qui StackEDU est-il conçu ?",
+        a: "StackEDU est conçu pour les universités, instituts et collèges d'Afrique — grands ou petits. C'est une plateforme éducative tout-en-un pour les admissions, les dossiers, les frais, l'enseignement, la bibliothèque et un dépôt institutionnel, afin que votre campus travaille depuis un seul endroit.",
+      },
+      {
+        q: "Comment les étudiants rejoignent-ils la plateforme et paient-ils ?",
+        a: "Les étudiants posent eux-mêmes leur candidature. Ils créent un compte sur votre portail d'admission, vérifient leur e-mail, remplissent le dossier et paient les frais de candidature via mobile money (y compris M-Pesa là où c'est disponible), carte ou virement. Une fois acceptés par votre équipe, ils acceptent l'offre en ligne, reçoivent un numéro d'étudiant et utilisent le même identifiant sur le portail étudiant. Les frais de semestre apparaissent ensuite sur leur relevé lorsque le bursar applique la structure tarifaire. Ils règlent les factures depuis le portail et reçoivent un reçu une fois le paiement confirmé. Un virement peut rester en attente jusqu'à confirmation par votre service financier.",
+      },
+      {
+        q: "Allez-vous remplacer nos systèmes et notre équipe informatique ?",
+        a: "Non. Nous ne mettons pas de côté vos systèmes existants et nous ne remplaçons pas votre équipe technique. Nous travaillons avec vos équipes ICT pour moderniser ce que vous avez déjà — afin de rendre les opérations plus efficaces et de réunir admissions, dossiers, frais, enseignement et bibliothèque sur une seule plateforme centrale. Votre équipe reste aux commandes. Nous l'accompagnons.",
+      },
+      {
+        q: "Pouvez-vous nous aider à construire un dépôt institutionnel ?",
+        a: "Oui. Un dépôt institutionnel (IR) est l'espace public pour la recherche, les thèses et les travaux savants de votre institution, afin que d'autres universités et chercheurs puissent les trouver, les citer et s'y référer. StackEDU aide les universités, instituts et collèges à construire et améliorer ce dépôt — bien indexé et ouvert au monde — pour que votre recherche soit plus visible et que votre institution se classe mieux en Afrique et à l'international.",
+      },
+      {
+        q: "Nos données sont-elles en sécurité ?",
+        a: "Oui. StackEDU suit les bonnes pratiques de sécurité : données chiffrées en transit, accès par rôle et journaux d'audit complets pour que vous sachiez qui a fait quoi.",
+      },
+      {
+        q: "Est-ce que ça marche quand internet est lent ?",
+        a: "Oui. StackEDU est conçu pour les campus où la connexion n'est pas toujours forte. La plateforme est d'abord mobile et reste utilisable sur un réseau lent. Enregistrer des dossiers et payer demande encore une connexion — dès que le réseau revient, vous reprenez là où vous vous étiez arrêtés.",
+      },
+      {
+        q: "Quel support recevons-nous après le lancement ?",
+        a: "Le support est disponible 24h/24 et 7j/7, en continu, avec une personne de contact dédiée à votre institution. Après le lancement, nous continuons à travailler avec votre équipe IT : formation des équipes, suivi de la plateforme, et montée en charge technique à mesure que l'école grandit.",
+      },
+    ],
+  },
   partners: {
     trustedBy: "Approuvé par des institutions à travers l'Afrique",
   },
@@ -235,6 +275,38 @@ export const africaMessagesRw: AfricaOverrides = {
   },
   modules: {
     title: "Ibikenewe ku ishuri rya kaminuza mu Afrika.",
+  },
+  faq: {
+    items: [
+      {
+        q: "StackEDU yubatswe ku bande?",
+        a: "StackEDU yubatswe ku kaminuza, amashuri y'ubumenyi n'amakollegi mu Afrika — nto cyangwa nini. Ni urubuga rumwe rw'uburezi rwo kwiyandikisha, inyandiko, amafaranga, kwigisha, ububiko bw'ibitabo n'ububiko bw'ubushakashatsi, kugira ngo ishuri ryawe rikore ahantu hamwe.",
+      },
+      {
+        q: "Abanyeshuri binjira batya kandi bishyura batya?",
+        a: "Abanyeshuri bishyiramo ubwabo. Bashyiraho konti ku rubuga rwo kwiyandikisha, bemeza email, buzuza dosiye kandi bishyura amafaranga yo gusaba binyuze muri mobile money (harimo M-Pesa aho iboneka), ikarita cyangwa banki. Nyuma y'uko itsinda ryawe ryemeye, bemera itangwa kuri interineti, bahabwa nimero y'umunyeshuri kandi bakoresha iyo konti ku rubuga rw'abanyeshuri. Amafaranga y'icyiciro agaragara ku nyandiko y'amafaranga iyo umuyobozi w'amafaranga ashyizeho gahunda. Bishyura fagitire ku rubuga kandi bahabwa recu iyo kwishyura byemejwe. Kohereza muri banki bishobora gukomeza gutegereza kugeza serivisi y'amafaranga byemeza.",
+      },
+      {
+        q: "Muzasimbura sisiteme n'itsinda ryacu rya tekinike?",
+        a: "Oya. Ntituvana sisiteme mufite cyangwa itsinda ryawe rya tekinike. Dukorana n'abakozi ba ICT bawe kugira ngo twongere imbaraga ibyo mukoresha — kugira ngo imirimo ikore neza kandi kwiyandikisha, inyandiko, amafaranga, kwigisha n'ububiko bihuzwe ku rubuga rumwe. Itsinda ryawe rikomeza kuyobora. Dukorana nabo.",
+      },
+      {
+        q: "Mushobora kudufasha kubaka ububiko bw'ubushakashatsi bw'ishuri?",
+        a: "Yego. Ububiko bw'ikigo (institutional repository, IR) ni ahantu hashamiye ubushakashatsi, teses na inyandiko z'ubuhanga z'ishuri ryawe, kugira ngo izindi kaminuza n'abashakashatsi babone, bavuge kandi babyitaho. StackEDU ifasha kaminuza, amashuri y'ubumenyi n'amakollegi kubaka no guteza imbere ubwo bubiko — bufite indekesi nziza kandi bufunguye isi — kugira ngo ubushakashatsi bwawe buboneke kandi ishuri ryawe rishyirwe hejuru mu Afrika no ku isi.",
+      },
+      {
+        q: "Amakuru yacu aratekanye?",
+        a: "Yego. StackEDU ikurikiza imikorere myiza y'umutekano: amakuru arinzwe mu nzira, uburenganzira n'inandikisho z'isuzuma kugira ngo umenye uwabyakoze.",
+      },
+      {
+        q: "Irakora n'interineti idahorana?",
+        a: "Yego. StackEDU yubatswe ku mashuri aho interineti idahora ikomeye. Urubuga rwa mbere kuri telefoni kandi rukora neza n'interineti idahorana. Kubika inyandiko no kwishyura biracyakeneye interineti — iyo interineti igarutse, ukomeza aho wari ugeze.",
+      },
+      {
+        q: "Duhabwa ubuhe bufasha nyuma yo gutangira?",
+        a: "Ubufasha burahari amasaha 24 ku munsi, iminsi 7 mu cyumweru, buri gihe, hamwe n'umuntu wihariye w'ishuri ryawe. Nyuma yo gutangira dukomeza gukorana n'itsinda ryawe rya IT — guhugura abakozi, gufata neza urubuga, no gufasha ishuri gukuza mu buryo bwa tekinike uko rikura.",
+      },
+    ],
   },
   partners: {
     trustedBy: "Byizewe n'amashuri mu Afrika",
