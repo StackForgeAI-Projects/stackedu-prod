@@ -164,7 +164,7 @@ def main():
             "WebSite (+ SearchAction)",
             "SoftwareApplication (EducationalApplication / school management)",
             "LocalBusiness (Kigali HQ coordinates)",
-            "Service + OfferCatalog (Starter / Institution / Enterprise)",
+            "Service (institutional school management platform)",
             "FAQPage (edtech / fees / AI / HQ questions)",
             "WebPage + BreadcrumbList",
             "StackForgeNext: EducationalOrganization child entity",

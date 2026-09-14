@@ -106,13 +106,6 @@ function softwareSchema(market: Market): JsonLd {
     url: seo.siteUrl,
     description: home.description,
     image: absoluteUrl(market, seo.ogImage),
-    offers: {
-      "@type": "AggregateOffer",
-      priceCurrency: market === "rw" ? "RWF" : "USD",
-      lowPrice: market === "rw" ? "750000" : "599",
-      highPrice: market === "rw" ? "2500000" : "1999",
-      offerCount: 3,
-    },
     provider: { "@id": `${seo.siteUrl}/#organization` },
     featureList: [
       "Admissions & student enrollment",
@@ -167,7 +160,6 @@ function localBusinessSchema(market: Market): JsonLd {
       market === "rw"
         ? ["Kigali", "Rwanda"]
         : ["Africa", "Rwanda", "Nigeria", "Kenya", "Ghana", "Uganda"],
-    priceRange: market === "rw" ? "RWF" : "USD",
     parentOrganization: { "@id": `${seo.siteUrl}/#organization` },
   };
 }
@@ -258,15 +250,6 @@ function serviceSchema(market: Market): JsonLd {
     areaServed: market === "rw" ? "Rwanda" : "Africa",
     description: seo.description,
     keywords: seo.keywords.slice(0, 20).join(", "),
-    hasOfferCatalog: {
-      "@type": "OfferCatalog",
-      name: "StackEDU plans",
-      itemListElement: [
-        { "@type": "Offer", itemOffered: { "@type": "Service", name: "Starter" } },
-        { "@type": "Offer", itemOffered: { "@type": "Service", name: "Institution" } },
-        { "@type": "Offer", itemOffered: { "@type": "Service", name: "Enterprise" } },
-      ],
-    },
   };
 }
 

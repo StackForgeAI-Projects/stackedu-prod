@@ -10,53 +10,6 @@ type DeepPartial<T> = {
 
 type AfricaOverrides = DeepPartial<Messages>;
 
-const africaPricingPlans: Messages["pricing"]["plans"] = [
-  {
-    name: "Starter",
-    tag: "For single-faculty colleges",
-    price: "$599",
-    unit: "USD / semester",
-    features: [
-      "Up to 1,500 student records",
-      "Admissions, records, e-library",
-      "Mobile money, card & bank payments",
-      "Email support (5 days/week)",
-      "Standard onboarding · 2 weeks",
-    ],
-    cta: "Start with Starter",
-  },
-  {
-    name: "Institution",
-    tag: "For universities & polytechnics",
-    price: "$1,999",
-    unit: "USD / semester",
-    features: [
-      "Up to 15,000 student records",
-      "All modules incl. e-learning & AI alerts",
-      "Mobile money, card & bank reconciliation",
-      "Personal contact · help 6 days a week",
-      "Guided onboarding · 4 weeks",
-      "Branded app for your students",
-    ],
-    cta: "Book a Demo",
-  },
-  {
-    name: "Enterprise",
-    tag: "For multi-campus systems",
-    price: "Custom",
-    unit: "annual contract",
-    features: [
-      "Unlimited student records",
-      "Custom modules & integrations",
-      "Regional hosting or on your servers",
-      "Fast support · dedicated engineer",
-      "White-label apps",
-      "Quarterly executive reviews",
-    ],
-    cta: "Talk to sales",
-  },
-];
-
 export const africaMessagesEn: AfricaOverrides = {
   hero: {
     subtitle:
@@ -154,13 +107,6 @@ export const africaMessagesEn: AfricaOverrides = {
       { t: "Platform Admin", d: "Roles, audit logs & security." },
     ],
   },
-  pricing: {
-    subtitle:
-      "One flat semester fee. No per-seat charges, no surprise invoices. Priced in USD for institutions across Africa.",
-    footnote:
-      "All plans include secure hosting, mobile apps and staff training. Payment via mobile money, card or bank transfer.",
-    plans: africaPricingPlans,
-  },
   faq: {
     items: [
       {
@@ -243,34 +189,6 @@ export const africaMessagesFr: AfricaOverrides = {
   modules: {
     title: "Tout ce dont une institution tertiaire africaine a besoin.",
   },
-  pricing: {
-    subtitle:
-      "Un tarif fixe par semestre. Pas de frais par utilisateur, pas de factures surprises. Tarifs en USD pour les institutions à travers l'Afrique.",
-    footnote:
-      "Tous les forfaits incluent un hébergement sécurisé, des applications mobiles et la formation du personnel. Paiement via mobile money, carte ou virement bancaire.",
-    plans: africaPricingPlans.map((plan) => ({
-      ...plan,
-      tag:
-        plan.name === "Starter"
-          ? "Pour les collèges à une seule faculté"
-          : plan.name === "Institution"
-            ? "Pour universités et instituts"
-            : plan.tag,
-      unit: plan.unit.replace("semester", "semestre"),
-      features: plan.features.map((f) =>
-        f
-          .replace("Mobile money", "Mobile money")
-          .replace("Standard onboarding", "Intégration standard")
-          .replace("Guided onboarding", "Intégration guidée"),
-      ),
-      cta:
-        plan.cta === "Start with Starter"
-          ? "Commencer avec Starter"
-          : plan.cta === "Book a Demo"
-            ? "Réserver une démo"
-            : "Contacter les ventes",
-    })),
-  },
   partners: {
     trustedBy: "Approuvé par des institutions à travers l'Afrique",
   },
@@ -317,22 +235,6 @@ export const africaMessagesRw: AfricaOverrides = {
   },
   modules: {
     title: "Ibikenewe ku ishuri rya kaminuza mu Afrika.",
-  },
-  pricing: {
-    subtitle:
-      "Igiciro kimwe ku cyiciro. Nta mafaranga ku muntu, nta fagitire itunguranye. Ibiciro mu USD ku mashuri mu Afrika yose.",
-    footnote:
-      "Gahunda zose zirimo gukurikirana neza, porogaramu za telefoni n'amahugurwa. Kwishyura binyuze muri mobile money, ikarita cyangwa banki.",
-    plans: africaPricingPlans.map((plan) => ({
-      ...plan,
-      unit: plan.unit.replace("semester", "icyiciro"),
-      cta:
-        plan.cta === "Start with Starter"
-          ? "Tangira na Starter"
-          : plan.cta === "Book a Demo"
-            ? "Fata demo"
-            : "Vugana n'ubucuruzi",
-    })),
   },
   partners: {
     trustedBy: "Byizewe n'amashuri mu Afrika",

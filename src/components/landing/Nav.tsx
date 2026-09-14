@@ -19,7 +19,6 @@ export function Nav() {
     t.nav.about,
     t.nav.forInstitutions,
     t.nav.features,
-    t.nav.pricing,
     t.nav.next,
     t.nav.contact,
   ];

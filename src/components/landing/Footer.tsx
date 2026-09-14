@@ -43,7 +43,6 @@ export function Footer() {
               { label: t.footer.features, href: homeSectionHref("#modules") },
               { label: t.footer.about, href: homeSectionHref("#about") },
               { label: t.footer.howItWorks, href: homeSectionHref("#product") },
-              { label: t.footer.pricing, href: homeSectionHref("#pricing") },
               { label: t.footer.contact, href: homeSectionHref("#contact") },
             ]}
           />

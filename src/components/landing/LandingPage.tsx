@@ -14,7 +14,6 @@ import { ModulesSection } from "@/components/landing/ModulesSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
 import { DarkCTA } from "@/components/landing/DarkCTA";
 import { TestimonialsCarousel } from "@/components/landing/TestimonialsCarousel";
-import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQ } from "@/components/landing/FAQ";
 import { StackForgeNextSection } from "@/components/landing/StackForgeNextSection";
 import { ContactSection } from "@/components/landing/ContactSection";
@@ -36,7 +35,6 @@ function LandingContent() {
       <DashboardPreview />
       <DarkCTA />
       <TestimonialsCarousel />
-      <PricingSection />
       <FAQ />
       <StackForgeNextSection />
       <ContactSection />

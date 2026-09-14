@@ -39,7 +39,6 @@ export const NAV_HREFS = [
   "/#about",
   "/#roles",
   "/#modules",
-  "/#pricing",
   "/#stackforgenext",
   "/#contact",
 ] as const;
@@ -57,8 +56,6 @@ export const SOLUTION_POSITIONS = [
   "bottom-24 -left-3 sm:-left-6 lg:-left-8",
   "bottom-2 -right-3 sm:-right-6 lg:-right-8",
 ] as const;
-
-export const PLAN_FEATURED = [false, true, false] as const;
 
 export const PAYMENT_DOTS: (string | undefined)[] = ["#FFCC00", "#ED1C24", undefined, undefined];
 
