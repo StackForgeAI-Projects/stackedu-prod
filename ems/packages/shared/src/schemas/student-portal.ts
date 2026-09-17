@@ -361,6 +361,7 @@ export type StudentDashboard = z.infer<typeof studentDashboardSchema>
 export type StudentCourseSummary = z.infer<typeof studentCourseSummarySchema>
 export type StudentCourseDetail = z.infer<typeof studentCourseDetailSchema>
 export type StudentRegistrationState = z.infer<typeof studentRegistrationStateSchema>
+export type StudentOfferingOption = z.infer<typeof studentOfferingOptionSchema>
 export type RegisterCoursesRequest = z.infer<typeof registerCoursesRequestSchema>
 export type StudentResults = z.infer<typeof studentResultsSchema>
 export type StudentTranscript = z.infer<typeof studentTranscriptSchema>
