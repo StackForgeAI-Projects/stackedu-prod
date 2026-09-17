@@ -3,9 +3,20 @@ import { eq } from 'drizzle-orm'
 import { LECTURER_ASSIGNMENT_REQUIRES_SEMESTER } from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
-import { academicYears, courses, departments, faculties, semesters, academicCalendarEvents } from '../src/db/institution/schema/academic'
+import { academicYears, courses, departments, faculties, programmes, semesters, academicCalendarEvents } from '../src/db/institution/schema/academic'
+import { notifications } from '../src/db/institution/schema/communication'
+import { students } from '../src/db/institution/schema/students'
 import { AppError } from '../src/lib/errors'
-import { createAcademicCourse, deleteAcademicCourse, createAcademicCalendarEvent, deleteAcademicCalendarEvent, listAcademicSemesters } from '../src/services/academic'
+import {
+  createAcademicCourse,
+  deleteAcademicCourse,
+  createAcademicCalendarEvent,
+  deleteAcademicCalendarEvent,
+  listAcademicSemesters,
+  updateAcademicCalendarEvent,
+  updateAcademicCourse,
+} from '../src/services/academic'
+import { getRegistrationState, registerForCourses } from '../src/services/student'
 import { createUser } from '../src/services/users'
 import { createTestPlatform, uniqueSlug, type TestPlatform } from './helpers/test-database'
 
@@ -15,6 +26,8 @@ describe('academic courses', () => {
   let actor: { id: string; email: string; role: 'AcademicAdmin' }
   let lecturerId: string
   let semesterId: string
+  let studentUserId: string
+  let departmentId: string
 
   beforeAll(async () => {
     platform = await createTestPlatform()
@@ -47,10 +60,35 @@ describe('academic courses', () => {
 
     const db = await getInstitutionDb(institutionId)
     const [faculty] = await db.insert(faculties).values({ code: 'SCI', name: 'Science' }).returning({ id: faculties.id })
-    await db.insert(departments).values({
+    const [department] = await db.insert(departments).values({
       facultyId: faculty!.id,
       code: 'CMP',
       name: 'Department of Computing',
+    }).returning({ id: departments.id })
+    departmentId = department!.id
+
+    const [programme] = await db.insert(programmes).values({
+      departmentId,
+      code: 'BSC-CS',
+      name: 'Computer Science',
+      level: 'Bachelor',
+      durationYears: 4,
+      totalCreditsRequired: 480,
+    }).returning({ id: programmes.id })
+
+    const student = await createUser({
+      institutionId,
+      email: 'student@courses.test',
+      fullName: 'Course Student',
+      role: 'Student',
+      password: 'Correct#Horse2026',
+    })
+    studentUserId = student.id
+    await db.insert(students).values({
+      userId: student.id,
+      studentNumber: 'CTU-2026-0001',
+      programmeId: programme!.id,
+      yearOfStudy: 1,
     })
 
     const [year] = await db
@@ -182,5 +220,88 @@ describe('academic courses', () => {
     await deleteAcademicCalendarEvent(institutionId, actor, event.id)
 
     expect((await listAcademicSemesters(institutionId)).some((s) => s.label.includes('Second Semester'))).toBe(false)
+  })
+
+  it('closes a course for registration, notifies students, and rejects a tick until it is opened', async () => {
+    const current = (await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)
+    expect(current?.id).toBeTruthy()
+
+    const created = await createAcademicCourse(institutionId, actor, {
+      code: 'CMP201',
+      name: 'Operating Systems',
+      departmentName: 'Department of Computing',
+      credits: 3,
+      lecturerId,
+      semesterId: current!.id,
+      openForRegistration: true,
+    })
+
+    expect(created.openForRegistration).toBe(true)
+    expect(created.semesterId).toBe(current!.id)
+
+    const openState = await getRegistrationState(institutionId, studentUserId)
+    const offering = openState.offerings.find((row) => row.offeringId && row.name === 'Operating Systems')
+    expect(offering?.openForRegistration).toBe(true)
+    expect(openState.registrationOpen).toBe(true)
+
+    await updateAcademicCourse(institutionId, actor, created.id, {
+      semesterId: current!.id,
+      openForRegistration: false,
+    })
+
+    const closedState = await getRegistrationState(institutionId, studentUserId)
+    expect(closedState.offerings.find((row) => row.name === 'Operating Systems')?.openForRegistration).toBe(false)
+
+    const closedError = await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [offering!.offeringId],
+    }).catch((cause: AppError) => cause)
+    expect(closedError).toBeInstanceOf(AppError)
+    expect((closedError as AppError).message).toBe('That course is closed for registration.')
+
+    await updateAcademicCourse(institutionId, actor, created.id, {
+      semesterId: current!.id,
+      openForRegistration: true,
+    })
+
+    await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [offering!.offeringId],
+    })
+
+    const registered = await getRegistrationState(institutionId, studentUserId)
+    expect(registered.offerings.find((row) => row.name === 'Operating Systems')?.registered).toBe(true)
+
+    const db = await getInstitutionDb(institutionId)
+    const notes = await db
+      .select({ title: notifications.title, category: notifications.category })
+      .from(notifications)
+      .where(eq(notifications.userId, studentUserId))
+    expect(notes.some((note) => note.title === 'New course: CMP 201')).toBe(true)
+    expect(notes.some((note) => note.title === 'Registration closed: CMP 201')).toBe(true)
+    expect(notes.some((note) => note.title === 'Registration open: CMP 201')).toBe(true)
+  })
+
+  it('lets an academic admin edit a calendar event and notifies students', async () => {
+    const event = await createAcademicCalendarEvent(institutionId, actor, {
+      title: 'Library induction',
+      category: 'Holiday',
+      startDate: '2026-09-20',
+      endDate: '2026-09-20',
+      description: 'Optional visit',
+    })
+
+    const updated = await updateAcademicCalendarEvent(institutionId, actor, event.id, {
+      title: 'Library induction week',
+      description: 'Hall A',
+    })
+    expect(updated.title).toBe('Library induction week')
+    expect(updated.description).toBe('Hall A')
+
+    const db = await getInstitutionDb(institutionId)
+    const notes = await db
+      .select({ title: notifications.title, category: notifications.category })
+      .from(notifications)
+      .where(eq(notifications.userId, studentUserId))
+    expect(notes.some((note) => note.title === 'Calendar: Library induction')).toBe(true)
+    expect(notes.some((note) => note.title === 'Calendar updated: Library induction week')).toBe(true)
   })
 })

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { LecturerNotification } from '@stackedu/shared'
 import {
-  Bell, FileText, GraduationCap, AlertTriangle, ChevronRight,
+  Bell, FileText, GraduationCap, AlertTriangle, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { LecturerShell } from '@/components/LecturerShell'
 import { PagedList } from '@/components/ListPagination'
@@ -28,6 +28,8 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; iconBg: string; ico
   Results: { icon: GraduationCap, iconBg: 'var(--success-bg)', iconColor: 'var(--success)' },
   Assignments: { icon: FileText, iconBg: 'var(--info-bg)', iconColor: 'var(--info)' },
   'At-Risk': { icon: AlertTriangle, iconBg: 'var(--error-bg)', iconColor: 'var(--error)' },
+  Registration: { icon: FileText, iconBg: 'var(--info-bg)', iconColor: 'var(--info)' },
+  Calendar: { icon: CalendarDays, iconBg: 'var(--info-bg)', iconColor: 'var(--info)' },
   System: { icon: Bell, iconBg: 'var(--muted)', iconColor: 'var(--muted-foreground)' },
 }
 

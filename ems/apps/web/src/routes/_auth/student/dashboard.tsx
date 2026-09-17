@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import type { StudentDashboard } from '@stackedu/shared'
 import {
-  CreditCard, TrendingUp, Users, Sparkles, ChevronLeft, ChevronRight, FileText, BookMarked,
+  CreditCard, TrendingUp, Users, Sparkles, ChevronLeft, ChevronRight, FileText, BookMarked, CalendarDays,
 } from 'lucide-react'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { StudentShell } from '@/components/StudentShell'
@@ -312,7 +312,7 @@ function CalendarCard({
           <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No upcoming deadlines.</p>
         ) : (
           deadlines.map((item, i) => {
-            const Icon = item.type === 'fee' ? CreditCard : item.type === 'registration' ? BookMarked : FileText
+            const Icon = item.type === 'fee' ? CreditCard : item.type === 'registration' ? BookMarked : item.type === 'calendar' ? CalendarDays : FileText
             return (
               <div key={item.id} className="flex items-center gap-3 py-3" style={{ borderBottom: i < deadlines.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 30, height: 30, backgroundColor: 'var(--muted)' }}>

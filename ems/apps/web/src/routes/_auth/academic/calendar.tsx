@@ -3,11 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import type { AcademicCalendarEvent } from '@stackedu/shared'
 import { formatAppDateDdMmYyyy } from '@stackedu/shared'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { AcademicShell } from '@/components/AcademicShell'
 import { calEventColors } from '@/data/academic'
 import {
@@ -16,6 +24,7 @@ import {
   createAcademicCalendarEvent,
   deleteAcademicCalendarEvent,
   listAcademicCalendarEvents,
+  updateAcademicCalendarEvent,
 } from '@/lib/api/academic'
 import { apiErrorMessage } from '@/lib/api/client'
 import { toast } from 'sonner'
@@ -92,6 +101,7 @@ function CalendarPage() {
   const [navDate, setNavDate] = useState(new Date())
   const [selDate, setSelDate] = useState(today)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<AcademicCalendarEvent | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AcademicCalendarEvent | null>(null)
   const [confirmSave, setConfirmSave] = useState(false)
   const [form, setForm] = useState<EventForm>(BLANK_EVENT)
@@ -103,27 +113,31 @@ function CalendarPage() {
 
   const events = data ?? []
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: () => {
       if (!form.title.trim()) throw new Error('Event title is required.')
       if (!form.startDate) throw new Error('Start date is required.')
-      return createAcademicCalendarEvent({
+      const input = {
         title: form.title.trim(),
         category: form.category,
         startDate: form.startDate,
         endDate: form.endDate || undefined,
         description: form.description.trim() || undefined,
-      })
+      }
+      return editing
+        ? updateAcademicCalendarEvent(editing.id, input)
+        : createAcademicCalendarEvent(input)
     },
     onSuccess: async () => {
-      toast.success('Event added to the calendar.')
+      toast.success(editing ? 'Event updated.' : 'Event added to the calendar.')
       setSheetOpen(false)
       setConfirmSave(false)
+      setEditing(null)
       setForm(BLANK_EVENT)
       await queryClient.invalidateQueries({ queryKey: academicCalendarQueryKey })
       await queryClient.invalidateQueries({ queryKey: academicSemestersQueryKey })
     },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not create event.')),
+    onError: (err) => toast.error(apiErrorMessage(err, editing ? 'Could not update event.' : 'Could not create event.')),
   })
 
   const deleteMutation = useMutation({
@@ -164,10 +178,25 @@ function CalendarPage() {
   const heading = `${MONTH_NAMES[navDate.getMonth()]} ${navDate.getFullYear()}`
 
   const openAdd = () => {
+    setEditing(null)
     setForm({
       ...BLANK_EVENT,
       startDate: toIsoDate(selDate),
       endDate: toIsoDate(selDate),
+    })
+    setSheetOpen(true)
+  }
+
+  const openEdit = (event: AcademicCalendarEvent) => {
+    setEditing(event)
+    setForm({
+      title: event.title,
+      category: (EVENT_TYPES as readonly string[]).includes(event.type)
+        ? (event.type as typeof EVENT_TYPES[number])
+        : 'Semester',
+      startDate: event.startDate,
+      endDate: event.endDate ?? event.startDate,
+      description: event.description ?? '',
     })
     setSheetOpen(true)
   }
@@ -244,79 +273,96 @@ function CalendarPage() {
             <EventList
               title={selDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
               events={selEvents}
-              onSelect={(ev) => setDeleteTarget(ev)}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
             />
             <div className="mt-4">
-              <EventList title="All Events" events={allEvents} scroll onSelect={(ev) => setDeleteTarget(ev)} />
+              <EventList title="All Events" events={allEvents} scroll onEdit={openEdit} onDelete={setDeleteTarget} />
             </div>
           </div>
         </div>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); if (!open) setEditing(null) }}>
         <SheetContent side="right" className="p-0 overflow-y-auto sheet-lg">
-          <SheetHeader className="px-8 py-6" style={{ borderBottom: '1px solid var(--border)' }}>
-            <SheetTitle style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Add Calendar Event</SheetTitle>
+          <SheetHeader className="px-6 sm:px-8 py-6" style={{ borderBottom: '1px solid var(--border)' }}>
+            <SheetTitle style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
+              {editing ? 'Edit calendar event' : 'Add calendar event'}
+            </SheetTitle>
           </SheetHeader>
-          <div className="px-8 py-6 flex flex-col gap-4">
-            <div>
-              <label className="t-label mb-1.5 block" style={{ color: 'var(--muted-foreground)' }}>Title</label>
-              <input
+          <div className="px-6 sm:px-8 py-6 flex flex-col gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="calendar-event-title" style={{ color: 'var(--muted-foreground)' }}>Title</Label>
+              <Input
+                id="calendar-event-title"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                className="w-full text-sm rounded-lg px-3 h-9 outline-none"
-                style={inputStyle}
                 placeholder="e.g. First Semester begins"
+                style={inputStyle}
               />
             </div>
-            <div>
-              <label className="t-label mb-1.5 block" style={{ color: 'var(--muted-foreground)' }}>Category</label>
-              <select
+            <div className="space-y-2">
+              <Label style={{ color: 'var(--muted-foreground)' }}>Category</Label>
+              <Select
                 value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as typeof EVENT_TYPES[number] }))}
-                className="w-full text-sm rounded-lg px-3 h-9 outline-none"
-                style={inputStyle}
+                onValueChange={(value) => setForm((f) => ({ ...f, category: value as typeof EVENT_TYPES[number] }))}
               >
-                {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+                <SelectTrigger style={inputStyle}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+                {form.category === 'Semester'
+                  ? 'A Semester event whose dates include today opens course registration for that semester.'
+                  : 'This is a calendar notice. Only a Semester event opens student registration.'}
+              </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="t-label mb-1.5 block" style={{ color: 'var(--muted-foreground)' }}>Start Date</label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="calendar-event-start" style={{ color: 'var(--muted-foreground)' }}>Start date</Label>
+                <Input
+                  id="calendar-event-start"
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-                  className="w-full text-sm rounded-lg px-3 h-9 outline-none"
                   style={inputStyle}
                 />
               </div>
-              <div>
-                <label className="t-label mb-1.5 block" style={{ color: 'var(--muted-foreground)' }}>End Date</label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="calendar-event-end" style={{ color: 'var(--muted-foreground)' }}>End date</Label>
+                <Input
+                  id="calendar-event-end"
                   type="date"
                   value={form.endDate}
                   onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-                  className="w-full text-sm rounded-lg px-3 h-9 outline-none"
                   style={inputStyle}
                 />
               </div>
             </div>
-            <div>
-              <label className="t-label mb-1.5 block" style={{ color: 'var(--muted-foreground)' }}>Description</label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="calendar-event-description" style={{ color: 'var(--muted-foreground)' }}>Description</Label>
+              <Textarea
+                id="calendar-event-description"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={3}
-                className="w-full text-sm rounded-lg px-3 py-2 outline-none resize-none"
-                style={inputStyle}
                 placeholder="Optional details"
+                style={inputStyle}
               />
             </div>
-            <div className="flex gap-3 mt-2">
-              <button type="button" onClick={() => setSheetOpen(false)} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ border: '1px solid var(--border)', color: 'var(--foreground)', backgroundColor: 'transparent', cursor: 'pointer' }}>Cancel</button>
-              <button
+            <div className="flex flex-col-reverse sm:flex-row gap-3 mt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setSheetOpen(false)}>
+                Cancel
+              </Button>
+              <Button
                 type="button"
+                className="flex-1"
+                disabled={saveMutation.isPending}
                 onClick={() => {
                   if (!form.title.trim()) {
                     toast.error('Event title is required.')
@@ -328,12 +374,10 @@ function CalendarPage() {
                   }
                   setConfirmSave(true)
                 }}
-                disabled={createMutation.isPending}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: createMutation.isPending ? 'not-allowed' : 'pointer', opacity: createMutation.isPending ? 0.7 : 1 }}
+                style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
               >
-                {createMutation.isPending ? 'Saving…' : 'Save event'}
-              </button>
+                {saveMutation.isPending ? 'Saving…' : editing ? 'Save changes' : 'Save event'}
+              </Button>
             </div>
           </div>
         </SheetContent>
@@ -358,19 +402,22 @@ function CalendarPage() {
       <ConfirmAlertDialog
         open={confirmSave}
         onOpenChange={(open) => { if (!open) setConfirmSave(false) }}
-        title="Add this calendar event?"
+        title={editing ? 'Save these calendar changes?' : 'Add this calendar event?'}
         tone="success"
         headlineLabel="Action"
-        headline="Create event"
-        summary={`${form.title.trim()} will be added to the academic calendar.`}
+        headline={editing ? 'Update event' : 'Create event'}
+        summary={`${form.title.trim()} will be saved on the academic calendar.`}
         notices={[
-          { icon: 'info', label: 'Staff and students will see this event on the calendar.' },
+          { icon: 'info', label: 'Students and lecturers will be notified and can see this event.' },
+          ...(form.category === 'Semester'
+            ? [{ icon: 'info' as const, label: 'If the dates include today, this semester opens for course registration.' }]
+            : []),
         ]}
-        confirmLabel={createMutation.isPending ? 'Saving…' : 'Confirm'}
+        confirmLabel={saveMutation.isPending ? 'Saving…' : 'Confirm'}
         confirmVariant="brand"
-        loading={createMutation.isPending}
+        loading={saveMutation.isPending}
         onCancel={() => setConfirmSave(false)}
-        onConfirm={() => createMutation.mutate()}
+        onConfirm={() => saveMutation.mutate()}
       />
     </AcademicShell>
   )
@@ -380,12 +427,14 @@ function EventList({
   title,
   events,
   scroll,
-  onSelect,
+  onEdit,
+  onDelete,
 }: {
   title: string
   events: AcademicCalendarEvent[]
   scroll?: boolean
-  onSelect?: (event: AcademicCalendarEvent) => void
+  onEdit: (event: AcademicCalendarEvent) => void
+  onDelete: (event: AcademicCalendarEvent) => void
 }) {
   return (
     <div
@@ -401,23 +450,29 @@ function EventList({
             {events.map((ev) => {
               const { bg, color } = eventColors(ev.type)
               return (
-                <button
+                <div
                   key={ev.id}
-                  type="button"
-                  onClick={() => onSelect?.(ev)}
-                  className="p-3 rounded-xl text-left w-full transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: bg, border: `1px solid ${color}20`, cursor: onSelect ? 'pointer' : 'default' }}
-                  title={onSelect ? 'Click to delete' : undefined}
+                  className="p-3 rounded-xl w-full"
+                  style={{ backgroundColor: bg, border: `1px solid ${color}20` }}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(ev)}
+                      className="text-left min-w-0 flex-1"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
                       <p className="text-sm font-semibold">{ev.title}</p>
                       <p className="t-caption mt-0.5">{formatEventRange(ev.startDate, ev.endDate)}</p>
-                      {ev.description && <p className="t-caption mt-1">{ev.description}</p>}
+                      {ev.description ? <p className="t-caption mt-1">{ev.description}</p> : null}
+                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.5)', color, fontSize: 10 }}>{ev.type}</span>
+                      <IconActionButton label="Edit event" icon={Pencil} onClick={() => onEdit(ev)} />
+                      <IconActionButton label="Delete event" icon={Trash2} danger onClick={() => onDelete(ev)} />
                     </div>
-                    <span className="t-label px-1.5 py-0.5 shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.5)', color, fontSize: 10 }}>{ev.type}</span>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

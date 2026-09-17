@@ -42,7 +42,7 @@ export const studentDeadlineSchema = z.object({
   id: z.string(),
   title: z.string(),
   date: isoDateSchema.nullable(),
-  type: z.enum(['fee', 'registration', 'assignment']),
+  type: z.enum(['fee', 'registration', 'assignment', 'calendar']),
 })
 
 export const studentScheduleItemSchema = z.object({
@@ -165,6 +165,7 @@ export const studentOfferingOptionSchema = z.object({
   type: z.enum(['Compulsory', 'Elective']),
   registered: z.boolean(),
   status: registrationStatusSchema.nullable(),
+  openForRegistration: z.boolean(),
 })
 
 export const studentRegistrationStateSchema = z.object({

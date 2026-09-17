@@ -7,6 +7,8 @@ import { Pencil, Archive, Plus, Trash2, Upload } from 'lucide-react'
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { AcademicShell } from '@/components/AcademicShell'
 import { DataTable } from '@/components/DataTable'
@@ -44,6 +46,7 @@ type CourseFormData = {
   semesterId: string
   lecturerId: string
   status: 'Active' | 'Inactive'
+  openForRegistration: boolean
 }
 
 function blankForm(): CourseFormData {
@@ -58,6 +61,7 @@ function blankForm(): CourseFormData {
     semesterId: '',
     lecturerId: '',
     status: 'Active',
+    openForRegistration: true,
   }
 }
 
@@ -116,6 +120,7 @@ function CoursesCataloguePage() {
           prerequisiteCodes,
           lecturerId: form.lecturerId || null,
           semesterId,
+          openForRegistration: form.openForRegistration,
         })
       }
 
@@ -129,6 +134,7 @@ function CoursesCataloguePage() {
         prerequisiteCodes: prerequisiteCodes.length > 0 ? prerequisiteCodes : undefined,
         lecturerId,
         semesterId,
+        openForRegistration: form.openForRegistration,
       })
     },
     onSuccess: async () => {
@@ -231,9 +237,10 @@ function CoursesCataloguePage() {
       type: c.type,
       description: c.description ?? '',
       prerequisites: c.prerequisites,
-      semesterId: defaultSemesterId(semesters),
+      semesterId: c.semesterId ?? defaultSemesterId(semesters),
       lecturerId: c.lecturerId ?? '',
       status: c.status === 'Active' ? 'Active' : 'Inactive',
+      openForRegistration: c.openForRegistration,
     })
     setPrereqInput('')
     setSheetOpen(true)
@@ -298,6 +305,29 @@ function CoursesCataloguePage() {
               },
             },
             { id: 'lecturer', header: 'Assigned Lecturer', value: (c) => c.lecturerName ?? '', cell: (c) => <span className="text-sm whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>{c.lecturerName ?? '—'}</span> },
+            {
+              id: 'registration',
+              header: 'Registration',
+              value: (c) => (c.semesterId ? (c.openForRegistration ? 'Open' : 'Closed') : ''),
+              cell: (c) => {
+                if (!c.semesterId) {
+                  return <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>—</span>
+                }
+                const open = c.openForRegistration
+                return (
+                  <span
+                    className="t-label px-2 py-0.5"
+                    style={{
+                      backgroundColor: open ? 'var(--success-bg)' : 'var(--muted)',
+                      color: open ? 'var(--success)' : 'var(--muted-foreground)',
+                      borderRadius: 'var(--radius-sm)',
+                    }}
+                  >
+                    {open ? 'Open' : 'Closed'}
+                  </span>
+                )
+              },
+            },
             { id: 'enrolled', header: 'Enrolled', value: (c) => c.enrolled, cell: (c) => <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{c.enrolled}</span> },
             {
               id: 'status', header: 'Status', value: (c) => c.status,
@@ -383,6 +413,14 @@ function CoursesCataloguePage() {
             : form.lecturerId
               ? [{ icon: 'info' as const, label: LECTURER_ASSIGNMENT_REQUIRES_SEMESTER }]
               : []),
+          ...(form.semesterId
+            ? [{
+                icon: 'info' as const,
+                label: form.openForRegistration
+                  ? 'Students can tick this course while semester registration is open.'
+                  : 'This course will stay closed for registration even if the semester is open.',
+              }]
+            : []),
         ]}
         confirmLabel={saveMutation.isPending ? 'Saving…' : 'Confirm'}
         confirmVariant="brand"
@@ -601,6 +639,27 @@ function CoursesCataloguePage() {
                 </p>
               ) : null}
             </FormField>
+            <FormField label="Open for registration" className="mb-4">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="course-open-for-registration"
+                  checked={form.openForRegistration}
+                  onCheckedChange={(checked) => setForm((f) => ({ ...f, openForRegistration: checked }))}
+                  className="data-[state=checked]:bg-[var(--brand)]"
+                />
+                <Label htmlFor="course-open-for-registration" className="text-sm cursor-pointer" style={{ color: 'var(--foreground)' }}>
+                  {form.openForRegistration ? 'Open' : 'Closed'}
+                </Label>
+              </div>
+              <p className="t-caption mt-1.5" style={{ color: 'var(--muted-foreground)' }}>
+                Semester registration is opened on Calendar. This switch opens or closes this course for students to tick.
+              </p>
+              {form.openForRegistration === false && !form.semesterId ? (
+                <p className="t-caption mt-1.5" style={{ color: 'var(--warning)' }}>
+                  Choose a semester to close this course for registration.
+                </p>
+              ) : null}
+            </FormField>
             {editing ? (
               <FormField label="Status" className="mb-8">
                 <select
@@ -639,6 +698,10 @@ function CoursesCataloguePage() {
                   }
                   if (form.lecturerId && !form.semesterId) {
                     toast.error(LECTURER_ASSIGNMENT_REQUIRES_SEMESTER)
+                    return
+                  }
+                  if (!form.openForRegistration && !form.semesterId) {
+                    toast.error('Choose a semester to close a course for registration.')
                     return
                   }
                   setConfirmSave(true)

@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import type { UserRole } from '@stackedu/shared'
+import { formatAppDateDdMmYyyy, type UserRole } from '@stackedu/shared'
 import type { InstitutionDb } from '../db/connection'
 import { courses } from '../db/institution/schema/academic'
 import { notifications } from '../db/institution/schema/communication'
@@ -160,6 +160,84 @@ export async function notifyAcademicAdminsOfResultSubmit(
     body: `${submitterEmail} submitted ${courseName} results for review.`,
     category: 'Results',
     actionUrl: '/academic/results',
+  })
+}
+
+async function notifyStudentsAndLecturers(
+  db: InstitutionDb,
+  payload: Omit<InAppNotificationInput, 'userId' | 'actionUrl'>,
+  actionUrls: { student: string; lecturer: string },
+): Promise<void> {
+  const [studentIds, lecturerIds] = await Promise.all([
+    activeUserIdsByRole(db, 'Student'),
+    activeUserIdsByRole(db, 'Lecturer'),
+  ])
+  await notifyUserIds(db, studentIds, { ...payload, actionUrl: actionUrls.student })
+  await notifyUserIds(db, lecturerIds, { ...payload, actionUrl: actionUrls.lecturer })
+}
+
+export async function notifyCourseCatalogueChange(
+  db: InstitutionDb,
+  input: {
+    code: string
+    name: string
+    kind: 'created' | 'updated' | 'opened' | 'closed'
+  },
+): Promise<void> {
+  const code = formatCourseCode(input.code)
+  const copy =
+    input.kind === 'created'
+      ? {
+          title: `New course: ${code}`,
+          body: `${input.name} was added to the course catalogue.`,
+        }
+      : input.kind === 'updated'
+        ? {
+            title: `Course updated: ${code}`,
+            body: `${input.name} was updated in the course catalogue.`,
+          }
+        : input.kind === 'opened'
+          ? {
+              title: `Registration open: ${code}`,
+              body: `${input.name} is now open for registration.`,
+            }
+          : {
+              title: `Registration closed: ${code}`,
+              body: `${input.name} is closed for registration.`,
+            }
+
+  await notifyStudentsAndLecturers(db, { ...copy, category: 'Registration' }, {
+    student: '/student/course-registration',
+    lecturer: '/lecturer/courses',
+  })
+}
+
+export async function notifyAcademicCalendarChange(
+  db: InstitutionDb,
+  input: {
+    title: string
+    kind: 'created' | 'updated'
+    startDate: string
+    endDate: string | null
+  },
+): Promise<void> {
+  const start = formatAppDateDdMmYyyy(input.startDate)
+  const end = input.endDate ? formatAppDateDdMmYyyy(input.endDate) : start
+  const range = end === start ? start : `${start} – ${end}`
+  const copy =
+    input.kind === 'created'
+      ? {
+          title: `Calendar: ${input.title}`,
+          body: `${input.title} was added to the academic calendar (${range}).`,
+        }
+      : {
+          title: `Calendar updated: ${input.title}`,
+          body: `${input.title} was updated on the academic calendar (${range}).`,
+        }
+
+  await notifyStudentsAndLecturers(db, { ...copy, category: 'Calendar' }, {
+    student: '/student/dashboard',
+    lecturer: '/lecturer/dashboard',
   })
 }
 

@@ -26,6 +26,7 @@ import { env } from '../config/env'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
 import {
+  academicCalendarEvents,
   academicYears,
   courses,
   departments,
@@ -306,6 +307,24 @@ export async function getStudentDashboard(
     .orderBy(assessments.dueAt)
     .limit(5)
 
+  const today = new Date().toISOString().slice(0, 10)
+  const calendarDeadlines = await db
+    .select({
+      id: academicCalendarEvents.id,
+      title: academicCalendarEvents.title,
+      startDate: academicCalendarEvents.startDate,
+      endDate: academicCalendarEvents.endDate,
+    })
+    .from(academicCalendarEvents)
+    .where(
+      and(
+        eq(academicCalendarEvents.isPublished, true),
+        sql`coalesce(${academicCalendarEvents.endDate}, ${academicCalendarEvents.startDate}) >= ${today}`,
+      ),
+    )
+    .orderBy(academicCalendarEvents.startDate)
+    .limit(8)
+
   const deadlines = [
     ...(openInvoice && openInvoice.amountDue - openInvoice.amountPaid > 0
       ? [
@@ -335,6 +354,12 @@ export async function getStudentDashboard(
         date: row.dueAt!.slice(0, 10),
         type: 'assignment' as const,
       })),
+    ...calendarDeadlines.map((row) => ({
+      id: `cal-${row.id}`,
+      title: row.title,
+      date: row.startDate,
+      type: 'calendar' as const,
+    })),
   ]
 
   return {
@@ -845,6 +870,7 @@ export async function getRegistrationState(
       type: courseType(row.yearOfStudy, profile.yearOfStudy),
       registered: row.status === 'Approved' || row.status === 'Pending',
       status: row.status,
+      openForRegistration: row.isOpen,
     })),
   }
 }
@@ -863,6 +889,9 @@ export async function registerForCourses(
   const selected = state.offerings.filter((offering) => input.offeringIds.includes(offering.offeringId))
   if (selected.length !== input.offeringIds.length) {
     throw badRequest('One or more selected courses are not available this semester.')
+  }
+  if (selected.some((offering) => !offering.registered && !offering.openForRegistration)) {
+    throw badRequest('That course is closed for registration.')
   }
 
   const extraCredits = selected

@@ -63,7 +63,11 @@ import {
   studentProfiles,
   students,
 } from '../db/institution/schema/students'
-import { notifyLecturerOfResultReview } from './role-notifications'
+import {
+  notifyAcademicCalendarChange,
+  notifyCourseCatalogueChange,
+  notifyLecturerOfResultReview,
+} from './role-notifications'
 import { writeAudit } from '../lib/audit'
 import { courseColor } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
@@ -517,6 +521,8 @@ export async function listAcademicCourses(institutionId: string): Promise<Academ
       lecturerName: users.fullName,
       enrolled: courseOfferings.enrolledCount,
       semesterName: semesters.name,
+      semesterId: courseOfferings.semesterId,
+      openForRegistration: courseOfferings.isOpenForRegistration,
     })
     .from(courses)
     .innerJoin(departments, eq(departments.id, courses.departmentId))
@@ -566,6 +572,8 @@ export async function listAcademicCourses(institutionId: string): Promise<Academ
     description: row.description,
     prerequisites: prereqsByCourse.get(row.id) ?? [],
     semester: row.semesterName,
+    semesterId: row.semesterId ?? null,
+    openForRegistration: row.openForRegistration ?? true,
   }))
 }
 
@@ -1547,6 +1555,33 @@ async function ensureOffering(
   return created!.id
 }
 
+async function offeringRegistrationState(
+  db: Awaited<ReturnType<typeof getInstitutionDb>>,
+  courseId: string,
+  semesterId: string,
+): Promise<boolean | null> {
+  const [row] = await db
+    .select({ isOpen: courseOfferings.isOpenForRegistration })
+    .from(courseOfferings)
+    .where(and(eq(courseOfferings.courseId, courseId), eq(courseOfferings.semesterId, semesterId)))
+    .limit(1)
+  return row?.isOpen ?? null
+}
+
+async function setOfferingRegistration(
+  db: Awaited<ReturnType<typeof getInstitutionDb>>,
+  courseId: string,
+  semesterId: string,
+  open: boolean,
+): Promise<void> {
+  await assertSemesterExists(db, semesterId)
+  const offeringId = await ensureOffering(db, courseId, semesterId)
+  await db
+    .update(courseOfferings)
+    .set({ isOpenForRegistration: open })
+    .where(eq(courseOfferings.id, offeringId))
+}
+
 async function assignLeadLecturer(
   db: Awaited<ReturnType<typeof getInstitutionDb>>,
   courseId: string,
@@ -1689,10 +1724,15 @@ export async function createAcademicCourse(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },
   input: CreateAcademicCourseRequest,
+  options?: { notify?: boolean },
 ): Promise<AcademicCourseRow> {
   const db = await getInstitutionDb(institutionId)
   const departmentId = await resolveDepartmentId(db, input.departmentName)
   const code = normalizeCourseCode(input.code)
+
+  if (input.openForRegistration === false && !input.semesterId) {
+    throw badRequest('Choose a semester to close a course for registration.')
+  }
 
   const [duplicate] = await db
     .select({ id: courses.id })
@@ -1733,6 +1773,9 @@ export async function createAcademicCourse(
     if (input.lecturerId) {
       await assignLeadLecturer(tx, row!.id, input.lecturerId, actor.id, input.semesterId)
     }
+    if (input.semesterId && input.openForRegistration !== undefined) {
+      await setOfferingRegistration(tx, row!.id, input.semesterId, input.openForRegistration)
+    }
 
     return row!
   })
@@ -1745,8 +1788,16 @@ export async function createAcademicCourse(
     action: 'course.create',
     targetType: 'course',
     targetId: created.id,
-    metadata: { code, name: input.name },
+    metadata: { code, name: input.name, openForRegistration: input.openForRegistration },
   })
+
+  if (options?.notify !== false) {
+    await notifyCourseCatalogueChange(db, {
+      code,
+      name: input.name.trim(),
+      kind: input.openForRegistration === false ? 'closed' : 'created',
+    })
+  }
 
   const rows = await listAcademicCourses(institutionId)
   return rows.find((row) => row.id === created.id)!
@@ -1765,6 +1816,14 @@ export async function updateAcademicCourse(
     .where(eq(courses.id, courseId))
     .limit(1)
   if (!existing) throw notFound('That course')
+
+  if (input.openForRegistration === false && !input.semesterId) {
+    throw badRequest('Choose a semester to close a course for registration.')
+  }
+
+  const previousOpen = input.semesterId
+    ? await offeringRegistrationState(db, courseId, input.semesterId)
+    : null
 
   let nextCode = existing.code
   if (input.code !== undefined) {
@@ -1817,6 +1876,9 @@ export async function updateAcademicCourse(
   if (input.lecturerId !== undefined) {
     await assignLeadLecturer(db, courseId, input.lecturerId, actor.id, input.semesterId)
   }
+  if (input.semesterId && input.openForRegistration !== undefined) {
+    await setOfferingRegistration(db, courseId, input.semesterId, input.openForRegistration)
+  }
 
   await writeAudit({
     institutionId,
@@ -1829,7 +1891,24 @@ export async function updateAcademicCourse(
     ...(nextCode !== existing.code
       ? { changes: { code: { from: existing.code, to: nextCode } } }
       : {}),
-    metadata: { code: nextCode, name: input.name ?? existing.name },
+    metadata: {
+      code: nextCode,
+      name: input.name ?? existing.name,
+      openForRegistration: input.openForRegistration,
+    },
+  })
+
+  const nextName = input.name?.trim() ?? existing.name
+  const registrationChanged =
+    input.openForRegistration !== undefined && previousOpen !== input.openForRegistration
+  await notifyCourseCatalogueChange(db, {
+    code: nextCode,
+    name: nextName,
+    kind: registrationChanged
+      ? input.openForRegistration
+        ? 'opened'
+        : 'closed'
+      : 'updated',
   })
 
   const rows = await listAcademicCourses(institutionId)
@@ -2063,6 +2142,13 @@ export async function createAcademicCalendarEvent(
     metadata: { title: input.title },
   })
 
+  await notifyAcademicCalendarChange(db, {
+    title: created!.title,
+    kind: 'created',
+    startDate: created!.startDate,
+    endDate: created!.endDate,
+  })
+
   return mapCalendarEvent(created!)
 }
 
@@ -2139,6 +2225,13 @@ export async function updateAcademicCalendarEvent(
     targetType: 'calendar_event',
     targetId: eventId,
     metadata: { title: input.title ?? existing.title },
+  })
+
+  await notifyAcademicCalendarChange(db, {
+    title: updated!.title,
+    kind: 'updated',
+    startDate: updated!.startDate,
+    endDate: updated!.endDate,
   })
 
   return mapCalendarEvent(updated!)
@@ -2311,7 +2404,7 @@ export async function bulkCreateAcademicCourses(
 
   for (const course of input.courses) {
     try {
-      await createAcademicCourse(institutionId, actor, course)
+      await createAcademicCourse(institutionId, actor, course, { notify: false })
       created += 1
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Could not create course.'

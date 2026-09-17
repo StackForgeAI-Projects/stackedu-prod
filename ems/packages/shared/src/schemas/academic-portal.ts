@@ -122,6 +122,8 @@ export const academicCourseRowSchema = z.object({
   description: z.string().nullable(),
   prerequisites: z.array(z.string()),
   semester: z.string().nullable(),
+  semesterId: uuidSchema.nullable(),
+  openForRegistration: z.boolean(),
 })
 
 export const academicProgrammeCourseSchema = z.object({
@@ -330,12 +332,20 @@ export const createAcademicCourseRequestSchema = z
     prerequisiteCodes: z.array(z.string().trim().min(2).max(20)).max(10).optional(),
     lecturerId: uuidSchema.optional(),
     semesterId: uuidSchema.optional(),
+    openForRegistration: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.lecturerId && !data.semesterId) {
       ctx.addIssue({
         code: 'custom',
         message: LECTURER_ASSIGNMENT_REQUIRES_SEMESTER,
+        path: ['semesterId'],
+      })
+    }
+    if (data.openForRegistration === false && !data.semesterId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Choose a semester to close a course for registration.',
         path: ['semesterId'],
       })
     }
@@ -353,12 +363,20 @@ export const updateAcademicCourseRequestSchema = z
     prerequisiteCodes: z.array(z.string().trim().min(2).max(20)).max(10).optional(),
     lecturerId: uuidSchema.nullable().optional(),
     semesterId: uuidSchema.optional(),
+    openForRegistration: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.lecturerId && !data.semesterId) {
       ctx.addIssue({
         code: 'custom',
         message: LECTURER_ASSIGNMENT_REQUIRES_SEMESTER,
+        path: ['semesterId'],
+      })
+    }
+    if (data.openForRegistration === false && !data.semesterId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Choose a semester to close a course for registration.',
         path: ['semesterId'],
       })
     }
