@@ -18,6 +18,7 @@ import { getInstitutionDb } from '../connection'
 import { env } from '../../config/env'
 import { createUser } from '../../services/users'
 import { resolveDepartmentId } from '../../services/academic'
+import { DEFAULT_SEMESTER_MAX_CREDITS, timetableTimesOverlap } from '@stackedu/shared'
 
 const DEMO_COURSES = [
   { code: 'CSC101', name: 'Introduction to Computer Science', credits: 3, year: 1 },
@@ -61,6 +62,38 @@ const RESULT_CLASSMATES = [
 ] as const
 
 type InstitutionDb = Awaited<ReturnType<typeof getInstitutionDb>>
+
+async function capApprovedCredits(
+  db: InstitutionDb,
+  studentIds: string[],
+  maxCredits: number,
+): Promise<void> {
+  const now = new Date().toISOString()
+  for (const studentId of studentIds) {
+    const rows = await db
+      .select({
+        id: courseRegistrations.id,
+        credits: courses.credits,
+      })
+      .from(courseRegistrations)
+      .innerJoin(courseOfferings, eq(courseOfferings.id, courseRegistrations.courseOfferingId))
+      .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
+      .where(and(eq(courseRegistrations.studentId, studentId), eq(courseRegistrations.status, 'Approved')))
+      .orderBy(courses.code)
+
+    let used = 0
+    for (const row of rows) {
+      if (used + row.credits > maxCredits) {
+        await db
+          .update(courseRegistrations)
+          .set({ status: 'Dropped', droppedAt: now })
+          .where(eq(courseRegistrations.id, row.id))
+      } else {
+        used += row.credits
+      }
+    }
+  }
+}
 
 async function ensureEngineeringProgramme(db: InstitutionDb): Promise<void> {
   const departmentId = await resolveDepartmentId(db, 'Department of Engineering')
@@ -515,13 +548,15 @@ async function seedLecturerDemo(
     if (row) classmateIds.push(row.id)
   }
 
-  const roomIds: Record<string, string> = {}
-  for (const room of [
+  const demoRooms = [
     { code: 'LAB3', name: 'Lab 3' },
     { code: 'R101', name: 'Room 101' },
     { code: 'HALLA', name: 'Hall A' },
     { code: 'LAB2', name: 'Lab 2' },
-  ]) {
+  ]
+  const roomIds: Record<string, string> = {}
+  const roomNameByCode: Record<string, string> = {}
+  for (const room of demoRooms) {
     const [inserted] = await db
       .insert(rooms)
       .values({ code: room.code, name: room.name, roomType: 'Lecture Hall' })
@@ -530,31 +565,96 @@ async function seedLecturerDemo(
     roomIds[room.code] =
       inserted?.id ??
       (await db.select({ id: rooms.id }).from(rooms).where(eq(rooms.code, room.code)).limit(1))[0]!.id
+    roomNameByCode[room.code] = room.name
   }
 
   const defaultSlots = [
     { day: 1, start: '08:00', end: '10:00', type: 'Lecture', room: 'LAB3' },
-    { day: 3, start: '10:00', end: '12:00', type: 'Tutorial', room: 'R101' },
+    { day: 1, start: '14:00', end: '16:00', type: 'Tutorial', room: 'HALLA' },
+    { day: 2, start: '10:00', end: '12:00', type: 'Lab', room: 'LAB2' },
+    { day: 2, start: '14:00', end: '16:00', type: 'Lecture', room: 'R101' },
+    { day: 3, start: '08:00', end: '10:00', type: 'Lecture', room: 'HALLA' },
+    { day: 3, start: '10:00', end: '12:00', type: 'Tutorial', room: 'LAB3' },
+    { day: 4, start: '08:00', end: '10:00', type: 'Lecture', room: 'LAB2' },
+    { day: 4, start: '14:00', end: '16:00', type: 'Tutorial', room: 'HALLA' },
+    { day: 5, start: '08:00', end: '10:00', type: 'Lecture', room: 'LAB3' },
+    { day: 5, start: '10:00', end: '12:00', type: 'Tutorial', room: 'R101' },
     { day: 5, start: '14:00', end: '16:00', type: 'Lab', room: 'LAB2' },
   ]
 
-  for (const [index, offering] of assigned.entries()) {
+  const existingSlotRows = await db
+    .select({
+      offeringId: timetableSlots.courseOfferingId,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      startTime: timetableSlots.startTime,
+      endTime: timetableSlots.endTime,
+      room: rooms.name,
+      lecturerId: lecturerAssignments.lecturerId,
+    })
+    .from(timetableSlots)
+    .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
+    .leftJoin(rooms, eq(rooms.id, timetableSlots.roomId))
+    .leftJoin(
+      lecturerAssignments,
+      and(eq(lecturerAssignments.courseOfferingId, courseOfferings.id), eq(lecturerAssignments.isLead, true)),
+    )
+    .where(eq(courseOfferings.semesterId, semesterId))
+
+  const booked = existingSlotRows.map((row) => ({
+    day: row.dayOfWeek,
+    start: row.startTime.slice(0, 5),
+    end: row.endTime.slice(0, 5),
+    room: row.room,
+    lecturerId: row.lecturerId,
+  }))
+
+  const slotTaken = (candidate: {
+    day: number
+    start: string
+    end: string
+    room: string
+    lecturerId: string
+  }) =>
+    booked.some((row) => {
+      if (row.day !== candidate.day) return false
+      if (!timetableTimesOverlap(row.start, row.end, candidate.start, candidate.end)) return false
+      if (row.room && row.room === candidate.room) return true
+      if (row.lecturerId && row.lecturerId === candidate.lecturerId) return true
+      return false
+    })
+
+  for (const offering of assigned) {
     const [hasSlot] = await db
       .select({ id: timetableSlots.id })
       .from(timetableSlots)
       .where(eq(timetableSlots.courseOfferingId, offering.offeringId))
       .limit(1)
-    if (!hasSlot) {
-      const slot = defaultSlots[index % defaultSlots.length]!
-      await db.insert(timetableSlots).values({
-        courseOfferingId: offering.offeringId,
-        roomId: roomIds[slot.room],
-        dayOfWeek: slot.day,
-        startTime: slot.start,
-        endTime: slot.end,
-        sessionType: slot.type,
-      })
-    }
+    if (hasSlot) continue
+    const slot = defaultSlots.find((row) =>
+      !slotTaken({
+        day: row.day,
+        start: row.start,
+        end: row.end,
+        room: roomNameByCode[row.room] ?? row.room,
+        lecturerId: lecturerUserId,
+      }),
+    )
+    if (!slot) continue
+    await db.insert(timetableSlots).values({
+      courseOfferingId: offering.offeringId,
+      roomId: roomIds[slot.room],
+      dayOfWeek: slot.day,
+      startTime: slot.start,
+      endTime: slot.end,
+      sessionType: slot.type,
+    })
+    booked.push({
+      day: slot.day,
+      start: slot.start,
+      end: slot.end,
+      room: roomNameByCode[slot.room] ?? slot.room,
+      lecturerId: lecturerUserId,
+    })
   }
 
   for (const offering of assigned) {
@@ -570,6 +670,28 @@ async function seedLecturerDemo(
         .onConflictDoNothing({ target: [courseRegistrations.studentId, courseRegistrations.courseOfferingId] })
     }
 
+    const registered = await db
+      .select({ id: courseRegistrations.id })
+      .from(courseRegistrations)
+      .where(
+        and(eq(courseRegistrations.courseOfferingId, offering.offeringId), eq(courseRegistrations.status, 'Approved')),
+      )
+    await db
+      .update(courseOfferings)
+      .set({ enrolledCount: registered.length })
+      .where(eq(courseOfferings.id, offering.offeringId))
+  }
+
+  await capApprovedCredits(
+    db,
+    [...new Set([
+      ...classmateIds,
+      ...(await db.select({ studentId: courseRegistrations.studentId }).from(courseRegistrations)).map((row) => row.studentId),
+    ])],
+    DEFAULT_SEMESTER_MAX_CREDITS,
+  )
+
+  for (const offering of assigned) {
     const registered = await db
       .select({ id: courseRegistrations.id })
       .from(courseRegistrations)

@@ -13,6 +13,7 @@ import { useInactivityLogout } from '@/hooks/useInactivityLogout'
 import { roleLabel } from '@/lib/auth/portals'
 import { initialsFrom } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useNotifications } from '@/hooks/useNotifications'
 import { Sidebar, type NavItem } from './Sidebar'
 import { Header } from './Header'
 import { AppVersion } from './AppVersion'
@@ -55,6 +56,7 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const { user } = useCurrentUser()
+  useNotifications()
   const logoutDialog = useLogoutDialog()
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (state) => state.location.pathname })

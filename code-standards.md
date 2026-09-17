@@ -34,6 +34,11 @@
   hardcoded hex values]
 - [Rule — e.g. Follow the border radius scale defined
   in ui-context.md]
+- Every icon-only control (CRUD, pagination, download, and similar actions)
+  shows a tooltip on hover. Use `IconActionButton` for table and row actions
+  so the label, `aria-label`, and tooltip stay in one place. Do not ship an
+  icon button with only a native `title` or a silent icon. This applies for
+  every role.
 
 ## API Routes
 

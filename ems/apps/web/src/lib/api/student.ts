@@ -14,12 +14,15 @@ import type {
   StudentOnboarding,
   StudentProfile,
   StudentReceipt,
+  RegisterCoursesRequest,
   StudentRegistrationState,
   StudentResults,
   StudentTranscript,
   StudyAssistantRequest,
   StudyAssistantResponse,
   PaymentMethod,
+  SaveTimetableReminderRequest,
+  StudentTimetableReminder,
 } from '@stackedu/shared'
 import { api } from './client'
 import { getReaderLibrary } from './library'
@@ -104,12 +107,26 @@ export async function getStudentRegistration(): Promise<StudentRegistrationState
   return registration
 }
 
-export async function registerStudentCourses(offeringIds: string[]) {
+export async function registerStudentCourses(input: RegisterCoursesRequest) {
   const { registration } = await api.post<{ registration: StudentRegistrationState }>(
     '/student/registration',
-    { offeringIds },
+    input,
   )
   return registration
+}
+
+export async function saveStudentTimetableReminder(
+  input: SaveTimetableReminderRequest,
+): Promise<StudentTimetableReminder> {
+  const { reminder } = await api.post<{ reminder: StudentTimetableReminder }>(
+    '/student/timetable/reminders',
+    input,
+  )
+  return reminder
+}
+
+export async function cancelStudentTimetableReminder(slotId: string): Promise<void> {
+  await api.delete(`/student/timetable/reminders/${slotId}`)
 }
 
 export async function getStudentResults(): Promise<StudentResults> {

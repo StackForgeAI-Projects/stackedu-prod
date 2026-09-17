@@ -147,6 +147,32 @@ export const liveSessionStatusSchema = z.enum(['Scheduled', 'Live', 'Ended', 'Ca
 export const recordingStatusSchema = z.enum(['Pending', 'Ready', 'Failed'])
 
 export type UserRole = z.infer<typeof userRoleSchema>
+
+/** Path prefix each signed-in role can open in the app. */
+export const ROLE_APP_PATH_PREFIX: Record<UserRole, string> = {
+  Applicant: '/apply',
+  Student: '/student',
+  Lecturer: '/lecturer',
+  Bursar: '/bursar',
+  AcademicAdmin: '/academic',
+  Librarian: '/librarian',
+  ICTManager: '/ict',
+}
+
+/** Default credit cap for a semester. Academic Admin can raise or lower it. */
+export const DEFAULT_SEMESTER_MAX_CREDITS = 21
+
+/** Hide Open links that would send this role to another portal. */
+export function reachableNotificationActionUrl(
+  role: UserRole,
+  actionUrl: string | null | undefined,
+): string | null {
+  if (!actionUrl) return null
+  const prefix = ROLE_APP_PATH_PREFIX[role]
+  const path = actionUrl.split('?')[0] ?? ''
+  if (path === prefix || path.startsWith(`${prefix}/`)) return actionUrl
+  return null
+}
 export type Gender = z.infer<typeof genderSchema>
 export type EnrolmentStatus = z.infer<typeof enrolmentStatusSchema>
 export type AcademicStanding = z.infer<typeof academicStandingSchema>

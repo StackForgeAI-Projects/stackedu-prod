@@ -56,12 +56,15 @@ The requester can see Pending, Fulfilled, and Declined on their e-library page.
 
 ## Browse and download (Student, Lecturer, Academic Admin)
 
-1. Open **E-Library**.
-2. Search by title, author, subject, or words inside the file.
-3. Download a file. That opens a short-lived signed link. The app records the download for licensing reports.
-4. Unpublished titles never appear. Restricted titles never appear for that person.
+1. Open **E-Library** (student, lecturer, or academic sidebar).
+2. Search by title, author, subject, or words inside the file. Typing waits a moment, then runs the search.
+3. The catalogue is a **table**, not a card grid: type, title, author (and year), subjects, and a download control. Sort a column by clicking its header. Filter by **Type** (book, journal, video, and so on). Empty types stay off the filter list.
+4. The table is paginated. Change page or how many rows to show (5, 10, 25, 50, 100) at the foot of the table. Default is 10 rows.
+5. Download a file with the row download control (tooltip on hover). That opens a short-lived signed link. The app records the download for licensing reports. A title with no file shows **No file**.
+6. **Request a title** if the search does not find it. Fill title (and optional author and reason), then confirm. Pending, fulfilled, and declined requests sit above the table with the date as DD-MM-YYYY.
+7. Unpublished titles never appear. Restricted titles never appear for that person.
 
-ICT and bursar accounts are refused if they call these routes.
+ICT and bursar accounts are refused if they call these routes. The same browse table is used for student, lecturer, and academic readers so the path stays one place.
 
 ## Analytics (Librarian)
 

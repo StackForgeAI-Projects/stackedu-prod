@@ -130,6 +130,30 @@ export const timetableSlots = pgTable(
   ],
 )
 
+export const timetableReminders = pgTable(
+  'timetable_reminders',
+  {
+    id: primaryKeyColumn(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    timetableSlotId: uuid('timetable_slot_id')
+      .notNull()
+      .references(() => timetableSlots.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    notes: text('notes'),
+    minutesBefore: integer('minutes_before').notNull(),
+    nextFireAt: timestamp('next_fire_at', { withTimezone: true, mode: 'string' }).notNull(),
+    lastSentAt: timestamp('last_sent_at', { withTimezone: true, mode: 'string' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'string' }),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('timetable_reminders_student_slot_key').on(t.studentId, t.timetableSlotId),
+    index('timetable_reminders_fire_idx').on(t.nextFireAt),
+  ],
+)
+
 export const attendanceSessions = pgTable(
   'attendance_sessions',
   {

@@ -1,16 +1,23 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Info } from 'lucide-react'
+import { AlertCircle, Download, Info, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import type { RegisterCoursesRequest, StudentOfferingOption } from '@stackedu/shared'
 import { toast } from 'sonner'
 import { StudentShell } from '@/components/StudentShell'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useInstitutionBranding } from '@/hooks/useInstitutionBranding'
+import { courseRegistrationTotalsLabel, downloadCourseRegistrationPdf } from '@/lib/course-registration-pdf'
 import {
+  getStudentProfile,
   getStudentRegistration,
   registerStudentCourses,
   studentCoursesQueryKey,
   studentDashboardQueryKey,
+  studentProfileQueryKey,
   studentRegistrationQueryKey,
 } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -27,46 +34,120 @@ function CourseRegistrationPage() {
     queryKey: studentRegistrationQueryKey,
     queryFn: getStudentRegistration,
   })
+  const profileQuery = useQuery({
+    queryKey: studentProfileQueryKey,
+    queryFn: getStudentProfile,
+  })
+  const branding = useInstitutionBranding()
   const [selected, setSelected] = useState<string[]>([])
+  const [dropTarget, setDropTarget] = useState<StudentOfferingOption | null>(null)
+  const [confirmAdd, setConfirmAdd] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   const mutation = useMutation({
     mutationFn: registerStudentCourses,
-    onSuccess: async () => {
-      toast.success('Courses registered.')
+    onSuccess: async (_result, vars) => {
+      const droppedOnly = (vars.dropOfferingIds?.length ?? 0) > 0 && (vars.offeringIds?.length ?? 0) === 0
+      toast.success(droppedOnly ? 'Course dropped.' : 'Registration updated.')
+      setSelected([])
+      setDropTarget(null)
+      setConfirmAdd(false)
       await queryClient.invalidateQueries({ queryKey: studentRegistrationQueryKey })
       await queryClient.invalidateQueries({ queryKey: studentCoursesQueryKey })
       await queryClient.invalidateQueries({ queryKey: studentDashboardQueryKey })
-      void navigate({ to: '/student/courses' })
+      if (!droppedOnly) void navigate({ to: '/student/courses' })
     },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not register those courses.')),
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not update your registration.')),
   })
 
+  const registered = data?.offerings.filter((row) => row.registered) ?? []
   const available = data?.offerings.filter((row) => !row.registered) ?? []
   const extraCredits = available
     .filter((row) => selected.includes(row.offeringId) && row.openForRegistration !== false)
     .reduce((sum, row) => sum + row.credits, 0)
   const overCredit = Boolean(data && data.registeredCredits + extraCredits > data.maxCredits)
+  const overCapNow = Boolean(data && data.registeredCredits > data.maxCredits)
   const canSelect = Boolean(data?.registrationOpen && !data.feeHold)
+  const canDrop = Boolean(data && (data.registrationOpen || overCapNow))
   const closedOfferings = available.filter((row) => row.openForRegistration === false)
+  const addIds = available
+    .filter((row) => selected.includes(row.offeringId) && row.openForRegistration !== false)
+    .map((row) => row.offeringId)
+  const totalsLabel = data
+    ? courseRegistrationTotalsLabel(registered.length, data.registeredCredits, data.maxCredits)
+    : null
+
+  const downloadPdf = async () => {
+    const profile = profileQuery.data
+    if (!data || !profile || registered.length === 0) return
+    setDownloadingPdf(true)
+    try {
+      await downloadCourseRegistrationPdf({
+        institutionName: branding.institutionName,
+        logoUrl: branding.logoUrl,
+        studentName: profile.fullName,
+        studentNumber: profile.studentNumber,
+        email: profile.email,
+        programmeName: profile.programmeName,
+        programmeCode: profile.programmeCode,
+        departmentName: profile.departmentName,
+        facultyName: profile.facultyName,
+        yearOfStudy: profile.yearOfStudy,
+        sessionName: data.academicYearName,
+        semesterName: data.semesterName,
+        registeredCredits: data.registeredCredits,
+        maxCredits: data.maxCredits,
+        courses: registered.map((row) => ({
+          code: row.code,
+          name: row.name,
+          credits: row.credits,
+          type: row.type,
+          lecturerName: row.lecturerName,
+        })),
+      })
+      toast.success('Course registration downloaded.')
+    } catch {
+      toast.error('Could not download the registration PDF.')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
 
   return (
     <StudentShell pageTitle="Course registration" guide="Add offerings while registration is open and you have no fee hold. Academic Admin opens the semester; the Bursar clears holds.">
       <div className="animate-fade-up" style={{ padding: '24px 16px 56px' }}>
-        <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Register for courses</h1>
         {isPending ? (
-          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading offerings…</p>
+          <>
+            <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Register for courses</h1>
+            <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading offerings…</p>
+          </>
         ) : error ? (
-          <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load registration.')}</p>
+          <>
+            <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Register for courses</h1>
+            <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load registration.')}</p>
+          </>
         ) : data ? (
           <>
-            <p className="t-body mb-4" style={{ color: 'var(--muted-foreground)' }}>
-              {data.registeredCredits} of {data.maxCredits} credits used
-            </p>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Register for courses</h1>
+                <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>{totalsLabel}</p>
+              </div>
+              <Button
+                variant="outline"
+                className="shrink-0 self-start"
+                disabled={registered.length === 0 || downloadingPdf || !profileQuery.data}
+                onClick={() => { void downloadPdf() }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {downloadingPdf ? 'Preparing PDF…' : 'Download PDF'}
+              </Button>
+            </div>
             {data.feeHold ? (
               <RegistrationStatusNotice
                 tone="error"
                 title="Fee hold"
-                body="A fee hold is blocking registration. Pay fees, then ask the Bursar to release the hold."
+                body="A fee hold is blocking new registration. Pay fees, then ask the Bursar to release the hold. You can still drop a course if you are over the credit cap."
               />
             ) : null}
             {data.registrationOpen ? (
@@ -75,15 +156,19 @@ function CourseRegistrationPage() {
                 title="Registration is open"
                 body={
                   data.registrationClosesAt
-                    ? `You can add offerings for this semester. Registration closes on ${formatDateShort(data.registrationClosesAt)}.`
-                    : 'You can add offerings for this semester.'
+                    ? `You can add or drop offerings for this semester. Registration closes on ${formatDateShort(data.registrationClosesAt)}.`
+                    : 'You can add or drop offerings for this semester.'
                 }
               />
             ) : (
               <RegistrationStatusNotice
                 tone="info"
                 title="Registration is closed"
-                body="Course registration is closed for this semester. Academic Admin opens it on the calendar. You can still see what you already registered."
+                body={
+                  overCapNow
+                    ? 'Course registration is closed. Drop courses until you are within the credit cap. Academic Admin sets that cap on the calendar.'
+                    : 'Course registration is closed for this semester. Academic Admin opens it on the calendar. You can still see what you already registered.'
+                }
               />
             )}
             {overCredit ? (
@@ -92,21 +177,46 @@ function CourseRegistrationPage() {
                 title="Credit limit"
                 body={
                   extraCredits > 0
-                    ? `You cannot register more than ${data.maxCredits} credits. Uncheck a course to continue.`
-                    : `You already have ${data.registeredCredits} of ${data.maxCredits} credits. You cannot add more courses.`
+                    ? `You cannot register more than ${data.maxCredits} credits. Uncheck a course, or drop one you already registered.`
+                    : `You have ${data.registeredCredits} of ${data.maxCredits} credits. Drop a course before you add another, unless Academic Admin raises the cap.`
                 }
               />
             ) : null}
 
             <div className="mb-6 p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
               <h2 className="t-h3 mb-3">Already registered</h2>
-              {data.offerings.filter((row) => row.registered).length === 0 ? (
+              {registered.length === 0 ? (
                 <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>None yet.</p>
-              ) : data.offerings.filter((row) => row.registered).map((row) => (
-                <p key={row.offeringId} className="text-sm py-2" style={{ borderTop: '1px solid var(--border)' }}>
-                  {row.code} · {row.name} · {row.credits} cr
-                </p>
-              ))}
+              ) : (
+                <>
+                  {registered.map((row) => (
+                    <div
+                      key={row.offeringId}
+                      className="flex items-center gap-3 py-2"
+                      style={{ borderTop: '1px solid var(--border)' }}
+                    >
+                      <p className="text-sm flex-1 min-w-0">
+                        {row.code} · {row.name} · {row.credits} cr
+                      </p>
+                      {canDrop ? (
+                        <IconActionButton
+                          label={`Drop ${row.code}`}
+                          icon={Trash2}
+                          danger
+                          disabled={mutation.isPending}
+                          onClick={() => setDropTarget(row)}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                  <p
+                    className="t-caption pt-3"
+                    style={{ borderTop: '1px solid var(--border)', color: 'var(--muted-foreground)' }}
+                  >
+                    {totalsLabel}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="mb-6 p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
@@ -149,14 +259,52 @@ function CourseRegistrationPage() {
             </div>
 
             <Button
-              disabled={!selected.length || data.feeHold || !data.registrationOpen || data.registeredCredits + extraCredits > data.maxCredits || mutation.isPending}
-              onClick={() => mutation.mutate(selected)}
+              disabled={!addIds.length || data.feeHold || !data.registrationOpen || overCredit || mutation.isPending}
+              onClick={() => setConfirmAdd(true)}
             >
               Confirm registration
             </Button>
           </>
         ) : null}
       </div>
+
+      <ConfirmAlertDialog
+        open={dropTarget !== null}
+        onOpenChange={(open) => { if (!open) setDropTarget(null) }}
+        title={`Drop ${dropTarget?.code}?`}
+        tone="destructive"
+        headline="Drop course"
+        summary={`${dropTarget?.code} · ${dropTarget?.name} will be removed from this semester (${dropTarget?.credits} credits).`}
+        notices={[
+          { icon: 'trash', label: 'You can add it again while registration is open, if you still have credit room.' },
+        ]}
+        confirmLabel={mutation.isPending ? 'Dropping…' : 'Drop course'}
+        confirmVariant="destructive"
+        loading={mutation.isPending}
+        onConfirm={() => {
+          if (!dropTarget) return
+          mutation.mutate({ offeringIds: [], dropOfferingIds: [dropTarget.offeringId] })
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={confirmAdd}
+        onOpenChange={(open) => { if (!open) setConfirmAdd(false) }}
+        title="Save these courses?"
+        tone="success"
+        headline="Update registration"
+        summary={`Add ${addIds.length} offering${addIds.length === 1 ? '' : 's'} to your semester list.`}
+        notices={[
+          { icon: 'info', label: 'You can drop a registered course from this page while registration is open.' },
+        ]}
+        confirmLabel={mutation.isPending ? 'Saving…' : 'Confirm'}
+        confirmVariant="brand"
+        loading={mutation.isPending}
+        onConfirm={() => {
+          const input: RegisterCoursesRequest = { offeringIds: addIds, dropOfferingIds: [] }
+          mutation.mutate(input)
+        }}
+      />
     </StudentShell>
   )
 }

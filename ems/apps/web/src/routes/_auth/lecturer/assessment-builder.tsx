@@ -18,6 +18,7 @@ import {
 import { LecturerShell } from '@/components/LecturerShell'
 import { PagedList } from '@/components/ListPagination'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { AssessmentWeightField } from '@/components/AssessmentWeightField'
 import { Button } from '@/components/ui/button'
 import {
@@ -207,16 +208,12 @@ function AssessmentBuilderPage() {
                             <Button variant="outline" size="sm" onClick={() => setEditing(quiz)}>
                               Build questions
                             </Button>
-                            <button
-                              type="button"
-                              title="Delete"
-                              aria-label="Delete assessment"
+                            <IconActionButton
+                              label="Delete assessment"
+                              icon={Trash2}
+                              danger
                               onClick={() => setDeletePaper(quiz)}
-                              className="flex items-center justify-center h-7 w-7 rounded-lg"
-                              style={{ border: '1px solid var(--border)', color: 'var(--error)', background: 'transparent', cursor: 'pointer' }}
-                            >
-                              <Trash2 style={{ width: 12, height: 12 }} />
-                            </button>
+                            />
                           </div>
                         </div>
                       </div>
@@ -302,19 +299,14 @@ function AssessmentBuilderPage() {
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          title="Edit"
-                          aria-label="Edit question"
+                        <IconActionButton
+                          label="Edit question"
+                          icon={Pencil}
                           onClick={() => {
                             setQuestion(item)
                             setQuestionOpen(true)
                           }}
-                          className="flex items-center justify-center h-7 w-7 rounded-lg"
-                          style={{ border: '1px solid var(--border)', color: 'var(--muted-foreground)', background: 'transparent', cursor: 'pointer' }}
-                        >
-                          <Pencil style={{ width: 12, height: 12 }} />
-                        </button>
+                        />
                         <DeleteQuestionButton
                           question={item}
                           onDeleted={() => queryClient.invalidateQueries({ queryKey: lecturerQuestionsQueryKey() })}
@@ -430,15 +422,9 @@ function DeleteQuestionButton({
   return (
     <ConfirmAlertDialog
       trigger={
-        <button
-          type="button"
-          title="Delete"
-          aria-label="Delete question"
-          className="flex items-center justify-center h-7 w-7 rounded-lg"
-          style={{ border: '1px solid var(--border)', color: 'var(--error)', background: 'transparent', cursor: 'pointer' }}
-        >
-          <Trash2 style={{ width: 12, height: 12 }} />
-        </button>
+        <span className="inline-flex">
+          <IconActionButton label="Delete question" icon={Trash2} danger />
+        </span>
       }
       title="Delete this question?"
       tone="destructive"
@@ -684,14 +670,12 @@ function QuizItemsEditor({
                 <span className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)' }}>
                   Q{index + 1}
                 </span>
-                <button
-                  type="button"
+                <IconActionButton
+                  label="Remove item"
+                  icon={Trash2}
+                  danger
                   onClick={() => setDraft(items.filter((_, i) => i !== index))}
-                  style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  aria-label="Remove item"
-                >
-                  <Trash2 style={{ width: 14, height: 14 }} />
-                </button>
+                />
               </div>
               {item.kind === 'question' ? (
                 <p className="text-sm mt-2" style={{ color: 'var(--foreground)' }}>

@@ -14,6 +14,7 @@ import type {
   AcademicStudentDetail,
   AcademicStudentRow,
   AcademicTimetableSlot,
+  AskLecturerTimetableSlotRequest,
   AcademicDepartmentOption,
   CreateAcademicCalendarEventRequest,
   CreateAcademicCourseRequest,
@@ -108,6 +109,17 @@ export async function listAcademicCalendarEvents(): Promise<AcademicCalendarEven
 export async function listAcademicTimetableSlots(): Promise<AcademicTimetableSlot[]> {
   const { slots } = await api.get<{ slots: AcademicTimetableSlot[] }>('/academic/timetable')
   return slots
+}
+
+export async function askLecturerToFreeTimetableSlot(
+  slotId: string,
+  input: AskLecturerTimetableSlotRequest,
+): Promise<{ lecturerName: string }> {
+  const { lecturerName } = await api.post<{ ok: true; lecturerName: string }>(
+    `/academic/timetable/${slotId}/ask-lecturer`,
+    input,
+  )
+  return { lecturerName }
 }
 
 export async function listAcademicLecturers(): Promise<AcademicLecturerRow[]> {

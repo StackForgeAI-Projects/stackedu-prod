@@ -7,6 +7,7 @@ import {
   submitAssessmentRequestSchema,
   studyAssistantRequestSchema,
   saveClassroomWhiteboardRequestSchema,
+  saveTimetableReminderRequestSchema,
 } from '@stackedu/shared'
 import { validationFailed } from '../lib/errors'
 import { requireAuth, requireRole, type AuthVariables } from '../middleware/auth'
@@ -44,6 +45,7 @@ import {
   saveClassroomWhiteboard,
 } from '../services/live-sessions'
 import { askStudyAssistant } from '../services/study-assistant'
+import { cancelStudentTimetableReminder, saveStudentTimetableReminder } from '../services/timetable-reminders'
 import { registerLibraryReaderRoutes } from './library-reader'
 
 type Variables = RequestVariables & Partial<AuthVariables>
@@ -64,6 +66,21 @@ studentRoutes.get('/student/me', ...studentOnly, async (c) => {
 studentRoutes.get('/student/dashboard', ...studentOnly, async (c) => {
   const user = c.get('user')!
   return c.json({ dashboard: await getStudentDashboard(user.institution.id, user.id) })
+})
+
+studentRoutes.post('/student/timetable/reminders', ...studentOnly, async (c) => {
+  const parsed = saveTimetableReminderRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  return c.json({
+    reminder: await saveStudentTimetableReminder(user.institution.id, user.id, parsed.data),
+  })
+})
+
+studentRoutes.delete('/student/timetable/reminders/:slotId', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  await cancelStudentTimetableReminder(user.institution.id, user.id, c.req.param('slotId'))
+  return c.body(null, 204)
 })
 
 studentRoutes.get('/student/courses', ...studentOnly, async (c) => {

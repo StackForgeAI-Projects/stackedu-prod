@@ -12,6 +12,7 @@ import { departments, faculties, programmes } from '../institution/schema/academ
 import { students } from '../institution/schema/students'
 import { seedStudentPortal } from './seed-student-portal'
 import { seedAcademicPortal } from './seed-academic-portal'
+import { seedInstitutionDefaults } from '../seed-defaults'
 
 /**
  * Creates the institution, its academic structure, and one account per role.
@@ -234,6 +235,7 @@ async function main() {
     .where(eq(institutions.id, institution.id))
 
   await seedAcademicStructure(institution.id)
+  await seedInstitutionDefaults(await getInstitutionDb(institution.id))
 
   process.stdout.write('\nAccounts\n')
 

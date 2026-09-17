@@ -30,6 +30,7 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; iconBg: string; ico
   'At-Risk': { icon: AlertTriangle, iconBg: 'var(--error-bg)', iconColor: 'var(--error)' },
   Registration: { icon: FileText, iconBg: 'var(--info-bg)', iconColor: 'var(--info)' },
   Calendar: { icon: CalendarDays, iconBg: 'var(--info-bg)', iconColor: 'var(--info)' },
+  Timetable: { icon: CalendarDays, iconBg: 'var(--warning-bg)', iconColor: 'var(--warning)' },
   System: { icon: Bell, iconBg: 'var(--muted)', iconColor: 'var(--muted-foreground)' },
 }
 

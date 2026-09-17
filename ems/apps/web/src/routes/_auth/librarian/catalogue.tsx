@@ -10,6 +10,7 @@ import { LibraryResourceForm } from '@/components/library/LibraryResourceForm'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
   getLibraryAccessOptions,
@@ -36,11 +37,13 @@ function CataloguePage() {
     queryFn: getLibraryAccessOptions,
   })
   const [editing, setEditing] = useState<LibraryResource | null | 'new'>(null)
+  const [unpublishTarget, setUnpublishTarget] = useState<LibraryResource | null>(null)
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => updateLibrarianResource(id, { isPublished: false }),
     onSuccess: async () => {
       toast.success('Resource unpublished.')
+      setUnpublishTarget(null)
       await queryClient.invalidateQueries({ queryKey: librarianResourcesQueryKey })
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not unpublish that resource.')),
@@ -103,62 +106,47 @@ function CataloguePage() {
               {
                 id: 'actions',
                 header: '',
-                cell: (row) => (
-                  <div className="flex justify-end gap-1">
-                    {row.files[0] ? (
-                      <button
-                        type="button"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg"
-                        style={{ border: '1px solid var(--border)' }}
-                        aria-label="Download"
-                        onClick={async () => {
+              cell: (row) => (
+                <div className="flex justify-end gap-1">
+                  {row.files[0] ? (
+                    <IconActionButton
+                      label="Download file"
+                      icon={Download}
+                      onClick={() => {
+                        void (async () => {
                           try {
                             const target = await getLibrarianDownload(row.id)
                             window.open(target.url, '_blank', 'noopener,noreferrer')
                           } catch (err) {
                             toast.error(apiErrorMessage(err, 'Could not open that file.'))
                           }
-                        }}
-                      >
-                        <Download style={{ width: 12, height: 12 }} />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="flex h-7 w-7 items-center justify-center rounded-lg"
-                      style={{ border: '1px solid var(--border)' }}
-                      aria-label="Edit"
-                      onClick={() => setEditing(row)}
-                    >
-                      <Pencil style={{ width: 12, height: 12 }} />
-                    </button>
-                    {row.isPublished ? (
-                      <ConfirmAlertDialog
-                        tone="warning"
-                        title="Unpublish this resource?"
-                        headline="Unpublish"
-                        summary={`"${row.title}" will leave the student and lecturer catalogues.`}
-                        confirmLabel="Unpublish"
-                        onConfirm={async () => { await archiveMutation.mutateAsync(row.id) }}
-                        trigger={
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg"
-                            style={{ border: '1px solid var(--border)', color: 'var(--warning)' }}
-                            aria-label="Unpublish"
-                          >
-                            <Archive style={{ width: 12, height: 12 }} />
-                          </button>
-                        }
-                      />
-                    ) : null}
-                  </div>
-                ),
+                        })()
+                      }}
+                    />
+                  ) : null}
+                  <IconActionButton label="Edit resource" icon={Pencil} onClick={() => setEditing(row)} />
+                  {row.isPublished ? (
+                    <IconActionButton label="Unpublish resource" icon={Archive} onClick={() => setUnpublishTarget(row)} />
+                  ) : null}
+                </div>
+              ),
               },
             ]}
           />
         )}
       </div>
+
+      <ConfirmAlertDialog
+        open={unpublishTarget !== null}
+        onOpenChange={(open) => { if (!open) setUnpublishTarget(null) }}
+        tone="warning"
+        title="Unpublish this resource?"
+        headline="Unpublish"
+        summary={`"${unpublishTarget?.title}" will leave the student and lecturer catalogues.`}
+        confirmLabel={archiveMutation.isPending ? 'Unpublishing…' : 'Unpublish'}
+        loading={archiveMutation.isPending}
+        onConfirm={() => { if (unpublishTarget) archiveMutation.mutate(unpublishTarget.id) }}
+      />
 
       <Sheet open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null) }}>
         <SheetContent side="right" className="p-0 border-l overflow-hidden flex flex-col sheet-md">

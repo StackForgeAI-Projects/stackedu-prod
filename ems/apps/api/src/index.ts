@@ -5,6 +5,7 @@ import { closeAllConnections, getInstitutionDb, getPlatformDb } from './db/conne
 import { migrateAllInstitutions, migratePlatform } from './db/migrate'
 import { institutions } from './db/platform/schema'
 import { processFeeDueReminders } from './lib/fee-due-reminders'
+import { processTimetableReminders } from './services/timetable-reminders'
 
 const { app, env, logger } = createApp()
 
@@ -42,12 +43,28 @@ async function runFeeDueReminders() {
   }
 }
 
+async function runTimetableReminders() {
+  try {
+    const platform = getPlatformDb()
+    const rows = await platform.select({ id: institutions.id }).from(institutions)
+    for (const row of rows) {
+      const db = await getInstitutionDb(row.id)
+      const sent = await processTimetableReminders(row.id, db)
+      if (sent > 0) logger.info('Timetable reminders sent', { institutionId: row.id, sent })
+    }
+  } catch (error) {
+    logger.error('Timetable reminder job failed', { error })
+  }
+}
+
 async function start() {
   await runPendingMigrations()
 
   if (env.NODE_ENV !== 'test') {
     void runFeeDueReminders()
+    void runTimetableReminders()
     setInterval(() => void runFeeDueReminders(), 60 * 60 * 1000).unref()
+    setInterval(() => void runTimetableReminders(), 60 * 1000).unref()
   }
 
   const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {

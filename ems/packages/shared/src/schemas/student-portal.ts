@@ -12,6 +12,7 @@ import {
 import { paymentFeeKindSchema } from '../payment-policy'
 import { invoiceLineItemSchema } from '../invoice-line-items'
 import { isoDateSchema, isoDateTimeSchema, uuidSchema } from '../primitives'
+import { TIMETABLE_REMINDER_OFFSETS } from '../timetable-reminders'
 import { libraryCatalogueItemSchema } from './library'
 import { discussionThreadSummarySchema } from './lecturer-portal'
 import { classroomSessionSummarySchema } from './classroom'
@@ -29,6 +30,7 @@ export const studentProfileSchema = z.object({
   feeHold: z.boolean(),
   programmeName: z.string(),
   programmeCode: z.string(),
+  departmentName: z.string().nullable(),
   facultyName: z.string().nullable(),
   dateOfBirth: isoDateSchema.nullable(),
   gender: genderSchema.nullable(),
@@ -45,6 +47,22 @@ export const studentDeadlineSchema = z.object({
   type: z.enum(['fee', 'registration', 'assignment', 'calendar']),
 })
 
+export const timetableReminderOffsetSchema = z.union([
+  z.literal(TIMETABLE_REMINDER_OFFSETS[0]),
+  z.literal(TIMETABLE_REMINDER_OFFSETS[1]),
+  z.literal(TIMETABLE_REMINDER_OFFSETS[2]),
+  z.literal(TIMETABLE_REMINDER_OFFSETS[3]),
+  z.literal(TIMETABLE_REMINDER_OFFSETS[4]),
+])
+
+export const studentTimetableReminderSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  notes: z.string().nullable(),
+  minutesBefore: timetableReminderOffsetSchema,
+  nextFireAt: isoDateTimeSchema,
+})
+
 export const studentScheduleItemSchema = z.object({
   id: uuidSchema,
   offeringId: uuidSchema,
@@ -56,6 +74,14 @@ export const studentScheduleItemSchema = z.object({
   room: z.string().nullable(),
   dayOfWeek: z.number().int().min(1).max(7),
   color: z.string(),
+  reminder: studentTimetableReminderSchema.nullable(),
+})
+
+export const saveTimetableReminderRequestSchema = z.object({
+  slotId: uuidSchema,
+  title: z.string().trim().min(1).max(120),
+  minutesBefore: timetableReminderOffsetSchema,
+  notes: z.string().trim().max(500).optional(),
 })
 
 export const studentCourseSummarySchema = z.object({
@@ -174,12 +200,24 @@ export const studentRegistrationStateSchema = z.object({
   registeredCredits: z.number().int(),
   registrationOpen: z.boolean(),
   registrationClosesAt: isoDateSchema.nullable(),
+  semesterName: z.string().nullable(),
+  academicYearName: z.string().nullable(),
   offerings: z.array(studentOfferingOptionSchema),
 })
 
-export const registerCoursesRequestSchema = z.object({
-  offeringIds: z.array(uuidSchema).min(1).max(20),
-})
+export const registerCoursesRequestSchema = z
+  .object({
+    offeringIds: z.array(uuidSchema).max(20).default([]),
+    dropOfferingIds: z.array(uuidSchema).max(20).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.offeringIds.length === 0 && data.dropOfferingIds.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Choose at least one course to add or drop.',
+      })
+    }
+  })
 
 export const studentSemesterResultsSchema = z.object({
   semesterId: uuidSchema,
@@ -337,3 +375,5 @@ export type StudentAssessment = z.infer<typeof studentAssessmentSchema>
 export type SubmitAssessmentRequest = z.infer<typeof submitAssessmentRequestSchema>
 export type StudentAssessmentDetail = z.infer<typeof studentAssessmentDetailSchema>
 export type StudentQuizQuestion = z.infer<typeof studentQuizQuestionSchema>
+export type StudentTimetableReminder = z.infer<typeof studentTimetableReminderSchema>
+export type SaveTimetableReminderRequest = z.infer<typeof saveTimetableReminderRequestSchema>

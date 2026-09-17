@@ -195,7 +195,7 @@ function SystemSettingsPage() {
   return (
     <IctShell
       pageTitle="Settings"
-      guide="Change the institution name, contact email, website, location, logo, system colour, timezone and language. Faculties, programmes and semester activation are Academic Admin screens, not settings."
+      guide="Change the institution name, contact email, website, location, logo, system colour, timezone and language. Class times and timetable reminder emails follow the timezone. Faculties, programmes and semester activation are Academic Admin screens, not settings."
     >
       <div className="animate-fade-up mx-auto w-full max-w-[760px]" style={{ padding: '32px 0 48px' }}>
         <h1 className="t-h1 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Institution settings</h1>
@@ -353,6 +353,9 @@ function SystemSettingsPage() {
             <div>
               <Label htmlFor="tz">Timezone</Label>
               <Input id="tz" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
+              <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                Class times and timetable reminder emails use this timezone. For Rwanda keep Africa/Kigali.
+              </p>
             </div>
             <div>
               <Label>Locale</Label>

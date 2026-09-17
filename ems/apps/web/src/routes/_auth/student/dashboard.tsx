@@ -1,13 +1,14 @@
 ﻿import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import type { StudentDashboard } from '@stackedu/shared'
+import { jsWeekdayToIso, type StudentDashboard } from '@stackedu/shared'
 import {
-  CreditCard, TrendingUp, Users, Sparkles, ChevronLeft, ChevronRight, FileText, BookMarked, CalendarDays,
+  CreditCard, TrendingUp, Users, Sparkles, ChevronLeft, ChevronRight, FileText, BookMarked, CalendarDays, Bell,
 } from 'lucide-react'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { StudentShell } from '@/components/StudentShell'
 import { StatTile } from '@/components/StatTile'
+import { TimetableEventDialog, type StudentTimetableSlot } from '@/components/timetable/TimetableEventDialog'
 import { formatCurrency } from '@/lib/utils'
 import { getStudentDashboard, studentDashboardQueryKey } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -16,10 +17,6 @@ import { showNewStudentWelcomeIfPresent } from '@/lib/new-student-welcome'
 export const Route = createFileRoute('/_auth/student/dashboard')({
   component: StudentDashboardPage,
 })
-
-function jsToIsoDay(jsDay: number): number {
-  return jsDay === 0 ? 7 : jsDay
-}
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -236,11 +233,12 @@ function CalendarCard({
   deadlines: StudentDashboard['deadlines']
 }) {
   const today = new Date()
-  const [navDate, setNavDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [navDate, setNavDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedSlot, setSelectedSlot] = useState<StudentTimetableSlot | null>(null)
   const monthDays = getMonthDays(navDate)
   const heading = `${MONTH_NAMES[navDate.getMonth()]} ${navDate.getFullYear()}`
-  const selectedIso = jsToIsoDay(selectedDate.getDay())
+  const selectedIso = jsWeekdayToIso(selectedDate.getDay())
   const daySchedule = schedule.filter((item) => item.dayOfWeek === selectedIso)
   const daysWithClass = new Set(schedule.map((item) => item.dayOfWeek))
 
@@ -266,7 +264,7 @@ function CalendarCard({
             if (!day) return <div key={`null-${i}`} />
             const isToday = isSameDay(day, today)
             const isSelected = isSameDay(day, selectedDate)
-            const hasClass = daysWithClass.has(jsToIsoDay(day.getDay()))
+            const hasClass = daysWithClass.has(jsWeekdayToIso(day.getDay()))
             return (
               <button key={day.toISOString()} onClick={() => setSelectedDate(day)} className="flex flex-col items-center gap-0.5 py-1" style={{ borderRadius: 'var(--radius-md)', backgroundColor: isSelected ? 'rgba(var(--brand-rgb),0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
                 <span className="flex items-center justify-center text-xs" style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: isToday ? 'var(--brand)' : 'transparent', color: isToday ? 'var(--brand-ink)' : 'var(--foreground)', fontWeight: isToday || isSelected ? 700 : 400 }}>
@@ -291,14 +289,21 @@ function CalendarCard({
           <p className="text-sm text-center py-4" style={{ color: 'var(--muted-foreground)' }}>No classes scheduled</p>
         ) : (
           daySchedule.map((item, i) => (
-            <div key={item.id} className="flex items-center gap-3 py-3" style={{ borderBottom: i < daySchedule.length - 1 ? '1px solid var(--border)' : 'none' }}>
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSelectedSlot(item)}
+              className="flex items-center gap-3 py-3 w-full text-left"
+              style={{ borderBottom: i < daySchedule.length - 1 ? '1px solid var(--border)' : 'none' }}
+            >
               <span className="t-mono flex-shrink-0" style={{ color: 'var(--muted-foreground)', width: 80, fontSize: 11 }}>{item.startTime} – {item.endTime}</span>
               <p className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>{item.courseCode}</span>
                 {' · '}{item.courseName}
               </p>
+              {item.reminder ? <Bell className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--muted-foreground)' }} /> : null}
               <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{item.sessionType}</span>
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -329,6 +334,7 @@ function CalendarCard({
           })
         )}
       </div>
+      <TimetableEventDialog slot={selectedSlot} open={selectedSlot !== null} onOpenChange={(next) => { if (!next) setSelectedSlot(null) }} />
     </>
   )
 }

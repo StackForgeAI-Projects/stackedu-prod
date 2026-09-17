@@ -174,9 +174,12 @@ export const academicTimetableSlotSchema = z.object({
   id: uuidSchema,
   day: z.number().int().min(1).max(7),
   hour: z.number().int(),
+  startTime: z.string(),
+  endTime: z.string(),
   courseCode: z.string(),
   courseName: z.string(),
   lecturer: z.string().nullable(),
+  lecturerId: uuidSchema.nullable(),
   room: z.string().nullable(),
   type: z.string(),
   dept: z.string(),
@@ -236,6 +239,7 @@ export const academicSemesterOptionSchema = z.object({
   id: uuidSchema,
   label: z.string(),
   isCurrent: z.boolean(),
+  maxCredits: z.number().int().min(1).max(60),
 })
 
 export const academicYearOptionSchema = z.object({
@@ -388,9 +392,14 @@ export const createAcademicCalendarEventRequestSchema = z.object({
   startDate: isoDateSchema,
   endDate: isoDateSchema.optional(),
   description: z.string().trim().max(2000).optional(),
+  maxCredits: z.number().int().min(1).max(60).optional(),
 })
 
 export const updateAcademicCalendarEventRequestSchema = createAcademicCalendarEventRequestSchema.partial()
+
+export const askLecturerTimetableSlotRequestSchema = z.object({
+  message: z.string().trim().min(1, 'Write a short message for the lecturer.').max(1000),
+})
 
 export const changeAcademicStudentStatusRequestSchema = z.object({
   action: z.enum(['suspend', 'transfer', 'graduate', 'withdraw']),
@@ -453,4 +462,5 @@ export type CreateAcademicCourseRequest = z.infer<typeof createAcademicCourseReq
 export type UpdateAcademicCourseRequest = z.infer<typeof updateAcademicCourseRequestSchema>
 export type CreateAcademicCalendarEventRequest = z.infer<typeof createAcademicCalendarEventRequestSchema>
 export type UpdateAcademicCalendarEventRequest = z.infer<typeof updateAcademicCalendarEventRequestSchema>
+export type AskLecturerTimetableSlotRequest = z.infer<typeof askLecturerTimetableSlotRequestSchema>
 export type AcademicDepartmentOption = z.infer<typeof academicDepartmentOptionSchema>

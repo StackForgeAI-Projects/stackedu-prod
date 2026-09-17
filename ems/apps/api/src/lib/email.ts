@@ -4,6 +4,12 @@ import { resolveCredential } from './integration-credentials'
 import { isIntegrationEnabled } from './integrations'
 import { createLogger } from './logger'
 
+export interface EmailAttachment {
+  filename: string
+  content: string
+  contentType?: string
+}
+
 export interface SendEmailInput {
   to: string
   subject: string
@@ -11,6 +17,7 @@ export interface SendEmailInput {
   html: string
   /** When set, Resend must be enabled in ICT integrations for this institution. */
   institutionId?: string
+  attachments?: EmailAttachment[]
 }
 
 /**
@@ -52,6 +59,15 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
       subject: input.subject,
       text: input.text,
       html: input.html,
+      ...(input.attachments?.length
+        ? {
+            attachments: input.attachments.map((file) => ({
+              filename: file.filename,
+              content: Buffer.from(file.content, 'utf8'),
+              contentType: file.contentType,
+            })),
+          }
+        : {}),
     })
 
     if (error) {

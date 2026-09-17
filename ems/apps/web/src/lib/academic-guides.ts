@@ -21,7 +21,7 @@ export const ACADEMIC_PAGE_GUIDES: Record<string, string> = {
   Calendar:
     'Academic calendar for semesters, registration windows, exams, and holidays. Create and edit events here.',
   Timetable:
-    'Current semester class schedule from live offerings. Slot editing and publish will follow with the Lecturer portal.',
+    'This is the live week of classes. Lecturers pick the day, time and room. You only review it here. If you need a booked hall, open the class and message that lecturer. A taken room cannot be booked again.',
   Faculty:
     'Lecturers created by the ICT Manager. Assign a lecturer to a course on the Courses page.',
   Results:

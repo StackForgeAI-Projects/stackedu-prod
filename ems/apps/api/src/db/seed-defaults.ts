@@ -47,7 +47,7 @@ export const DEFAULT_PERMISSIONS: PermissionDefinition[] = [
   // Academic structure
   { key: 'courses.read', module: 'Academic', description: 'View the course catalogue', roles: ['AcademicAdmin', 'Lecturer', 'Student', 'Librarian'] },
   { key: 'courses.write', module: 'Academic', description: 'Create and edit courses and programmes', roles: ['AcademicAdmin'] },
-  { key: 'timetable.write', module: 'Academic', description: 'Edit the timetable', roles: ['AcademicAdmin', 'Lecturer'] },
+  { key: 'timetable.write', module: 'Academic', description: 'Lecturers set class times and rooms. A room or lecturer cannot be booked twice at the same time. Academic Admin reviews the live week.', roles: ['AcademicAdmin', 'Lecturer'] },
   { key: 'calendar.write', module: 'Academic', description: 'Edit the academic calendar', roles: ['AcademicAdmin'] },
 
   // Teaching
@@ -133,6 +133,13 @@ export async function seedInstitutionDefaults(db: InstitutionDb): Promise<void> 
   if (permissionIdByKey.size < DEFAULT_PERMISSIONS.length) {
     const existing = await db.select({ id: permissions.id, key: permissions.key }).from(permissions)
     for (const row of existing) permissionIdByKey.set(row.key, row.id)
+  }
+
+  for (const permission of DEFAULT_PERMISSIONS) {
+    await db
+      .update(permissions)
+      .set({ description: permission.description, module: permission.module })
+      .where(eq(permissions.key, permission.key))
   }
 
   const links = DEFAULT_PERMISSIONS.flatMap((permission) => {

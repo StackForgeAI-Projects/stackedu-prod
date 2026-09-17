@@ -21,7 +21,15 @@ import type {
   StudentTranscript,
   SubmitAssessmentRequest,
 } from '@stackedu/shared'
-import { splitFullName, titleAndFirstName, displayFullName, formatDisplayName } from '@stackedu/shared'
+import {
+  DEFAULT_SEMESTER_MAX_CREDITS,
+  reachableNotificationActionUrl,
+  splitFullName,
+  titleAndFirstName,
+  displayFullName,
+  formatDisplayName,
+  isTimetableReminderOffset,
+} from '@stackedu/shared'
 import { env } from '../config/env'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
@@ -55,6 +63,7 @@ import {
   courseRegistrations,
   lecturerAssignments,
   rooms,
+  timetableReminders,
   timetableSlots,
 } from '../db/institution/schema/teaching'
 
@@ -74,7 +83,25 @@ import {
   validatePaymentAmount,
 } from '@stackedu/shared'
 
-const MAX_CREDITS = 21
+function isMissingRelation(error: unknown): boolean {
+  let current: unknown = error
+  for (let i = 0; i < 5 && current; i++) {
+    if (typeof current === 'object' && current && 'code' in current && (current as { code: unknown }).code === '42P01') {
+      return true
+    }
+    current = current instanceof Error ? current.cause : undefined
+  }
+  return false
+}
+
+async function optionalRows<T>(load: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await load()
+  } catch (error) {
+    if (isMissingRelation(error)) return []
+    throw error
+  }
+}
 
 function gradePointNumber(value: string | number | null): number | null {
   if (value === null || value === undefined) return null
@@ -100,6 +127,7 @@ export async function requireStudent(institutionId: string, userId: string) {
       programmeName: programmes.name,
       programmeCode: programmes.code,
       departmentId: departments.id,
+      departmentName: departments.name,
       facultyName: faculties.name,
       firstName: studentProfiles.firstName,
       lastName: studentProfiles.lastName,
@@ -157,7 +185,8 @@ export async function getStudentProfile(
     feeHold: row.feeHold,
     programmeName: row.programmeName,
     programmeCode: row.programmeCode,
-    facultyName: row.facultyName,
+    departmentName: row.departmentName ?? null,
+    facultyName: row.facultyName ?? null,
     dateOfBirth: row.dateOfBirth,
     gender: row.gender,
     phone: row.phone,
@@ -175,6 +204,7 @@ async function currentSemester(institutionId: string) {
       name: semesters.name,
       registrationClosesAt: semesters.registrationClosesAt,
       status: semesters.status,
+      maxCredits: semesters.maxCredits,
       yearName: academicYears.name,
     })
     .from(semesters)
@@ -258,12 +288,25 @@ export async function getStudentDashboard(
           endTime: timetableSlots.endTime,
           room: rooms.name,
           dayOfWeek: timetableSlots.dayOfWeek,
+          reminderId: timetableReminders.id,
+          reminderTitle: timetableReminders.title,
+          reminderNotes: timetableReminders.notes,
+          reminderMinutes: timetableReminders.minutesBefore,
+          reminderNextFireAt: timetableReminders.nextFireAt,
         })
         .from(courseRegistrations)
         .innerJoin(courseOfferings, eq(courseOfferings.id, courseRegistrations.courseOfferingId))
         .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
         .innerJoin(timetableSlots, eq(timetableSlots.courseOfferingId, courseOfferings.id))
         .leftJoin(rooms, eq(rooms.id, timetableSlots.roomId))
+        .leftJoin(
+          timetableReminders,
+          and(
+            eq(timetableReminders.timetableSlotId, timetableSlots.id),
+            eq(timetableReminders.studentId, profile.studentId),
+            isNull(timetableReminders.cancelledAt),
+          ),
+        )
         .where(
           and(
             eq(courseRegistrations.studentId, profile.studentId),
@@ -389,6 +432,20 @@ export async function getStudentDashboard(
       room: row.room,
       dayOfWeek: row.dayOfWeek,
       color: courseColor(row.courseCode),
+      reminder:
+        row.reminderId
+        && row.reminderTitle
+        && row.reminderNextFireAt
+        && row.reminderMinutes != null
+        && isTimetableReminderOffset(row.reminderMinutes)
+          ? {
+              id: row.reminderId,
+              title: row.reminderTitle,
+              notes: row.reminderNotes,
+              minutesBefore: row.reminderMinutes,
+              nextFireAt: new Date(row.reminderNextFireAt).toISOString(),
+            }
+          : null,
     })),
     deadlines,
   }
@@ -592,8 +649,10 @@ export async function getStudentCourse(
       }
     }),
     announcements: courseAnnouncements,
-    discussions: await listOfferingDiscussionSummaries(db, offeringId, { publishedOnly: true }),
-    liveSessions: await (await import('./live-sessions')).listOfferingLiveSessionSummaries(db, offeringId, { studentView: true }),
+    discussions: await optionalRows(() => listOfferingDiscussionSummaries(db, offeringId, { publishedOnly: true })),
+    liveSessions: await optionalRows(async () =>
+      (await import('./live-sessions')).listOfferingLiveSessionSummaries(db, offeringId, { studentView: true }),
+    ),
     assessments: openAssessments,
     attendance,
     attendanceRate: attendance.length === 0 ? null : Math.round((present / attendance.length) * 100),
@@ -813,10 +872,12 @@ export async function getRegistrationState(
   if (!semester) {
     return {
       feeHold: profile.feeHold,
-      maxCredits: MAX_CREDITS,
+      maxCredits: DEFAULT_SEMESTER_MAX_CREDITS,
       registeredCredits: 0,
       registrationOpen: false,
       registrationClosesAt: null,
+      semesterName: null,
+      academicYearName: null,
       offerings: [],
     }
   }
@@ -857,10 +918,12 @@ export async function getRegistrationState(
 
   return {
     feeHold: profile.feeHold,
-    maxCredits: MAX_CREDITS,
+    maxCredits: semester.maxCredits ?? DEFAULT_SEMESTER_MAX_CREDITS,
     registeredCredits,
     registrationOpen: semester.status === 'Open' || semester.status === 'InProgress',
     registrationClosesAt: semester.registrationClosesAt,
+    semesterName: semester.name,
+    academicYearName: semester.yearName,
     offerings: rows.map((row) => ({
       offeringId: row.offeringId,
       code: row.code,
@@ -881,40 +944,88 @@ export async function registerForCourses(
   input: RegisterCoursesRequest,
 ) {
   const profile = await getStudentProfile(institutionId, userId)
-  if (profile.feeHold) throw badRequest('Settle outstanding fees before registering for courses.')
-
   const state = await getRegistrationState(institutionId, userId)
-  if (!state.registrationOpen) throw badRequest('Course registration is closed.')
+  const addIds = input.offeringIds ?? []
+  const dropIds = input.dropOfferingIds ?? []
+  const overCap = state.registeredCredits > state.maxCredits
 
-  const selected = state.offerings.filter((offering) => input.offeringIds.includes(offering.offeringId))
-  if (selected.length !== input.offeringIds.length) {
+  if (addIds.length > 0) {
+    if (profile.feeHold) throw badRequest('Settle outstanding fees before registering for courses.')
+    if (!state.registrationOpen) throw badRequest('Course registration is closed.')
+  }
+  if (dropIds.length > 0 && !state.registrationOpen && !overCap) {
+    throw badRequest('Course registration is closed.')
+  }
+
+  const selected = state.offerings.filter((offering) => addIds.includes(offering.offeringId))
+  if (selected.length !== addIds.length) {
     throw badRequest('One or more selected courses are not available this semester.')
   }
   if (selected.some((offering) => !offering.registered && !offering.openForRegistration)) {
     throw badRequest('That course is closed for registration.')
   }
 
+  const dropping = state.offerings.filter((offering) => dropIds.includes(offering.offeringId))
+  if (dropping.length !== dropIds.length) {
+    throw badRequest('One or more courses to drop are not on this semester.')
+  }
+  if (dropping.some((offering) => !offering.registered)) {
+    throw badRequest('You can only drop a course you are registered for.')
+  }
+
   const extraCredits = selected
     .filter((offering) => !offering.registered)
     .reduce((sum, offering) => sum + offering.credits, 0)
-  if (state.registeredCredits + extraCredits > state.maxCredits) {
+  const droppedCredits = dropping.reduce((sum, offering) => sum + offering.credits, 0)
+  if (state.registeredCredits - droppedCredits + extraCredits > state.maxCredits) {
     throw badRequest(`You cannot register more than ${state.maxCredits} credits.`)
   }
 
   const db = await getInstitutionDb(institutionId)
   const now = new Date().toISOString()
 
+  for (const offering of dropping) {
+    await db
+      .update(courseRegistrations)
+      .set({ status: 'Dropped', droppedAt: now })
+      .where(
+        and(
+          eq(courseRegistrations.studentId, profile.studentId),
+          eq(courseRegistrations.courseOfferingId, offering.offeringId),
+        ),
+      )
+    await db
+      .update(courseOfferings)
+      .set({ enrolledCount: sql`GREATEST(${courseOfferings.enrolledCount} - 1, 0)` })
+      .where(eq(courseOfferings.id, offering.offeringId))
+  }
+
   for (const offering of selected) {
     if (offering.registered) continue
-    await db
-      .insert(courseRegistrations)
-      .values({
+    const [existing] = await db
+      .select({ id: courseRegistrations.id, status: courseRegistrations.status })
+      .from(courseRegistrations)
+      .where(
+        and(
+          eq(courseRegistrations.studentId, profile.studentId),
+          eq(courseRegistrations.courseOfferingId, offering.offeringId),
+        ),
+      )
+      .limit(1)
+
+    if (existing) {
+      await db
+        .update(courseRegistrations)
+        .set({ status: 'Approved', droppedAt: null, registeredAt: now })
+        .where(eq(courseRegistrations.id, existing.id))
+    } else {
+      await db.insert(courseRegistrations).values({
         studentId: profile.studentId,
         courseOfferingId: offering.offeringId,
         status: 'Approved',
         registeredAt: now,
       })
-      .onConflictDoNothing()
+    }
     await db
       .update(courseOfferings)
       .set({ enrolledCount: sql`${courseOfferings.enrolledCount} + 1` })
@@ -1246,7 +1357,7 @@ export async function listStudentNotifications(
 ): Promise<StudentNotification[]> {
   await requireStudent(institutionId, userId)
   const db = await getInstitutionDb(institutionId)
-  return db
+  const rows = await db
     .select({
       id: notifications.id,
       title: notifications.title,
@@ -1259,6 +1370,10 @@ export async function listStudentNotifications(
     .from(notifications)
     .where(eq(notifications.userId, userId))
     .orderBy(desc(notifications.createdAt))
+  return rows.map((row) => ({
+    ...row,
+    actionUrl: reachableNotificationActionUrl('Student', row.actionUrl),
+  }))
 }
 
 export async function markNotificationRead(

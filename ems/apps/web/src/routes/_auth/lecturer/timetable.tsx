@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { LecturerTimetableSlot, SaveLecturerTimetableSlotRequest } from '@stackedu/shared'
+import { TIMETABLE_WEEKDAYS, findTimetableClashes, timetableWeekdayLabel } from '@stackedu/shared'
 import { LecturerShell } from '@/components/LecturerShell'
 import { CourseCodePill } from '@/components/CourseCodePill'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { PagedList } from '@/components/ListPagination'
+import { TimetableClashBanner } from '@/components/timetable/TimetableClashBanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,16 +37,6 @@ export const Route = createFileRoute('/_auth/lecturer/timetable')({
   component: LecturerTimetablePage,
 })
 
-const DAY_OPTIONS = [
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-  { value: 7, label: 'Sunday' },
-] as const
-
 const SESSION_TYPES = ['Lecture', 'Tutorial', 'Lab', 'Practical'] as const
 
 type SlotForm = {
@@ -66,12 +58,13 @@ const EMPTY_FORM: SlotForm = {
 }
 
 function dayLabel(dayOfWeek: number): string {
-  return DAY_OPTIONS.find((d) => d.value === dayOfWeek)?.label ?? 'Day'
+  return timetableWeekdayLabel(dayOfWeek)
 }
 
 function LecturerTimetablePage() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [confirmSave, setConfirmSave] = useState(false)
   const [editingSlot, setEditingSlot] = useState<LecturerTimetableSlot | null>(null)
   const [deleteSlot, setDeleteSlot] = useState<LecturerTimetableSlot | null>(null)
   const [form, setForm] = useState<SlotForm>(EMPTY_FORM)
@@ -124,6 +117,7 @@ function LecturerTimetablePage() {
     },
     onSuccess: () => {
       toast.success(editingSlot ? 'Timetable slot updated.' : 'Timetable slot added.')
+      setConfirmSave(false)
       setDialogOpen(false)
       setEditingSlot(null)
       setForm(EMPTY_FORM)
@@ -146,6 +140,21 @@ function LecturerTimetablePage() {
     () => [...slots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime)),
     [slots],
   )
+  const clashes = useMemo(
+    () => findTimetableClashes(sortedSlots.map((slot) => ({
+      id: slot.id,
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      courseCode: slot.courseCode,
+      room: slot.room,
+      lecturer: 'You',
+    }))),
+    [sortedSlots],
+  )
+  const clashIds = useMemo(() => new Set(clashes.flatMap((clash) => clash.slotIds)), [clashes])
+  const selectedCourse = courses.find((course) => course.offeringId === form.offeringId)
+  const selectedRoom = rooms.find((room) => room.id === form.roomId)
 
   const openCreate = () => {
     setEditingSlot(null)
@@ -175,7 +184,7 @@ function LecturerTimetablePage() {
   return (
     <LecturerShell
       pageTitle="Timetable"
-      guide="Set class times for your assigned courses. Academic Admin can review the live schedule from their portal."
+      guide="Add class times for your assigned courses. A room or lecturer cannot be booked twice at the same time. Students and Academic Admin see the live week as soon as you save."
     >
       <div className="page-body animate-fade-up">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -187,7 +196,7 @@ function LecturerTimetablePage() {
               Timetable
             </h1>
             <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              Add and manage weekly class slots for your assigned courses.
+              Add and manage weekly class slots. A taken room cannot be booked again.
             </p>
           </div>
           <Button onClick={openCreate} disabled={courses.length === 0} className="self-start sm:self-auto">
@@ -201,6 +210,12 @@ function LecturerTimetablePage() {
             {apiErrorMessage(error, 'Could not load timetable.')}
           </p>
         ) : null}
+
+        <TimetableClashBanner
+          clashes={clashes}
+          uniqueCount={clashIds.size}
+          hint="Move one class. A taken room cannot be booked again."
+        />
 
         {courses.length === 0 ? (
           <div
@@ -236,7 +251,11 @@ function LecturerTimetablePage() {
             renderItem={(slot) => (
               <div
                 className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl"
-                style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+                style={{
+                  backgroundColor: clashIds.has(slot.id) ? 'var(--error-bg)' : 'var(--card)',
+                  border: `1px solid ${clashIds.has(slot.id) ? 'var(--error)' : 'var(--border)'}`,
+                  boxShadow: 'var(--shadow-sm)',
+                }}
               >
                 <CourseCodePill code={slot.courseCode} color={slot.color} />
                 <div className="flex-1 min-w-0">
@@ -311,8 +330,8 @@ function LecturerTimetablePage() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DAY_OPTIONS.map((day) => (
-                    <SelectItem key={day.value} value={String(day.value)}>{day.label}</SelectItem>
+                  {TIMETABLE_WEEKDAYS.map((day) => (
+                    <SelectItem key={day.iso} value={String(day.iso)}>{day.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -367,15 +386,32 @@ function LecturerTimetablePage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
               <Button
-                onClick={() => saveMutation.mutate()}
+                onClick={() => setConfirmSave(true)}
                 disabled={!form.offeringId || saveMutation.isPending}
               >
-                {saveMutation.isPending ? 'Saving…' : editingSlot ? 'Save changes' : 'Add slot'}
+                {editingSlot ? 'Save changes' : 'Add slot'}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmAlertDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editingSlot ? 'Save this class time?' : 'Add this class time?'}
+        tone="success"
+        headline={editingSlot ? 'Update timetable' : 'Add to timetable'}
+        summary={`${selectedCourse?.code ?? 'Course'} · ${dayLabel(form.dayOfWeek)} ${form.startTime}–${form.endTime}${selectedRoom ? ` · ${selectedRoom.name}` : ''}.`}
+        notices={[
+          { icon: 'clock', label: 'Students and Academic Admin see this on the live timetable as soon as you confirm.' },
+          { icon: 'shield', label: 'If this room is already booked in that time, the save is refused. The room is not available.' },
+        ]}
+        confirmLabel={saveMutation.isPending ? 'Saving…' : editingSlot ? 'Save changes' : 'Add slot'}
+        confirmVariant="brand"
+        loading={saveMutation.isPending}
+        onConfirm={() => saveMutation.mutate()}
+      />
 
       <ConfirmAlertDialog
         open={Boolean(deleteSlot)}

@@ -28,7 +28,7 @@ import type {
   UpdateAcademicProgrammeRequest,
   UserRole,
 } from '@stackedu/shared'
-import { formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, timetableWeekdayLabel } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
 import { applications } from '../db/institution/schema/admissions'
@@ -67,9 +67,10 @@ import {
   notifyAcademicCalendarChange,
   notifyCourseCatalogueChange,
   notifyLecturerOfResultReview,
+  notifyUsers,
 } from './role-notifications'
 import { writeAudit } from '../lib/audit'
-import { courseColor } from '../lib/course-color'
+import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 
 import { titleAndFirstName } from '@stackedu/shared'
@@ -734,9 +735,11 @@ export async function listAcademicTimetableSlots(
       id: timetableSlots.id,
       day: timetableSlots.dayOfWeek,
       startTime: timetableSlots.startTime,
+      endTime: timetableSlots.endTime,
       courseCode: courses.code,
       courseName: courses.name,
       lecturer: users.fullName,
+      lecturerId: lecturerAssignments.lecturerId,
       room: rooms.name,
       type: timetableSlots.sessionType,
       dept: departments.code,
@@ -761,14 +764,80 @@ export async function listAcademicTimetableSlots(
     id: row.id,
     day: row.day,
     hour: parseHour(row.startTime),
+    startTime: formatClock(row.startTime),
+    endTime: formatClock(row.endTime),
     courseCode: formatCourseCode(row.courseCode),
     courseName: row.courseName,
     lecturer: row.lecturer,
+    lecturerId: row.lecturerId,
     room: row.room,
     type: row.type,
     dept: deptPrefix(row.courseCode),
     color: courseColor(row.courseCode),
   }))
+}
+
+export async function askLecturerToFreeTimetableSlot(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  slotId: string,
+  message: string,
+): Promise<{ lecturerName: string }> {
+  const db = await getInstitutionDb(institutionId)
+  const [slot] = await db
+    .select({
+      id: timetableSlots.id,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      startTime: timetableSlots.startTime,
+      endTime: timetableSlots.endTime,
+      room: rooms.name,
+      courseCode: courses.code,
+      lecturerId: lecturerAssignments.lecturerId,
+      lecturerName: users.fullName,
+    })
+    .from(timetableSlots)
+    .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
+    .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
+    .leftJoin(rooms, eq(rooms.id, timetableSlots.roomId))
+    .leftJoin(
+      lecturerAssignments,
+      and(
+        eq(lecturerAssignments.courseOfferingId, courseOfferings.id),
+        eq(lecturerAssignments.isLead, true),
+      ),
+    )
+    .leftJoin(users, eq(users.id, lecturerAssignments.lecturerId))
+    .where(eq(timetableSlots.id, slotId))
+    .limit(1)
+
+  if (!slot) throw notFound('That class')
+  if (!slot.lecturerId) throw badRequest('This class has no lecturer to message.')
+
+  const when = `${timetableWeekdayLabel(slot.dayOfWeek)} ${formatClock(slot.startTime)}–${formatClock(slot.endTime)}`
+  const room = slot.room ?? 'This room'
+  const course = formatCourseCode(slot.courseCode)
+  const note = message.trim()
+
+  await notifyUsers(db, [{
+    userId: slot.lecturerId,
+    title: `${room} is needed`,
+    body: `Academic Admin asked you to free ${room} on ${when} (${course}). ${note}`,
+    category: 'Timetable',
+    actionUrl: '/lecturer/timetable',
+  }])
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'timetable.room.request',
+    targetType: 'timetable_slot',
+    targetId: slotId,
+    metadata: { lecturerId: slot.lecturerId, room, when },
+  })
+
+  return { lecturerName: slot.lecturerName ?? 'the lecturer' }
 }
 
 export async function listAcademicLecturers(institutionId: string): Promise<AcademicLecturerRow[]> {
@@ -940,6 +1009,7 @@ export async function listAcademicSemesters(
       name: semesters.name,
       yearName: academicYears.name,
       isCurrent: semesters.isCurrent,
+      maxCredits: semesters.maxCredits,
     })
     .from(academicCalendarEvents)
     .innerJoin(
@@ -955,6 +1025,7 @@ export async function listAcademicSemesters(
       semesters.name,
       academicYears.name,
       semesters.isCurrent,
+      semesters.maxCredits,
       academicYears.startDate,
       semesters.sequence,
     )
@@ -964,6 +1035,7 @@ export async function listAcademicSemesters(
     id: row.id,
     label: `${row.name} · ${row.yearName}`,
     isCurrent: row.isCurrent,
+    maxCredits: row.maxCredits ?? DEFAULT_SEMESTER_MAX_CREDITS,
   }))
 }
 
@@ -1963,7 +2035,7 @@ function academicYearNameFromDate(startDate: string): string {
 
 async function upsertSemesterFromCalendarEvent(
   db: Awaited<ReturnType<typeof getInstitutionDb>>,
-  input: { title: string; startDate: string; endDate: string; category: string },
+  input: { title: string; startDate: string; endDate: string; category: string; maxCredits?: number },
 ): Promise<string | null> {
   if (!isSemesterCalendarCategory(input.category)) return null
 
@@ -2024,6 +2096,7 @@ async function upsertSemesterFromCalendarEvent(
         sequence: (count ?? 0) + 1,
         startDate,
         endDate,
+        maxCredits: input.maxCredits ?? DEFAULT_SEMESTER_MAX_CREDITS,
         status: isActiveNow ? 'Open' : 'Planned',
         isCurrent: makeCurrent,
       })
@@ -2037,6 +2110,7 @@ async function upsertSemesterFromCalendarEvent(
       .set({
         startDate,
         endDate,
+        ...(input.maxCredits !== undefined ? { maxCredits: input.maxCredits } : {}),
         ...(isActiveNow ? { isCurrent: true, status: 'Open' as const } : {}),
       })
       .where(eq(semesters.id, semester.id))
@@ -2108,6 +2182,7 @@ export async function createAcademicCalendarEvent(
     startDate: input.startDate,
     endDate: input.endDate ?? input.startDate,
     category: input.category,
+    maxCredits: input.maxCredits,
   })
   const current = await currentSemester(institutionId)
   const [created] = await db
@@ -2183,6 +2258,7 @@ export async function updateAcademicCalendarEvent(
     startDate: nextStart,
     endDate: nextEnd,
     category: nextCategory,
+    maxCredits: input.maxCredits,
   })
 
   const current = await currentSemester(institutionId)

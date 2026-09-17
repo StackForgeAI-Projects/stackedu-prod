@@ -33,7 +33,7 @@ Also needed around this:
 - **Programmes** — the student’s programme is what they belong to.
 - **Faculty** — people and departments that sit behind the course list.
 - **Calendar** — academic year, semester, and whether registration is open.
-- **Timetable** — room and time for in-person slots. This is a timetable, not the live classroom. A live class is scheduled separately by the lecturer (section 8).
+- **Timetable** — room and time for in-person slots. Lecturers set times; Academic Admin reviews; a room or lecturer cannot be double-booked. Students see their approved week. See `Timetable-Lifecycle.md`. This is not the live classroom. A live class is scheduled separately by the lecturer (section 8).
 
 ICT must already have created the lecturer and student accounts (email, role, password) under **User Management**. Academic Admin cannot invent a login.
 

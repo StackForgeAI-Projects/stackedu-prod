@@ -113,6 +113,8 @@ export const semesters = pgTable(
     endDate: date('end_date').notNull(),
     registrationOpensAt: date('registration_opens_at'),
     registrationClosesAt: date('registration_closes_at'),
+    /** Credit cap students may register this semester. Academic Admin can change it. */
+    maxCredits: integer('max_credits').notNull().default(21),
     status: semesterStatusEnum('status').notNull().default('Planned'),
     isCurrent: boolean('is_current').notNull().default(false),
     ...timestamps(),

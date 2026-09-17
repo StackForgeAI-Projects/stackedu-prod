@@ -35,6 +35,8 @@ export interface BrandedEmailInput {
   /** When false, the Track button is omitted (e.g. account provisioning mail). */
   showTrackButton?: boolean
   trackUrl?: string
+  /** Header and footer office line. Admissions mail keeps the default. */
+  officeLabel?: string
 }
 
 function defaultLogoUrl(): string {
@@ -77,11 +79,11 @@ export async function getInstitutionEmailBranding(
   }
 }
 
-function footerLines(branding: InstitutionEmailBranding): string[] {
+function footerLines(branding: InstitutionEmailBranding, officeLabel = 'Admissions Office'): string[] {
   const websiteLabel = branding.website.replace(/^https?:\/\//, '')
   return [
     branding.name,
-    'Admissions Office',
+    officeLabel,
     branding.location,
     `Email: ${branding.contactEmail}`,
     `Website: ${websiteLabel}`,
@@ -92,13 +94,13 @@ function footerLines(branding: InstitutionEmailBranding): string[] {
   ]
 }
 
-function buildEmailFooterHtml(branding: InstitutionEmailBranding): string {
+function buildEmailFooterHtml(branding: InstitutionEmailBranding, officeLabel = 'Admissions Office'): string {
   const websiteLabel = branding.website.replace(/^https?:\/\//, '')
   const accent = escapeHtml(branding.brandColor)
   return `
     <div style="text-align:center">
       <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#374151">${escapeHtml(branding.name)}</p>
-      <p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:#6b7280">Admissions Office</p>
+      <p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:#6b7280">${escapeHtml(officeLabel)}</p>
       <p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:#6b7280">${escapeHtml(branding.location)}</p>
       <p style="margin:0 0 6px;font-size:12px;color:#6b7280">
         Email:
@@ -124,6 +126,7 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
   const track = input.trackUrl ?? `${env().WEB_APP_URL.replace(/\/$/, '')}/apply/track`
   const showTrack = input.showTrackButton !== false
   const ctaLabel = input.ctaLabel ?? 'Open Track'
+  const officeLabel = input.officeLabel ?? 'Admissions Office'
 
   const text = [
     input.greeting,
@@ -132,7 +135,7 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
     ...input.paragraphs,
     '',
     ...(showTrack ? [`${ctaLabel}: ${track}`, ''] : []),
-    ...footerLines(input.branding),
+    ...footerLines(input.branding, officeLabel),
   ].join('\n')
 
   const accent = escapeHtml(input.branding.brandColor)
@@ -149,7 +152,7 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
       </p>`
     : ''
 
-  const footerHtml = buildEmailFooterHtml(input.branding)
+  const footerHtml = buildEmailFooterHtml(input.branding, officeLabel)
 
   const leadNoteHtml = input.leadNote ? buildLeadNoteHtml(input.leadNote) : ''
 
@@ -169,7 +172,7 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
                   </td>
                   <td style="vertical-align:middle">
                     <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;line-height:1.2">${escapeHtml(input.branding.name)}</p>
-                    <p style="margin:4px 0 0;font-size:12px;color:#d1d5db">Admissions Office</p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#d1d5db">${escapeHtml(officeLabel)}</p>
                   </td>
                 </tr>
               </table>

@@ -1,5 +1,6 @@
 import { Info, X } from 'lucide-react'
 import { useState } from 'react'
+import { IconActionButton } from '@/components/IconActionButton'
 import {
   dismissPageGuide,
   isPageGuideDismissed,
@@ -26,23 +27,21 @@ export function PageGuide({ pageKey, title = 'On this page', children }: PageGui
         borderRadius: 'var(--radius-xl)',
       }}
     >
-      <Info className="flex-shrink-0 mt-0.5" style={{ width: 16, height: 16, color: 'var(--brand)' }} />
+      <Info className="shrink-0 mt-0.5" style={{ width: 16, height: 16, color: 'var(--brand)' }} />
       <div className="min-w-0 flex-1">
         <p className="t-label mb-1" style={{ color: 'var(--brand)' }}>{title}</p>
         <p className="text-sm" style={{ color: 'var(--foreground)', lineHeight: 1.55 }}>{children}</p>
       </div>
-      <button
-        type="button"
-        aria-label="Dismiss guide"
-        className="flex-shrink-0"
-        style={{ color: 'var(--muted-foreground)' }}
+      <IconActionButton
+        label="Dismiss guide"
+        icon={X}
+        className="shrink-0"
+        style={{ border: 'none', color: 'var(--muted-foreground)' }}
         onClick={() => {
           dismissPageGuide(storageKey)
           setHidden(true)
         }}
-      >
-        <X style={{ width: 16, height: 16 }} />
-      </button>
+      />
     </div>
   )
 }

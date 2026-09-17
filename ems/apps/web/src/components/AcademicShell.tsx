@@ -9,10 +9,11 @@ import { initialsFrom } from '@/lib/utils'
 interface AcademicShellProps {
   pageTitle: string
   guide?: string
+  guideKey?: string
   children: React.ReactNode
 }
 
-export function AcademicShell({ pageTitle, guide, children }: AcademicShellProps) {
+export function AcademicShell({ pageTitle, guide, guideKey, children }: AcademicShellProps) {
   const { data } = useQuery({
     queryKey: academicProfileQueryKey,
     queryFn: getAcademicProfile,
@@ -34,7 +35,7 @@ export function AcademicShell({ pageTitle, guide, children }: AcademicShellProps
     >
       {guideText ? (
         <div style={{ padding: '20px 16px 0' }}>
-          <PageGuide pageKey={`academic:${pageTitle}`}>{guideText}</PageGuide>
+          <PageGuide pageKey={guideKey ?? `academic:${pageTitle}`}>{guideText}</PageGuide>
         </div>
       ) : null}
       {children}

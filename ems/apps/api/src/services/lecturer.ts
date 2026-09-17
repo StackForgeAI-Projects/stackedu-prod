@@ -77,6 +77,7 @@ import {
   notifyEnrolledStudentsOfMaterial,
 } from './role-notifications'
 import { writeAudit } from '../lib/audit'
+import { assertTimetableSlotFree } from '../lib/timetable-conflicts'
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import {
@@ -2633,6 +2634,14 @@ export async function createLecturerTimetableSlot(
     if (!room) throw badRequest('Room not found.')
   }
 
+  await assertTimetableSlotFree(db, {
+    offeringId: input.offeringId,
+    dayOfWeek: input.dayOfWeek,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    roomId: input.roomId ?? null,
+  })
+
   const [created] = await db
     .insert(timetableSlots)
     .values({
@@ -2674,6 +2683,8 @@ export async function updateLecturerTimetableSlot(
     .select({
       startTime: timetableSlots.startTime,
       endTime: timetableSlots.endTime,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      roomId: timetableSlots.roomId,
     })
     .from(timetableSlots)
     .where(eq(timetableSlots.id, slotId))
@@ -2688,6 +2699,15 @@ export async function updateLecturerTimetableSlot(
     const [room] = await db.select({ id: rooms.id }).from(rooms).where(eq(rooms.id, input.roomId)).limit(1)
     if (!room) throw badRequest('Room not found.')
   }
+
+  await assertTimetableSlotFree(db, {
+    offeringId: owned.offeringId,
+    dayOfWeek: input.dayOfWeek ?? existing.dayOfWeek,
+    startTime,
+    endTime,
+    roomId: input.roomId !== undefined ? input.roomId : existing.roomId,
+    exceptSlotId: slotId,
+  })
 
   const patch: {
     dayOfWeek?: number

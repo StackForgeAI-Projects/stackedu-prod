@@ -67,6 +67,7 @@ import { writeAudit } from '../lib/audit'
 import { sendEmail } from '../lib/email'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import { hashPassword } from '../lib/password'
+import { DEFAULT_PERMISSIONS } from '../db/seed-defaults'
 import { createUser } from './users'
 import {
   audienceLabel,
@@ -708,8 +709,13 @@ export async function listIctRoles(institutionId: string): Promise<{
     keysByRole.set(link.roleId, current)
   }
 
+  const permissionCopy = new Map(DEFAULT_PERMISSIONS.map((row) => [row.key, row]))
+
   return {
-    catalogue,
+    catalogue: catalogue.map((item) => {
+      const fresh = permissionCopy.get(item.key)
+      return fresh ? { ...item, description: fresh.description, module: fresh.module } : item
+    }),
     roles: roleRows.map((row) => ({
       key: row.key,
       name: row.name,

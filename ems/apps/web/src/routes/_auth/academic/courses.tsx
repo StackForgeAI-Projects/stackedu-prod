@@ -10,6 +10,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { AcademicShell } from '@/components/AcademicShell'
 import { DataTable } from '@/components/DataTable'
 import { DepartmentPicker } from '@/components/DepartmentPicker'
@@ -342,18 +343,12 @@ function CoursesCataloguePage() {
               id: 'actions', header: '', className: 'text-right',
               cell: (c) => (
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => openEdit(c)} title="Edit" className="flex items-center justify-center h-7 w-7 rounded-lg" style={{ border: '1px solid var(--border)', color: 'var(--muted-foreground)', cursor: 'pointer', background: 'transparent' }}>
-                    <Pencil style={{ width: 12, height: 12 }} />
-                  </button>
+                  <IconActionButton label="Edit course" icon={Pencil} onClick={() => openEdit(c)} />
                   {c.status === 'Active' ? (
-                    <button type="button" onClick={() => setArchiveTarget(c)} title="Archive" className="flex items-center justify-center h-7 w-7 rounded-lg" style={{ border: '1px solid var(--border)', color: 'var(--muted-foreground)', cursor: 'pointer', background: 'transparent' }}>
-                      <Archive style={{ width: 12, height: 12 }} />
-                    </button>
+                    <IconActionButton label="Archive course" icon={Archive} onClick={() => setArchiveTarget(c)} />
                   ) : null}
                   {c.enrolled === 0 ? (
-                    <button type="button" onClick={() => setDeleteTarget(c)} title="Delete" className="flex items-center justify-center h-7 w-7 rounded-lg" style={{ border: '1px solid var(--border)', color: 'var(--error)', cursor: 'pointer', background: 'transparent' }}>
-                      <Trash2 style={{ width: 12, height: 12 }} />
-                    </button>
+                    <IconActionButton label="Delete course" icon={Trash2} danger onClick={() => setDeleteTarget(c)} />
                   ) : null}
                 </div>
               ),

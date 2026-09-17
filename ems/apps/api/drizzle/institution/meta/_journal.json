@@ -64,6 +64,20 @@
       "when": 1786497000000,
       "tag": "0008_live_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786498000000,
+      "tag": "0009_semester_max_credits",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786499000000,
+      "tag": "0010_timetable_reminders",
+      "breakpoints": true
     }
   ]
 }

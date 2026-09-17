@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { AcademicProgrammeRow } from '@stackedu/shared'
@@ -7,6 +7,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { Switch } from '@/components/ui/switch'
 import { AcademicShell } from '@/components/AcademicShell'
 import { DataTable } from '@/components/DataTable'
@@ -40,6 +41,7 @@ function deptBadgeColors(dept: string) {
 }
 
 function ProgrammesPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data, isPending, error } = useQuery({
     queryKey: academicProgrammesQueryKey,
@@ -204,17 +206,13 @@ function ProgrammesPage() {
               id: 'actions', header: '', className: 'text-right',
               cell: (prog) => (
                 <div className="flex items-center gap-0.5">
-                  <Link to="/academic/programme" search={{ id: prog.id }}>
-                    <button type="button" title="View" className="flex items-center justify-center rounded-lg" style={{ width: 30, height: 30, color: 'var(--muted-foreground)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>
-                      <Eye style={{ width: 14, height: 14 }} />
-                    </button>
-                  </Link>
-                  <button type="button" onClick={() => openEdit(prog)} title="Edit" className="flex items-center justify-center rounded-lg" style={{ width: 30, height: 30, color: 'var(--muted-foreground)', border: 'none', background: 'none', cursor: 'pointer' }}>
-                    <Pencil style={{ width: 14, height: 14 }} />
-                  </button>
-                  <button type="button" onClick={() => setDeleteTarget(prog)} title="Delete" className="flex items-center justify-center rounded-lg" style={{ width: 30, height: 30, color: 'var(--error)', border: 'none', background: 'none', cursor: 'pointer' }}>
-                    <Trash2 style={{ width: 14, height: 14 }} />
-                  </button>
+                  <IconActionButton
+                    label="View programme"
+                    icon={Eye}
+                    onClick={() => { void navigate({ to: '/academic/programme', search: { id: prog.id } }) }}
+                  />
+                  <IconActionButton label="Edit programme" icon={Pencil} onClick={() => openEdit(prog)} />
+                  <IconActionButton label="Delete programme" icon={Trash2} danger onClick={() => setDeleteTarget(prog)} />
                 </div>
               ),
             },

@@ -7,6 +7,7 @@ import {
   COURSE_MATERIAL_MAX_BYTES,
 } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,7 +30,7 @@ const UNASSIGNED_MODULE = 'none'
 export function TableIconButton({
   label,
   onClick,
-  icon: Icon,
+  icon,
   danger,
 }: {
   label: string
@@ -38,21 +39,9 @@ export function TableIconButton({
   danger?: boolean
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="flex items-center justify-center h-7 w-7 rounded-lg shrink-0"
-      style={{
-        border: '1px solid var(--border)',
-        color: danger ? 'var(--error)' : 'var(--muted-foreground)',
-        cursor: 'pointer',
-        background: 'transparent',
-      }}
-    >
-      <Icon style={{ width: 12, height: 12 }} />
-    </button>
+    <span className="inline-flex">
+      <IconActionButton label={label} icon={icon} onClick={onClick} danger={danger} />
+    </span>
   )
 }
 

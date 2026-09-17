@@ -144,7 +144,7 @@ export const INTEGRATION_CATALOG: IntegrationCatalogItem[] = [
     displayName: 'Resend Email',
     category: 'email',
     description:
-      'Sends admissions, account and notification emails. The institution logo and system colour from System Settings are applied to those emails. Mail is skipped when this service is off or the key is missing — the rest of the system still works.',
+      'Sends admissions, account, timetable reminder and notification emails. The institution logo and system colour from System Settings are applied to those emails. Mail is skipped when this service is off or the key is missing — the rest of the system still works.',
     docsUrl: 'https://resend.com/docs',
     setupSteps: [
       'Create an API key in the Resend dashboard.',

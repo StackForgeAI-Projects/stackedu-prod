@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { reachableNotificationActionUrl } from '@stackedu/shared'
 import { StudentShell } from '@/components/StudentShell'
 import { PagedList } from '@/components/ListPagination'
 import {
@@ -43,7 +44,9 @@ function NotificationsPage() {
             defaultPageSize={10}
             itemLabel="notifications"
             empty={<p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p>}
-            renderItem={(item) => (
+            renderItem={(item) => {
+              const href = reachableNotificationActionUrl('Student', item.actionUrl)
+              return (
               <button
                 className="w-full text-left p-4"
                 style={{
@@ -57,9 +60,9 @@ function NotificationsPage() {
                 <p className="t-label mb-1">{item.category}</p>
                 <p className="text-sm font-semibold">{item.title}</p>
                 <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{item.body}</p>
-                {item.actionUrl ? (
+                {href ? (
                   <a
-                    href={item.actionUrl}
+                    href={href}
                     className="t-caption mt-2 inline-block"
                     style={{ color: 'var(--success)' }}
                     onClick={(event) => event.stopPropagation()}
@@ -68,7 +71,8 @@ function NotificationsPage() {
                   </a>
                 ) : null}
               </button>
-            )}
+              )
+            }}
           />
         )}
       </div>

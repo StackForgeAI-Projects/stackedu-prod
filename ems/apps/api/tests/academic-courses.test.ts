@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { LECTURER_ASSIGNMENT_REQUIRES_SEMESTER } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, reachableNotificationActionUrl } from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
 import { academicYears, courses, departments, faculties, programmes, semesters, academicCalendarEvents } from '../src/db/institution/schema/academic'
@@ -16,7 +16,7 @@ import {
   updateAcademicCalendarEvent,
   updateAcademicCourse,
 } from '../src/services/academic'
-import { getRegistrationState, registerForCourses } from '../src/services/student'
+import { getRegistrationState, getStudentProfile, listStudentNotifications, registerForCourses } from '../src/services/student'
 import { createUser } from '../src/services/users'
 import { createTestPlatform, uniqueSlug, type TestPlatform } from './helpers/test-database'
 
@@ -254,6 +254,7 @@ describe('academic courses', () => {
 
     const closedError = await registerForCourses(institutionId, studentUserId, {
       offeringIds: [offering!.offeringId],
+      dropOfferingIds: [],
     }).catch((cause: AppError) => cause)
     expect(closedError).toBeInstanceOf(AppError)
     expect((closedError as AppError).message).toBe('That course is closed for registration.')
@@ -265,6 +266,7 @@ describe('academic courses', () => {
 
     await registerForCourses(institutionId, studentUserId, {
       offeringIds: [offering!.offeringId],
+      dropOfferingIds: [],
     })
 
     const registered = await getRegistrationState(institutionId, studentUserId)
@@ -303,5 +305,89 @@ describe('academic courses', () => {
       .where(eq(notifications.userId, studentUserId))
     expect(notes.some((note) => note.title === 'Calendar: Library induction')).toBe(true)
     expect(notes.some((note) => note.title === 'Calendar updated: Library induction week')).toBe(true)
+
+    const inbox = await listStudentNotifications(institutionId, studentUserId)
+    expect(inbox.every((note) => note.actionUrl === null || note.actionUrl.startsWith('/student'))).toBe(true)
+  })
+
+  it('hides Open links that the signed-in role cannot open', () => {
+    expect(reachableNotificationActionUrl('Student', '/academic/calendar')).toBeNull()
+    expect(reachableNotificationActionUrl('Student', '/student/fees')).toBe('/student/fees')
+    expect(reachableNotificationActionUrl('Lecturer', '/student/fees')).toBeNull()
+  })
+
+  it('returns department, session, and semester for a student registration slip', async () => {
+    const profile = await getStudentProfile(institutionId, studentUserId)
+    expect(profile.departmentName).toBe('Department of Computing')
+    expect(profile.facultyName).toBe('Science')
+    expect(profile.programmeName).toBe('Computer Science')
+    expect(profile.studentNumber).toBe('CTU-2026-0001')
+
+    const state = await getRegistrationState(institutionId, studentUserId)
+    const current = (await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)
+    expect(current).toBeTruthy()
+    expect(state.semesterName).toBeTruthy()
+    expect(state.academicYearName).toBeTruthy()
+    expect(`${state.semesterName} · ${state.academicYearName}`).toBe(current!.label)
+  })
+
+  it('stores semester max credits from a calendar save and lets a student drop and re-add under the cap', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const [event] = await db
+      .select({ id: academicCalendarEvents.id })
+      .from(academicCalendarEvents)
+      .where(eq(academicCalendarEvents.title, 'First Semester'))
+      .limit(1)
+    expect(event?.id).toBeTruthy()
+
+    await updateAcademicCalendarEvent(institutionId, actor, event!.id, { maxCredits: 3 })
+    const current = (await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)
+    expect(current?.maxCredits).toBe(3)
+
+    await createAcademicCourse(institutionId, actor, {
+      code: 'CAP301',
+      name: 'Credit Cap Course',
+      departmentName: 'Department of Computing',
+      credits: 3,
+      lecturerId,
+      semesterId: current!.id,
+      openForRegistration: true,
+    })
+
+    let state = await getRegistrationState(institutionId, studentUserId)
+    const already = state.offerings.filter((row) => row.registered).map((row) => row.offeringId)
+    if (already.length) {
+      await registerForCourses(institutionId, studentUserId, { offeringIds: [], dropOfferingIds: already })
+    }
+
+    state = await getRegistrationState(institutionId, studentUserId)
+    const first = state.offerings.find((row) => row.name === 'Operating Systems')
+    const second = state.offerings.find((row) => row.name === 'Credit Cap Course')
+    expect(first?.offeringId).toBeTruthy()
+    expect(second?.offeringId).toBeTruthy()
+
+    await registerForCourses(institutionId, studentUserId, { offeringIds: [first!.offeringId], dropOfferingIds: [] })
+    const over = await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [second!.offeringId],
+      dropOfferingIds: [],
+    }).catch((cause: AppError) => cause)
+    expect(over).toBeInstanceOf(AppError)
+    expect((over as AppError).message).toBe('You cannot register more than 3 credits.')
+
+    await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [],
+      dropOfferingIds: [first!.offeringId],
+    })
+    state = await getRegistrationState(institutionId, studentUserId)
+    expect(state.offerings.find((row) => row.offeringId === first!.offeringId)?.registered).toBe(false)
+
+    await registerForCourses(institutionId, studentUserId, { offeringIds: [first!.offeringId], dropOfferingIds: [] })
+    state = await getRegistrationState(institutionId, studentUserId)
+    expect(state.offerings.find((row) => row.offeringId === first!.offeringId)?.registered).toBe(true)
+
+    await updateAcademicCalendarEvent(institutionId, actor, event!.id, { maxCredits: DEFAULT_SEMESTER_MAX_CREDITS })
+    expect((await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)?.maxCredits).toBe(
+      DEFAULT_SEMESTER_MAX_CREDITS,
+    )
   })
 })

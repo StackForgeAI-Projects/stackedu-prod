@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CreateLibraryRequest, LibraryCatalogueItem, LibraryRequest, ResourceType } from '@stackedu/shared'
 import {
   formatAppDateDdMmYyyy,
@@ -8,6 +8,8 @@ import {
 } from '@stackedu/shared'
 import { Download, Inbox } from 'lucide-react'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { DataTable } from '@/components/DataTable'
+import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,24 +38,15 @@ export function LibraryBrowsePanel({
 }) {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
-  const [type, setType] = useState<ResourceType | 'all'>('all')
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [reason, setReason] = useState('')
   const [requestOpen, setRequestOpen] = useState(false)
 
-  const types = useMemo(() => {
-    const seen = new Set<ResourceType>()
-    for (const item of resources ?? []) seen.add(item.type)
-    return [...seen]
-  }, [resources])
-
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
   }, [])
-
-  const filtered = (resources ?? []).filter((item) => type === 'all' || item.type === type)
 
   const requestMutation = useMutation({
     mutationFn: onRequest,
@@ -67,6 +60,15 @@ export function LibraryBrowsePanel({
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not send that request.')),
   })
+
+  async function openFile(item: LibraryCatalogueItem, fileId?: string) {
+    try {
+      const target = await onDownload(item.id, fileId)
+      window.open(target.url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not open that file.'))
+    }
+  }
 
   return (
     <div className="animate-fade-up" style={{ padding: '24px 16px 56px', maxWidth: 1100, margin: '0 auto' }}>
@@ -134,7 +136,7 @@ export function LibraryBrowsePanel({
         </div>
       ) : null}
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-4">
         <Input
           value={query}
           onChange={(event) => {
@@ -146,79 +148,100 @@ export function LibraryBrowsePanel({
           placeholder="Search title, author or subject"
           className="sm:max-w-sm"
         />
-        <select
-          className="text-sm px-3 py-2 rounded-lg"
-          style={{ border: '1px solid var(--border)', background: 'var(--card)' }}
-          value={type}
-          onChange={(event) => setType(event.target.value as ResourceType | 'all')}
-        >
-          <option value="all">All types</option>
-          {types.map((value) => (
-            <option key={value} value={value}>{RESOURCE_TYPE_LABELS[value]}</option>
-          ))}
-        </select>
       </div>
 
       {isPending ? (
         <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading catalogue…</p>
       ) : error ? (
         <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load the library.')}</p>
-      ) : filtered.length === 0 ? (
-        <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-          {query.trim() || type !== 'all' || resources?.length ? 'No resources match that search.' : 'No published resources yet.'}
-        </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {filtered.map((item) => (
-            <article
-              key={item.id}
-              className="flex flex-col p-5"
-              style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}
-            >
-              <p className="t-label mb-2" style={{ color: 'var(--muted-foreground)' }}>{RESOURCE_TYPE_LABELS[item.type]}</p>
-              <h2 className="text-sm font-semibold mb-1">{item.title}</h2>
-              <p className="t-caption mb-3" style={{ color: 'var(--muted-foreground)' }}>
-                {[item.author, item.publicationYear].filter(Boolean).join(' · ')}
-              </p>
-              {item.description ? (
-                <p className="text-sm mb-3 line-clamp-3">{item.description}</p>
-              ) : null}
-              {item.subjectTags.length ? (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {item.subjectTags.map((tag) => (
+        <DataTable
+          rows={resources ?? []}
+          rowKey={(row) => row.id}
+          hideSearch
+          defaultPageSize={10}
+          empty={query.trim() || (resources?.length ?? 0) > 0 ? 'No resources match that search.' : 'No published resources yet.'}
+          filters={[
+            {
+              id: 'type',
+              label: 'Type',
+              allLabel: 'All types',
+              getValue: (row) => row.type,
+              options: (Object.keys(RESOURCE_TYPE_LABELS) as ResourceType[])
+                .filter((type) => (resources ?? []).some((row) => row.type === type))
+                .map((type) => ({ label: RESOURCE_TYPE_LABELS[type], value: type })),
+            },
+          ]}
+          columns={[
+            {
+              id: 'type',
+              header: 'Type',
+              value: (row) => RESOURCE_TYPE_LABELS[row.type],
+              sortable: true,
+              cell: (row) => <span className="t-label whitespace-nowrap">{RESOURCE_TYPE_LABELS[row.type]}</span>,
+            },
+            {
+              id: 'title',
+              header: 'Title',
+              value: (row) => row.title,
+              sortable: true,
+              cell: (row) => (
+                <div className="min-w-0 py-1">
+                  <p className="text-sm font-semibold">{row.title}</p>
+                  {row.description ? (
+                    <p className="t-caption mt-0.5 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>{row.description}</p>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              id: 'author',
+              header: 'Author',
+              value: (row) => row.author,
+              sortable: true,
+              cell: (row) => (
+                <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                  {[row.author, row.publicationYear].filter(Boolean).join(' · ') || '—'}
+                </span>
+              ),
+            },
+            {
+              id: 'subjects',
+              header: 'Subjects',
+              value: (row) => row.subjectTags.join(' '),
+              cell: (row) => row.subjectTags.length ? (
+                <div className="flex flex-wrap gap-1">
+                  {row.subjectTags.map((tag) => (
                     <span key={tag} className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--muted)', borderRadius: 'var(--radius-sm)' }}>
                       {tag}
                     </span>
                   ))}
                 </div>
-              ) : null}
-              <div className="mt-auto flex flex-wrap gap-2">
-                {item.files.length === 0 ? (
-                  <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>No file attached yet.</p>
-                ) : (
-                  item.files.map((file) => (
-                    <Button
+              ) : (
+                <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>—</span>
+              ),
+            },
+            {
+              id: 'file',
+              header: '',
+              className: 'text-right',
+              cell: (row) => (
+                <div className="flex justify-end gap-1">
+                  {row.files.length === 0 ? (
+                    <span className="t-caption whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>No file</span>
+                  ) : row.files.map((file) => (
+                    <IconActionButton
                       key={file.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const target = await onDownload(item.id, file.id)
-                          window.open(target.url, '_blank', 'noopener,noreferrer')
-                        } catch (err) {
-                          toast.error(apiErrorMessage(err, 'Could not open that file.'))
-                        }
-                      }}
-                    >
-                      <Download className="mr-1.5 h-3.5 w-3.5" />
-                      {file.format?.toUpperCase() ?? 'File'} · {formatLibraryFileSize(file.fileSizeBytes)}
-                    </Button>
-                  ))
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
+                      label={`Download ${file.format?.toUpperCase() ?? 'file'} · ${formatLibraryFileSize(file.fileSizeBytes)}`}
+                      icon={Download}
+                      onClick={() => { void openFile(row, file.id) }}
+                    />
+                  ))}
+                </div>
+              ),
+            },
+          ]}
+        />
       )}
     </div>
   )

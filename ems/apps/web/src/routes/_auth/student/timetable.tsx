@@ -1,7 +1,10 @@
 ﻿import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import type { StudentDashboard } from '@stackedu/shared'
+import { Bell } from 'lucide-react'
+import { useState } from 'react'
+import { TIMETABLE_GRID_DAYS, jsWeekdayToIso, type StudentDashboard } from '@stackedu/shared'
 import { StudentShell } from '@/components/StudentShell'
+import { TimetableEventDialog, type StudentTimetableSlot } from '@/components/timetable/TimetableEventDialog'
 import { getStudentCourses, getStudentDashboard, studentCoursesQueryKey, studentDashboardQueryKey } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
 
@@ -10,8 +13,6 @@ export const Route = createFileRoute('/_auth/student/timetable')({
 })
 
 const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const ISO_WEEKDAYS = [1, 2, 3, 4, 5]
 const ROW_H = 64
 const LABEL_W = 56
 
@@ -34,10 +35,6 @@ function coversHour(item: StudentDashboard['schedule'][number], hour: number): b
   return start < hour && end > hour
 }
 
-function jsToIsoDay(jsDay: number): number {
-  return jsDay === 0 ? 7 : jsDay
-}
-
 function TimetablePage() {
   const { data, isPending, error } = useQuery({
     queryKey: studentDashboardQueryKey,
@@ -47,11 +44,12 @@ function TimetablePage() {
     queryKey: studentCoursesQueryKey,
     queryFn: getStudentCourses,
   })
-  const todayIso = jsToIsoDay(new Date().getDay())
+  const [selected, setSelected] = useState<StudentTimetableSlot | null>(null)
+  const todayIso = jsWeekdayToIso(new Date().getDay())
   const schedule = data?.schedule ?? []
 
   return (
-    <StudentShell pageTitle="Timetable" guide="Your approved classes this week. Academic Admin publishes the timetable; empty days mean no slot is assigned yet.">
+    <StudentShell pageTitle="Timetable" guide="Your approved classes this week. Click a class to set a reminder — StackEDU emails you and notifies you in the app.">
       <div className="animate-fade-up" style={{ padding: '24px 16px 56px' }}>
         <div className="mb-8">
           <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.015em' }}>
@@ -83,19 +81,19 @@ function TimetablePage() {
               >
                 <div className="flex" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--muted)' }}>
                   <div style={{ width: LABEL_W, flexShrink: 0, borderRight: '1px solid var(--border)' }} />
-                  {DAYS.map((day, index) => {
-                    const isToday = ISO_WEEKDAYS[index] === todayIso
+                  {TIMETABLE_GRID_DAYS.map((day, index) => {
+                    const isToday = day.iso === todayIso
                     return (
                       <div
-                        key={day}
+                        key={day.iso}
                         className="flex-1 text-center py-3"
                         style={{
-                          borderRight: index < DAYS.length - 1 ? '1px solid var(--border)' : 'none',
+                          borderRight: index < TIMETABLE_GRID_DAYS.length - 1 ? '1px solid var(--border)' : 'none',
                           backgroundColor: isToday ? 'rgba(var(--brand-rgb),0.06)' : 'transparent',
                         }}
                       >
                         <p className="t-label" style={{ color: isToday ? 'var(--brand)' : 'var(--muted-foreground)' }}>
-                          {day.toUpperCase()}
+                          {day.label.toUpperCase()}
                         </p>
                         {isToday ? <span className="t-label" style={{ color: 'var(--brand)', fontSize: 10 }}>TODAY</span> : null}
                       </div>
@@ -123,7 +121,8 @@ function TimetablePage() {
                       >
                         {time}
                       </div>
-                      {ISO_WEEKDAYS.map((day, dayIndex) => {
+                      {TIMETABLE_GRID_DAYS.map((column, dayIndex) => {
+                        const day = column.iso
                         const dayItems = schedule.filter((item) => item.dayOfWeek === day)
                         const entry = dayItems.find((item) => startsAtHour(item, hour))
                         const occupied = !entry && dayItems.some((item) => coversHour(item, hour))
@@ -133,13 +132,15 @@ function TimetablePage() {
                             key={day}
                             className="flex-1 relative"
                             style={{
-                              borderRight: dayIndex < ISO_WEEKDAYS.length - 1 ? '1px solid var(--border)' : 'none',
+                              borderRight: dayIndex < TIMETABLE_GRID_DAYS.length - 1 ? '1px solid var(--border)' : 'none',
                               backgroundColor: isToday ? 'rgba(var(--brand-rgb),0.03)' : 'transparent',
                             }}
                           >
                             {entry && !occupied ? (
-                              <div
-                                className="absolute inset-x-1 flex flex-col justify-center px-2.5 py-2 rounded-lg overflow-hidden"
+                              <button
+                                type="button"
+                                onClick={() => setSelected(entry)}
+                                className="absolute inset-x-1 flex flex-col justify-center px-2.5 py-2 rounded-lg overflow-hidden text-left"
                                 style={{
                                   top: 4,
                                   height: durationHours(entry) * ROW_H - 8,
@@ -148,8 +149,9 @@ function TimetablePage() {
                                   zIndex: 1,
                                 }}
                               >
-                                <p className="text-xs font-bold truncate" style={{ color: entry.color, fontFamily: 'var(--font-mono)' }}>
+                                <p className="text-xs font-bold truncate flex items-center gap-1" style={{ color: entry.color, fontFamily: 'var(--font-mono)' }}>
                                   {entry.courseCode}
+                                  {entry.reminder ? <Bell className="h-3 w-3 shrink-0" /> : null}
                                 </p>
                                 <p className="text-xs font-medium truncate mt-0.5" style={{ color: 'var(--foreground)' }}>
                                   {entry.courseName}
@@ -157,7 +159,7 @@ function TimetablePage() {
                                 <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted-foreground)' }}>
                                   {entry.startTime}–{entry.endTime}{entry.room ? ` · ${entry.room}` : ''}
                                 </p>
-                              </div>
+                              </button>
                             ) : null}
                           </div>
                         )
@@ -169,8 +171,8 @@ function TimetablePage() {
             </div>
 
             <div className="md:hidden flex flex-col gap-5">
-              {DAYS.map((day, index) => {
-                const dayIso = ISO_WEEKDAYS[index]!
+              {TIMETABLE_GRID_DAYS.map((day) => {
+                const dayIso = day.iso
                 const isToday = dayIso === todayIso
                 const dayEntries = schedule
                   .filter((item) => item.dayOfWeek === dayIso)
@@ -178,7 +180,7 @@ function TimetablePage() {
 
                 return (
                   <div
-                    key={day}
+                    key={day.iso}
                     style={{
                       backgroundColor: 'var(--card)',
                       borderRadius: 'var(--radius-xl)',
@@ -195,7 +197,7 @@ function TimetablePage() {
                       }}
                     >
                       <p className="t-h3" style={{ fontFamily: 'var(--font-display)', color: isToday ? 'var(--brand)' : 'var(--foreground)' }}>
-                        {day}
+                        {day.label}
                       </p>
                       {isToday ? (
                         <span className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 'var(--radius-sm)' }}>
@@ -207,7 +209,13 @@ function TimetablePage() {
                       <p className="text-sm px-5 py-4" style={{ color: 'var(--muted-foreground)' }}>No classes</p>
                     ) : (
                       dayEntries.map((entry) => (
-                        <div key={entry.id} className="flex items-center gap-3 px-5 py-4" style={{ borderTop: '1px solid var(--border)' }}>
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => setSelected(entry)}
+                          className="flex items-center gap-3 px-5 py-4 w-full text-left"
+                          style={{ borderTop: '1px solid var(--border)' }}
+                        >
                           <div className="flex-shrink-0 rounded-lg" style={{ width: 4, height: 40, backgroundColor: entry.color }} />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{entry.courseName}</p>
@@ -215,6 +223,7 @@ function TimetablePage() {
                               {entry.startTime} – {entry.endTime}{entry.room ? ` · ${entry.room}` : ''}
                             </p>
                           </div>
+                          {entry.reminder ? <Bell className="h-4 w-4 shrink-0" style={{ color: 'var(--muted-foreground)' }} /> : null}
                           <span
                             className="t-label px-2 py-0.5 flex-shrink-0"
                             style={{
@@ -227,7 +236,7 @@ function TimetablePage() {
                           >
                             {entry.courseCode}
                           </span>
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>
@@ -237,6 +246,7 @@ function TimetablePage() {
           </>
         )}
       </div>
+      <TimetableEventDialog slot={selected} open={selected !== null} onOpenChange={(next) => { if (!next) setSelected(null) }} />
     </StudentShell>
   )
 }

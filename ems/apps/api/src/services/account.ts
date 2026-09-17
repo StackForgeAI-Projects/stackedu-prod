@@ -9,7 +9,7 @@ import type {
   UpdateAccountProfileRequest,
   UpdateAccountSecurityRequest,
 } from '@stackedu/shared'
-import { splitFullName, titleAndFirstName, STUDENT_IDENTITY_CONTACT_MESSAGE } from '@stackedu/shared'
+import { reachableNotificationActionUrl, splitFullName, titleAndFirstName, STUDENT_IDENTITY_CONTACT_MESSAGE } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions, userDirectory } from '../db/platform/schema'
 import { notifications } from '../db/institution/schema/communication'
@@ -201,7 +201,8 @@ export async function listAccountNotifications(
   limit = 8,
 ) {
   const db = await getInstitutionDb(institutionId)
-  return db
+  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1)
+  const rows = await db
     .select({
       id: notifications.id,
       title: notifications.title,
@@ -215,6 +216,11 @@ export async function listAccountNotifications(
     .where(eq(notifications.userId, userId))
     .orderBy(desc(notifications.createdAt))
     .limit(limit)
+  if (!user) return rows
+  return rows.map((row) => ({
+    ...row,
+    actionUrl: reachableNotificationActionUrl(user.role, row.actionUrl),
+  }))
 }
 
 export async function markAccountNotificationRead(

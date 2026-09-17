@@ -40,7 +40,7 @@ function AccessLevelsPage() {
   return (
     <IctShell
       pageTitle="Access levels"
-      guide="Each switch is one action a role may take. Semester, fees, teaching and the library stay with their owning roles unless you turn a switch on."
+      guide="Each switch is one action a role may take. Semester, fees, teaching and the library stay with their owning roles unless you turn a switch on. Timetable write lets lecturers set class times; a room or lecturer still cannot be booked twice."
     >
       <div className="animate-fade-up" style={{ padding: '24px 16px 56px' }}>
         <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Access levels</h1>

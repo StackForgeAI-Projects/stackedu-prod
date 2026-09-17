@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import type { AcademicCalendarEvent } from '@stackedu/shared'
-import { formatAppDateDdMmYyyy } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy } from '@stackedu/shared'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
@@ -24,6 +24,7 @@ import {
   createAcademicCalendarEvent,
   deleteAcademicCalendarEvent,
   listAcademicCalendarEvents,
+  listAcademicSemesters,
   updateAcademicCalendarEvent,
 } from '@/lib/api/academic'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -43,6 +44,7 @@ type EventForm = {
   startDate: string
   endDate: string
   description: string
+  maxCredits: number
 }
 
 const BLANK_EVENT: EventForm = {
@@ -51,6 +53,7 @@ const BLANK_EVENT: EventForm = {
   startDate: '',
   endDate: '',
   description: '',
+  maxCredits: DEFAULT_SEMESTER_MAX_CREDITS,
 }
 
 function getMonthDays(ref: Date): (Date | null)[] {
@@ -110,6 +113,10 @@ function CalendarPage() {
     queryKey: academicCalendarQueryKey,
     queryFn: listAcademicCalendarEvents,
   })
+  const semestersQuery = useQuery({
+    queryKey: academicSemestersQueryKey,
+    queryFn: listAcademicSemesters,
+  })
 
   const events = data ?? []
 
@@ -123,6 +130,7 @@ function CalendarPage() {
         startDate: form.startDate,
         endDate: form.endDate || undefined,
         description: form.description.trim() || undefined,
+        ...(form.category === 'Semester' ? { maxCredits: form.maxCredits } : {}),
       }
       return editing
         ? updateAcademicCalendarEvent(editing.id, input)
@@ -189,6 +197,7 @@ function CalendarPage() {
 
   const openEdit = (event: AcademicCalendarEvent) => {
     setEditing(event)
+    const matched = (semestersQuery.data ?? []).find((row) => row.label.startsWith(`${event.title} ·`))
     setForm({
       title: event.title,
       category: (EVENT_TYPES as readonly string[]).includes(event.type)
@@ -197,6 +206,7 @@ function CalendarPage() {
       startDate: event.startDate,
       endDate: event.endDate ?? event.startDate,
       description: event.description ?? '',
+      maxCredits: matched?.maxCredits ?? DEFAULT_SEMESTER_MAX_CREDITS,
     })
     setSheetOpen(true)
   }
@@ -236,13 +246,19 @@ function CalendarPage() {
           <div className="flex-1 lg:flex-[0_0_60%] lg:max-w-[60%]">
             <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', padding: 24 }}>
               <div className="flex items-center justify-between mb-4">
-                <button type="button" onClick={() => { const d = new Date(navDate); d.setMonth(d.getMonth() - 1); setNavDate(d) }} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
-                  <ChevronLeft style={{ width: 16, height: 16 }} />
-                </button>
+                <IconActionButton
+                  label="Previous month"
+                  icon={ChevronLeft}
+                  onClick={() => { const d = new Date(navDate); d.setMonth(d.getMonth() - 1); setNavDate(d) }}
+                  style={{ border: 'none' }}
+                />
                 <h3 className="t-h3">{heading}</h3>
-                <button type="button" onClick={() => { const d = new Date(navDate); d.setMonth(d.getMonth() + 1); setNavDate(d) }} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
-                  <ChevronRight style={{ width: 16, height: 16 }} />
-                </button>
+                <IconActionButton
+                  label="Next month"
+                  icon={ChevronRight}
+                  onClick={() => { const d = new Date(navDate); d.setMonth(d.getMonth() + 1); setNavDate(d) }}
+                  style={{ border: 'none' }}
+                />
               </div>
               <div className="grid grid-cols-7 mb-1">
                 {DAY_FULL.map((d) => <span key={d} className="t-label text-center" style={{ fontSize: 10 }}>{d}</span>)}
@@ -344,6 +360,23 @@ function CalendarPage() {
                 />
               </div>
             </div>
+            {form.category === 'Semester' ? (
+              <div className="space-y-2">
+                <Label htmlFor="calendar-event-max-credits" style={{ color: 'var(--muted-foreground)' }}>Max credits</Label>
+                <Input
+                  id="calendar-event-max-credits"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={form.maxCredits}
+                  onChange={(e) => setForm((f) => ({ ...f, maxCredits: Number(e.target.value) || DEFAULT_SEMESTER_MAX_CREDITS }))}
+                  style={inputStyle}
+                />
+                <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+                  Students cannot register more credits than this unless you raise it here.
+                </p>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="calendar-event-description" style={{ color: 'var(--muted-foreground)' }}>Description</Label>
               <Textarea
@@ -410,7 +443,10 @@ function CalendarPage() {
         notices={[
           { icon: 'info', label: 'Students and lecturers will be notified and can see this event.' },
           ...(form.category === 'Semester'
-            ? [{ icon: 'info' as const, label: 'If the dates include today, this semester opens for course registration.' }]
+            ? [
+                { icon: 'info' as const, label: 'If the dates include today, this semester opens for course registration.' },
+                { icon: 'info' as const, label: `Students cannot register more than ${form.maxCredits} credits unless you change this cap.` },
+              ]
             : []),
         ]}
         confirmLabel={saveMutation.isPending ? 'Saving…' : 'Confirm'}

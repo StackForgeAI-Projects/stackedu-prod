@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import {
+  askLecturerTimetableSlotRequestSchema,
   createAcademicCalendarEventRequestSchema,
   createAcademicCourseRequestSchema,
   createAcademicProgrammeRequestSchema,
@@ -38,6 +39,7 @@ import {
   listAcademicSemesters,
   listAcademicStudents,
   listAcademicTimetableSlots,
+  askLecturerToFreeTimetableSlot,
   markAcademicNotificationRead,
   rejectAcademicResultBatch,
   updateAcademicCalendarEvent,
@@ -198,6 +200,20 @@ academicRoutes.delete('/academic/calendar/:id', ...academicOnly, async (c) => {
 academicRoutes.get('/academic/timetable', ...academicOnly, async (c) => {
   const user = c.get('user')!
   return c.json({ slots: await listAcademicTimetableSlots(user.institution.id) })
+})
+
+academicRoutes.post('/academic/timetable/:slotId/ask-lecturer', ...academicOnly, async (c) => {
+  const parsed = askLecturerTimetableSlotRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    ok: true,
+    ...(await askLecturerToFreeTimetableSlot(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('slotId'),
+      parsed.data.message,
+    )),
+  })
 })
 
 academicRoutes.get('/academic/lecturers', ...academicOnly, async (c) => {

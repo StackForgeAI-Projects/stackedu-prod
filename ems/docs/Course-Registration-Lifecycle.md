@@ -9,12 +9,12 @@ This file is the registration path. Teaching after enrolment (materials, live cl
 - **ICT Manager** creates the student and lecturer logins under **User Management**. They do not open registration and they do not pick courses for a student.
 - **Academic Admin** creates programmes, the course catalogue, the semester offering, and the lead lecturer. They open the **semester** on **Calendar** (category **Semester**). They open or close a **single course** on **Edit Course**. The academic dashboard shortcut **Open registration** goes to the calendar.
 - **Bursar** places or releases a **fee hold** on **Student account**. A hold blocks new course registration. It does not drop courses already registered.
-- **Student** registers for themselves on **Register for courses**. They can also start from **Onboarding**, the dashboard (**Register now**), or **My Courses**.
+- **Student** registers for themselves on **Register** in the sidebar (`/student/course-registration`). They can also start from **Onboarding**, the dashboard (**Register now**), or **My Courses**. **Register** sits next to **My Courses** so the list stays short.
 - **Lecturer** does not register students. After a student confirms, the offering’s enrolled count goes up and the student appears on that lecturer’s roster.
 - **Librarian** is not in this path.
 - **Applicant** cannot register for courses. They must be admitted and signed in as a student first.
 
-A student cannot drop a course from this screen. There is no bursar, ICT, academic, or lecturer “register this student” button. The student confirms their own list.
+A student can drop a registered course from this screen (confirm first). There is no bursar, ICT, academic, or lecturer “register this student” button. The student confirms their own list.
 
 ---
 
@@ -53,9 +53,10 @@ Student registration for the form as a whole is open only when there is a **curr
 #### Open the semester
 
 1. From the academic dashboard, **Open registration**, or go to **Calendar**.
-2. Add or **edit** a calendar event with category **Semester** (not “Registration”). Title, start date, end date. Confirm, then save.
-3. If today’s date sits inside that start–end range, that semester becomes **current** and **Open**. Students can then confirm new courses (for offerings that are also open — see below).
+2. Add or **edit** a calendar event with category **Semester** (not “Registration”). Title, start date, end date, and **Max credits**. Confirm, then save.
+3. If today’s date sits inside that start–end range, that semester becomes **current** and **Open**. Students can then confirm new courses (for offerings that are also open — see below), up to that semester’s credit cap.
 4. If the dates are in the future, the semester is stored as **Planned**. Students still see **Registration is closed** until the dates include today (edit the semester event so the range covers today, confirm, save).
+5. **Max credits** defaults to **21**. Academic Admin is the person who can raise or lower it. Students cannot register more credits than this cap.
 
 #### What a “Registration” calendar event is
 
@@ -96,7 +97,7 @@ Semester open + course closed = that course cannot be ticked. Semester closed = 
 
 After admission, **Onboarding** includes a **Register** step.
 
-1. The step shows credits already registered (out of 21) and mentions a fee hold if one is on.
+1. The step shows credits already registered (out of the semester cap) and mentions a fee hold if one is on. The full course count, credit totals, and PDF download are on **Register for courses**.
 2. **Register courses** opens **Register for courses**.
 3. **Continue** marks the onboarding step done. It does not register courses by itself. The student must still confirm on the registration page while it is open.
 
@@ -104,44 +105,64 @@ After admission, **Onboarding** includes a **Register** step.
 
 ## 6. Register for courses (Student)
 
-Open **Register for courses** from onboarding, the dashboard, or **My Courses**.
+Open **Register for courses** from the **Register** sidebar item, onboarding, the dashboard, or **My Courses**.
 
 ### Status boxes (always visible)
 
-These sit under the credit line. They use a filled background so closed, open, hold, and over-limit are not a single line of faint text.
+These sit under the totals line. They use a filled background so closed, open, hold, and over-limit are not a single line of faint text.
 
 | Box | Background | When |
 | --- | --- | --- |
 | **Registration is closed** | Info (`--info-bg`) | Semester is not Open or In progress, or there is no current semester. Tick boxes and Confirm are off. Already-registered courses still list. |
 | **Registration is open** | Info (`--info-bg`) | Semester is Open or In progress. Close date is included when the semester has one. |
 | **Fee hold** | Error (`--error-bg`) | Bursar hold is on. Same lock as closed for new ticks. |
-| **Credit limit** | Warning (`--warning-bg`) | Ticked extras would go over **21** credits, or the student is already over the cap. Confirm stays off. |
+| **Credit limit** | Warning (`--warning-bg`) | Ticked extras would go over the semester cap, or the student is already over the cap. Confirm stays off. |
 
 ### What is on the page
 
-1. **Credits used** — already registered credits out of **21**.
-2. **Already registered** — courses with status Approved or Pending. “None yet” if empty. This list is visible even when registration is closed.
-3. **Available** — other offerings in the **current** semester. Each row is code, name, credits, and Compulsory or Elective.
+1. **Totals** — how many courses are already registered, and how many credits those courses add up to, out of this semester’s **max credits** (default 21; Academic Admin can change it on a Semester calendar event). Example: `7 courses registered · 21 of 21 credits`. The same line is repeated at the foot of the **Already registered** list.
+2. **Download PDF** — a labeled button (not a mutation, so there is no confirm dialog). It stays off until at least one course is registered and the student profile has loaded. The file is built in the browser (same pattern as a fee receipt). It is not stored as an object in the database.
+3. **Already registered** — courses with status Approved or Pending. “None yet” if empty. This list is visible even when registration is closed. Each row has **Drop** (confirm) while registration is open, or while the student is over the cap so they can get back under it.
+4. **Available** — other offerings in the **current** semester. Each row is code, name, credits, and Compulsory or Elective.
    - Compulsory means the course’s year matches the student’s year of study.
    - Elective means it does not.
    - A course closed on **Edit Course** still lists here with a **Closed** badge. Its tick box stays off.
-4. Tick offerings (only while registration is open, there is no fee hold, and that course is open for registration).
-5. **Confirm registration**. The button stays off when nothing is ticked, registration is closed, a fee hold is on, the 21-credit cap would be broken, or the save is already running.
+5. Tick offerings (only while registration is open, there is no fee hold, and that course is open for registration).
+6. **Confirm registration**. The button stays off when nothing is ticked, registration is closed, a fee hold is on, the credit cap would be broken, or the save is already running. Confirm before the request is sent.
+
+### Download the registration slip (PDF)
+
+The student keeps a copy of what they registered. The PDF is headed with the school logo (when one is uploaded) and the institution name. Below that it prints:
+
+- Student name, student ID, and email
+- Programme code and name
+- Department and faculty
+- Year of study
+- **Session** — the current academic year name (for example `2026/2027`)
+- **Semester** — the current semester name (for example `Semester 1`)
+- The same totals line as the page
+- A table of registered courses: code, name, type, credits, lecturer
+- A credits total, the printed date as DD-MM-YYYY, and a page footer
+
+The file name is `Course-registration-<student-id>-<semester>.pdf`. Download does not change the registration. Drop or add courses first if the list is wrong, then download again.
 
 ### What happens on confirm
 
-1. The server checks fee hold, open semester status, that every id is an offering this semester, that each new offering is **open for registration**, and the 21-credit cap. If any check fails, the student sees the error and nothing is saved.
-2. New rows are stored as **Approved** with the time of registration. Courses already on the list are skipped (no double row).
-3. The offering **enrolled** count goes up by one.
-4. The student is sent to **My Courses**.
+1. The server checks fee hold (for adds), open semester status (adds always; drops also need open registration unless the student is already over the cap), that every id is an offering this semester, that each new offering is **open for registration**, and the semester credit cap. If any check fails, the student sees the error and nothing is saved.
+2. New rows are stored as **Approved** with the time of registration. Courses already on the list are skipped (no double row). A previously dropped course is set back to **Approved** on the same unique student+offering row.
+3. Dropped rows are set to **Dropped** with the drop time. The offering **enrolled** count goes down by one.
+4. The offering **enrolled** count goes up by one for each new add.
+5. After an add, the student is sent to **My Courses**. After a drop they stay on this page.
 
-There is no drop, wait-list, or academic “approve this registration” step after confirm. Status **Pending** is treated as already registered if it exists; new confirms write **Approved**.
+There is no wait-list or academic “approve this registration” step after confirm. Status **Pending** is treated as already registered if it exists; new confirms write **Approved**.
 
 ---
 
 ## 7. After registration
 
 - **My Courses** lists Approved registrations for the current semester. Empty state links back to **Register**.
+- **Timetable** in the student navbar lists those classes by day and time. The student can open a class and set a StackEDU reminder (email + in-app). See `Timetable-Lifecycle.md`.
+- The student can download a PDF of the current list from **Register for courses** at any time (even when registration is closed), as long as at least one course is registered.
 - Opening a course is the LMS path (materials, live class, assignments). See `LMS-Classroom-Lifecycle.md`.
 - The lecturer sees the student on the course roster and in attendance.
 - Academic Admin cannot delete a course that already has enrolments.

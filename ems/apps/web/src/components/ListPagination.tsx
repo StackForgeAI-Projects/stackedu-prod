@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { IconActionButton } from '@/components/IconActionButton'
 import { LIST_PAGE_SIZES, usePagedList } from '@/hooks/usePagedList'
 
 export function ListPagination({
@@ -46,26 +47,18 @@ export function ListPagination({
         <span className="t-caption whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>
           {total === 0 ? `0 ${noun}` : `${from}-${to} of ${total}`}
         </span>
-        <button
-          type="button"
-          className="h-8 w-8 inline-flex items-center justify-center rounded-lg"
-          style={{ border: '1px solid var(--border)', color: 'var(--foreground)', opacity: page <= 1 ? 0.4 : 1 }}
+        <IconActionButton
+          label="Previous page"
+          icon={ChevronLeft}
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
-          aria-label="Previous page"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          className="h-8 w-8 inline-flex items-center justify-center rounded-lg"
-          style={{ border: '1px solid var(--border)', color: 'var(--foreground)', opacity: page >= totalPages ? 0.4 : 1 }}
+        />
+        <IconActionButton
+          label="Next page"
+          icon={ChevronRight}
           disabled={page >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          aria-label="Next page"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        />
       </div>
     </div>
   )
