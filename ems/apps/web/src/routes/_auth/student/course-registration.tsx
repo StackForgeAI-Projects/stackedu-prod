@@ -43,11 +43,11 @@ function CourseRegistrationPage() {
 
   const available = data?.offerings.filter((row) => !row.registered) ?? []
   const extraCredits = available
-    .filter((row) => selected.includes(row.offeringId) && row.openForRegistration)
+    .filter((row) => selected.includes(row.offeringId) && row.openForRegistration !== false)
     .reduce((sum, row) => sum + row.credits, 0)
   const overCredit = Boolean(data && data.registeredCredits + extraCredits > data.maxCredits)
   const canSelect = Boolean(data?.registrationOpen && !data.feeHold)
-  const closedOfferings = available.filter((row) => !row.openForRegistration)
+  const closedOfferings = available.filter((row) => row.openForRegistration === false)
 
   return (
     <StudentShell pageTitle="Course registration" guide="Add offerings while registration is open and you have no fee hold. Academic Admin opens the semester; the Bursar clears holds.">
@@ -121,7 +121,7 @@ function CourseRegistrationPage() {
                     </p>
                   ) : null}
                   {available.map((row) => {
-                    const rowOpen = canSelect && row.openForRegistration
+                    const rowOpen = canSelect && row.openForRegistration !== false
                     return (
                       <label key={row.offeringId} className="flex items-center gap-3 py-2" style={{ borderTop: '1px solid var(--border)' }}>
                         <Checkbox
@@ -136,7 +136,7 @@ function CourseRegistrationPage() {
                         <span className="text-sm flex-1 min-w-0">
                           {row.code} · {row.name} · {row.credits} cr · {row.type}
                         </span>
-                        {!row.openForRegistration ? (
+                        {row.openForRegistration === false ? (
                           <span className="t-label px-2 py-0.5 shrink-0" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)' }}>
                             Closed
                           </span>

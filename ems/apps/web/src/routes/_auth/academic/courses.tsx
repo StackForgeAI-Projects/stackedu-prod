@@ -240,7 +240,7 @@ function CoursesCataloguePage() {
       semesterId: c.semesterId ?? defaultSemesterId(semesters),
       lecturerId: c.lecturerId ?? '',
       status: c.status === 'Active' ? 'Active' : 'Inactive',
-      openForRegistration: c.openForRegistration,
+      openForRegistration: c.openForRegistration ?? true,
     })
     setPrereqInput('')
     setSheetOpen(true)
@@ -308,12 +308,12 @@ function CoursesCataloguePage() {
             {
               id: 'registration',
               header: 'Registration',
-              value: (c) => (c.semesterId ? (c.openForRegistration ? 'Open' : 'Closed') : ''),
+              value: (c) => (c.semesterId ? ((c.openForRegistration ?? true) ? 'Open' : 'Closed') : ''),
               cell: (c) => {
                 if (!c.semesterId) {
                   return <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>—</span>
                 }
-                const open = c.openForRegistration
+                const open = c.openForRegistration ?? true
                 return (
                   <span
                     className="t-label px-2 py-0.5"
