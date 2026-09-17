@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { StudentShell } from '@/components/StudentShell'
+import { PagedList } from '@/components/ListPagination'
 import {
   getStudentNotifications,
   markStudentNotificationRead,
@@ -35,36 +36,40 @@ function NotificationsPage() {
           <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading…</p>
         ) : error ? (
           <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load notifications.')}</p>
-        ) : !data?.length ? (
-          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p>
         ) : (
-          data.map((item) => (
-            <button
-              key={item.id}
-              className="w-full text-left p-4 mb-3"
-              style={{
-                backgroundColor: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-xl)',
-                opacity: item.readAt ? 0.7 : 1,
-              }}
-              onClick={() => { if (!item.readAt) mutation.mutate(item.id) }}
-            >
-              <p className="t-label mb-1">{item.category}</p>
-              <p className="text-sm font-semibold">{item.title}</p>
-              <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{item.body}</p>
-              {item.actionUrl ? (
-                <a
-                  href={item.actionUrl}
-                  className="t-caption mt-2 inline-block"
-                  style={{ color: 'var(--success)' }}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  Open →
-                </a>
-              ) : null}
-            </button>
-          ))
+          <PagedList
+            items={data ?? []}
+            getKey={(item) => item.id}
+            defaultPageSize={10}
+            itemLabel="notifications"
+            empty={<p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p>}
+            renderItem={(item) => (
+              <button
+                className="w-full text-left p-4"
+                style={{
+                  backgroundColor: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-xl)',
+                  opacity: item.readAt ? 0.7 : 1,
+                }}
+                onClick={() => { if (!item.readAt) mutation.mutate(item.id) }}
+              >
+                <p className="t-label mb-1">{item.category}</p>
+                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{item.body}</p>
+                {item.actionUrl ? (
+                  <a
+                    href={item.actionUrl}
+                    className="t-caption mt-2 inline-block"
+                    style={{ color: 'var(--success)' }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    Open →
+                  </a>
+                ) : null}
+              </button>
+            )}
+          />
         )}
       </div>
     </StudentShell>

@@ -10,6 +10,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import { primaryKeyColumn, timestamps } from '../../columns'
 import { deliveryStatusEnum, notificationChannelEnum } from './enums'
+import { courseOfferings } from './teaching'
+import { assessments } from './assessment'
 import { users } from './people'
 
 /**
@@ -96,4 +98,51 @@ export const messages = pgTable(
     ...timestamps(),
   },
   (t) => [index('messages_thread_idx').on(t.threadId, t.createdAt)],
+)
+
+/**
+ * Per-course discussion boards. Separate from announcements (one-way) and from
+ * private message threads. A graded discussion points at an assessment so marks
+ * reuse the existing grade tables.
+ */
+export const discussionThreads = pgTable(
+  'discussion_threads',
+  {
+    id: primaryKeyColumn(),
+    courseOfferingId: uuid('course_offering_id')
+      .notNull()
+      .references(() => courseOfferings.id, { onDelete: 'cascade' }),
+    assessmentId: uuid('assessment_id').references(() => assessments.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    prompt: text('prompt').notNull(),
+    isPublished: boolean('is_published').notNull().default(false),
+    publishedAt: timestamp('published_at', { withTimezone: true, mode: 'string' }),
+    closedAt: timestamp('closed_at', { withTimezone: true, mode: 'string' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('discussion_threads_offering_idx').on(t.courseOfferingId, t.createdAt),
+    index('discussion_threads_assessment_idx').on(t.assessmentId),
+  ],
+)
+
+export const discussionPosts = pgTable(
+  'discussion_posts',
+  {
+    id: primaryKeyColumn(),
+    threadId: uuid('thread_id')
+      .notNull()
+      .references(() => discussionThreads.id, { onDelete: 'cascade' }),
+    parentPostId: uuid('parent_post_id'),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    ...timestamps(),
+  },
+  (t) => [
+    index('discussion_posts_thread_idx').on(t.threadId, t.createdAt),
+    index('discussion_posts_parent_idx').on(t.parentPostId),
+  ],
 )

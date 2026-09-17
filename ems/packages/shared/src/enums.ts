@@ -81,6 +81,31 @@ export const assessmentTypeSchema = z.enum([
   'Project',
 ])
 
+/** Objective items the assessment builder can auto-mark. */
+export const questionTypeSchema = z.enum(['MultipleChoice', 'TrueFalse', 'ShortAnswer'])
+
+export const ASSESSMENT_TYPE_LABELS: Record<AssessmentType, string> = {
+  Coursework: 'Coursework',
+  Quiz: 'Quiz',
+  MidtermExam: 'Mid-term exam',
+  FinalExam: 'Final exam',
+  Practical: 'Practical',
+  Project: 'Project',
+}
+
+export const QUIZ_ASSESSMENT_TYPES = ['Quiz', 'MidtermExam', 'FinalExam'] as const
+
+export function isQuizAssessmentType(type: AssessmentType): boolean {
+  return (QUIZ_ASSESSMENT_TYPES as readonly string[]).includes(type)
+}
+
+/** Fresh option rows for the add-question form. True/false never reuses this list. */
+export function blankOptionsForQuestionType(type: QuestionType): string[] {
+  if (type === 'TrueFalse') return ['True', 'False']
+  if (type === 'ShortAnswer') return []
+  return ['', '', '', '']
+}
+
 export const submissionStatusSchema = z.enum([
   'Draft',
   'Submitted',
@@ -117,6 +142,10 @@ export const riskLevelSchema = z.enum(['Low', 'Medium', 'High', 'Critical'])
 
 export const aiJobStatusSchema = z.enum(['Queued', 'Running', 'Succeeded', 'Failed'])
 
+export const liveSessionStatusSchema = z.enum(['Scheduled', 'Live', 'Ended', 'Cancelled'])
+
+export const recordingStatusSchema = z.enum(['Pending', 'Ready', 'Failed'])
+
 export type UserRole = z.infer<typeof userRoleSchema>
 export type Gender = z.infer<typeof genderSchema>
 export type EnrolmentStatus = z.infer<typeof enrolmentStatusSchema>
@@ -131,6 +160,7 @@ export type SemesterStatus = z.infer<typeof semesterStatusSchema>
 export type RegistrationStatus = z.infer<typeof registrationStatusSchema>
 export type AttendanceStatus = z.infer<typeof attendanceStatusSchema>
 export type AssessmentType = z.infer<typeof assessmentTypeSchema>
+export type QuestionType = z.infer<typeof questionTypeSchema>
 export type SubmissionStatus = z.infer<typeof submissionStatusSchema>
 export type ResultBatchStatus = z.infer<typeof resultBatchStatusSchema>
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>
@@ -139,3 +169,5 @@ export type NotificationChannel = z.infer<typeof notificationChannelSchema>
 export type DeliveryStatus = z.infer<typeof deliveryStatusSchema>
 export type RiskLevel = z.infer<typeof riskLevelSchema>
 export type AiJobStatus = z.infer<typeof aiJobStatusSchema>
+export type LiveSessionStatus = z.infer<typeof liveSessionStatusSchema>
+export type RecordingStatus = z.infer<typeof recordingStatusSchema>

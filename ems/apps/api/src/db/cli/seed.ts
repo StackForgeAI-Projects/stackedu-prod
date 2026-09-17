@@ -201,7 +201,7 @@ async function main() {
   const logger = createLogger(env().LOG_LEVEL, { command: 'db:seed' })
 
   if (env().NODE_ENV === 'production') {
-    process.stderr.write('Refusing to seed in production.\n')
+    process.stderr.write('Demo seed data stays local. Refusing to seed in production.\n')
     process.exit(1)
   }
 

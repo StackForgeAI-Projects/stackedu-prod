@@ -70,7 +70,7 @@ function DashboardBody({
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatTile
             icon={TrendingUp}
-            iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)"
+            iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)"
             label="TOTAL COLLECTED TODAY"
             value={formatCurrency(data.stats.collectedToday)}
             delta={`${deltaToday >= 0 ? '+' : ''}${formatCurrency(deltaToday)} from yesterday`}
@@ -204,7 +204,7 @@ function PaymentMethodChart({ data }: { data: BursarDashboard['paymentsByMethod'
           <Tooltip
             formatter={(value: number) => [formatCurrency(value), 'Total']}
             contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, boxShadow: 'var(--shadow-md)' }}
-            cursor={{ fill: 'rgba(15, 189, 59,0.05)' }}
+            cursor={{ fill: 'rgba(var(--brand-rgb),0.05)' }}
           />
           <Bar dataKey="total" fill="var(--brand)" radius={[6, 6, 0, 0]} />
         </BarChart>
@@ -269,7 +269,7 @@ function AiAssistantCard({ firstName }: { firstName: string }) {
       </div>
       <div className="flex flex-col gap-2 mb-3" style={{ maxHeight: 140, overflowY: 'auto' }}>
         {messages.map((msg, i) => (
-          <div key={i} className="text-sm px-3 py-2.5" style={{ backgroundColor: msg.role === 'assistant' ? 'var(--ink-surface)' : 'rgba(15, 189, 59,0.12)', borderRadius: 'var(--radius-md)', color: 'var(--ink-foreground)', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>{msg.text}</div>
+          <div key={i} className="text-sm px-3 py-2.5" style={{ backgroundColor: msg.role === 'assistant' ? 'var(--ink-surface)' : 'rgba(var(--brand-rgb),0.12)', borderRadius: 'var(--radius-md)', color: 'var(--ink-foreground)', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>{msg.text}</div>
         ))}
       </div>
       <div className="flex items-center gap-2">

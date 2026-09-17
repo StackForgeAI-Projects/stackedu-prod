@@ -120,7 +120,7 @@ function StudentDashboardPage() {
               <StatTile
                 icon={TrendingUp}
                 iconColor="var(--brand)"
-                iconBg="rgba(15, 189, 59,0.08)"
+                iconBg="rgba(var(--brand-rgb),0.08)"
                 label="CURRENT GPA"
                 value={data.gpa === null ? '—' : data.gpa.toFixed(1)}
                 valueUnit={data.gpa === null ? '' : '/ 4.0'}
@@ -268,7 +268,7 @@ function CalendarCard({
             const isSelected = isSameDay(day, selectedDate)
             const hasClass = daysWithClass.has(jsToIsoDay(day.getDay()))
             return (
-              <button key={day.toISOString()} onClick={() => setSelectedDate(day)} className="flex flex-col items-center gap-0.5 py-1" style={{ borderRadius: 'var(--radius-md)', backgroundColor: isSelected ? 'rgba(15, 189, 59,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+              <button key={day.toISOString()} onClick={() => setSelectedDate(day)} className="flex flex-col items-center gap-0.5 py-1" style={{ borderRadius: 'var(--radius-md)', backgroundColor: isSelected ? 'rgba(var(--brand-rgb),0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
                 <span className="flex items-center justify-center text-xs" style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: isToday ? 'var(--brand)' : 'transparent', color: isToday ? 'var(--brand-ink)' : 'var(--foreground)', fontWeight: isToday || isSelected ? 700 : 400 }}>
                   {day.getDate()}
                 </span>

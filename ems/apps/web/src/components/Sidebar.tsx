@@ -191,11 +191,11 @@ function NavLink({
   const [hovered, setHovered] = useState(false)
 
   const bg = active
-    ? 'rgba(15, 189, 59, 0.15)'
+    ? 'rgba(var(--brand-rgb), 0.15)'
     : hovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
 
   const border = active
-    ? '1px solid rgba(15, 189, 59, 0.25)'
+    ? '1px solid rgba(var(--brand-rgb), 0.25)'
     : '1px solid transparent'
 
   const iconColor = active ? 'var(--brand)' : hovered ? '#FFFFFF' : 'var(--ink-muted)'

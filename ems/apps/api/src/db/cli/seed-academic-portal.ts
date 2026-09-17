@@ -15,6 +15,7 @@ import {
   timetableSlots,
 } from '../institution/schema/teaching'
 import { getInstitutionDb } from '../connection'
+import { env } from '../../config/env'
 import { createUser } from '../../services/users'
 import { resolveDepartmentId } from '../../services/academic'
 
@@ -149,6 +150,9 @@ export async function seedAcademicPortal(
   academicAdminUserId: string,
   lecturerUserId: string,
 ): Promise<void> {
+  if (env().NODE_ENV === 'production') {
+    throw new Error('Demo seed data stays local. Refusing to run in production.')
+  }
   const db = await getInstitutionDb(institutionId)
   await ensureEngineeringProgramme(db)
 

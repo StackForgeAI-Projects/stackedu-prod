@@ -226,7 +226,7 @@ function CalendarPage() {
                   const dayEvents = eventsOnDay(day)
                   const colors = dayEvents.map((e) => eventColors(e.type).color).filter((v, idx, a) => a.indexOf(v) === idx).slice(0, 3)
                   return (
-                    <button key={day.toISOString()} type="button" onClick={() => setSelDate(day)} className="flex flex-col items-center py-1 gap-0.5" style={{ borderRadius: 'var(--radius-md)', backgroundColor: isSelected ? 'rgba(15, 189, 59,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <button key={day.toISOString()} type="button" onClick={() => setSelDate(day)} className="flex flex-col items-center py-1 gap-0.5" style={{ borderRadius: 'var(--radius-md)', backgroundColor: isSelected ? 'rgba(var(--brand-rgb),0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
                       <span className="flex items-center justify-center text-xs" style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: isToday ? 'var(--brand)' : 'transparent', color: isToday ? 'var(--brand-ink)' : 'var(--foreground)', fontWeight: isToday || isSelected ? 700 : 400 }}>{day.getDate()}</span>
                       {colors.length > 0 && (
                         <div className="flex gap-0.5">

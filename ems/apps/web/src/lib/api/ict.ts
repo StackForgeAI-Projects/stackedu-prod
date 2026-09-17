@@ -22,6 +22,7 @@ import type {
   IctUserRow,
   UpdateIctSettingsRequest,
   UpdateIctUserRequest,
+  UpdateIntegrationRequest,
   UserRole,
 } from '@stackedu/shared'
 import { api, API_URL, ApiClientError } from './client'
@@ -169,8 +170,8 @@ export async function getIctIntegrations(): Promise<IctIntegration[]> {
   return integrations
 }
 
-export async function updateIctIntegration(id: string, isEnabled: boolean) {
-  const { integration } = await api.patch<{ integration: IctIntegration }>(`/ict/integrations/${id}`, { isEnabled })
+export async function updateIctIntegration(id: string, input: UpdateIntegrationRequest) {
+  const { integration } = await api.patch<{ integration: IctIntegration }>(`/ict/integrations/${id}`, input)
   return integration
 }
 

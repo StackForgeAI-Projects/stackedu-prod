@@ -4,16 +4,12 @@ import type { PublicInstitutionBranding } from '@stackedu/shared'
 import { env } from '../config/env'
 import { getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
+import { publicLogoUrl } from '../lib/branding'
 import { notFound } from '../lib/errors'
 import { createDownloadUrl, openInstitutionLogo } from '../lib/storage'
 import type { RequestVariables } from '../middleware/request-context'
 
 export const publicRoutes = new Hono<{ Variables: RequestVariables }>()
-
-function publicLogoUrl(slug: string, logoFileKey: string | null): string | null {
-  if (!logoFileKey) return null
-  return `${env().API_PUBLIC_URL.replace(/\/$/, '')}/public/institution/${slug}/logo`
-}
 
 function mapPublicBranding(row: {
   name: string
@@ -22,6 +18,8 @@ function mapPublicBranding(row: {
   website: string | null
   location: string | null
   logoFileKey: string | null
+  brandColor: string | null
+  updatedAt: string
 }): PublicInstitutionBranding {
   return {
     name: row.name,
@@ -29,7 +27,8 @@ function mapPublicBranding(row: {
     slug: row.slug,
     website: row.website,
     location: row.location,
-    logoUrl: publicLogoUrl(row.slug, row.logoFileKey),
+    logoUrl: publicLogoUrl(row),
+    brandColor: row.brandColor,
   }
 }
 
@@ -44,6 +43,8 @@ publicRoutes.get('/public/institution/:slug', async (c) => {
       website: institutions.website,
       location: institutions.location,
       logoFileKey: institutions.logoFileKey,
+      brandColor: institutions.brandColor,
+      updatedAt: institutions.updatedAt,
     })
     .from(institutions)
     .where(eq(institutions.slug, slug))
@@ -71,6 +72,8 @@ publicRoutes.get('/public/institution/:slug/logo', async (c) => {
 
   const { stream, mimeType } = openInstitutionLogo(row.logoFileKey)
   c.header('Content-Type', mimeType)
+  // The URL carries a version token, so a cached copy is only ever the copy
+  // that token was minted for.
   c.header('Cache-Control', 'public, max-age=3600')
   return c.body(stream as unknown as ReadableStream)
 })

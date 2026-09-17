@@ -24,6 +24,15 @@ export const loginRequestSchema = z.object({
   rememberMe: z.boolean().optional().default(false),
 })
 
+/**
+ * Why the session ended. The browser is the only place that can tell a
+ * deliberate sign-out from one the idle timer triggered, and the audit log
+ * needs to show the difference.
+ */
+export const logoutRequestSchema = z.object({
+  reason: z.enum(['manual', 'inactivity']).optional().default('manual'),
+})
+
 export const sessionInstitutionSchema = z.object({
   id: uuidSchema,
   name: z.string(),
@@ -55,6 +64,7 @@ export const loginResponseSchema = z.union([
 ])
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>
+export type LogoutReason = z.infer<typeof logoutRequestSchema>['reason']
 export type SessionInstitution = z.infer<typeof sessionInstitutionSchema>
 export type SessionUser = z.infer<typeof sessionUserSchema>
 export type SessionResponse = z.infer<typeof sessionResponseSchema>

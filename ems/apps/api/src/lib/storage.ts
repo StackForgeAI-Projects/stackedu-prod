@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
-import { createReadStream, createWriteStream, existsSync, mkdirSync } from 'node:fs'
+import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync } from 'node:fs'
 import { unlink, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable } from 'node:stream'
@@ -280,8 +280,37 @@ export async function deleteStoredObjectsByPrefix(prefix: string): Promise<numbe
   return 1
 }
 
-export function buildInstitutionLogoKey(institutionId: string): string {
-  return `institutions/${institutionId}/branding/logo`
+/** Logo formats the system accepts, and the extension each one is stored under. */
+const LOGO_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+}
+
+const LOGO_MIME_BY_EXTENSION: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+}
+
+const LOGO_TYPE_MESSAGE = 'Upload a PNG, JPEG, WebP or SVG logo.'
+
+/** Must stay in step with the body limit the upload route allows through. */
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024
+
+/**
+ * The extension is part of the key because it is the only place the image
+ * format survives: the local driver has nothing else to derive a Content-Type
+ * from when the file is read back, and a logo served as an octet-stream is
+ * refused by every browser.
+ */
+export function buildInstitutionLogoKey(institutionId: string, mimeType: string): string {
+  const extension = LOGO_EXTENSIONS[mimeType]
+  if (!extension) throw badRequest(LOGO_TYPE_MESSAGE)
+  return `institutions/${institutionId}/branding/logo.${extension}`
 }
 
 export function buildCourseMaterialFileKey(input: {
@@ -300,27 +329,152 @@ export function buildCourseMaterialFileKey(input: {
   ].join('/')
 }
 
+export function buildQuestionImportFileKey(input: {
+  institutionId: string
+  fileName: string
+}): string {
+  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
+  return ['institutions', input.institutionId, 'question-imports', `${randomUUID()}-${safeName}`].join('/')
+}
+
+export function buildLibraryFileKey(input: {
+  institutionId: string
+  resourceId: string
+  fileName: string
+}): string {
+  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
+  return [
+    'institutions',
+    input.institutionId,
+    'library',
+    input.resourceId,
+    `${randomUUID()}-${safeName}`,
+  ].join('/')
+}
+
+export function libraryFileKeyPrefix(institutionId: string, resourceId: string): string {
+  return `institutions/${institutionId}/library/${resourceId}/`
+}
+
+export function buildSessionObjectKey(input: {
+  institutionId: string
+  sessionId: string
+  kind: 'whiteboard' | 'recording'
+  fileName: string
+}): string {
+  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
+  return [
+    'institutions',
+    input.institutionId,
+    'sessions',
+    input.sessionId,
+    input.kind,
+    `${randomUUID()}-${safeName}`,
+  ].join('/')
+}
+
+/** System-owned live-sync blob. Not a user upload, so the name is stable and recoverable. */
+export function buildStableSessionObjectKey(input: {
+  institutionId: string
+  sessionId: string
+  kind: 'whiteboard'
+  fileName: string
+}): string {
+  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80)
+  return ['institutions', input.institutionId, 'sessions', input.sessionId, input.kind, safeName].join('/')
+}
+
+export async function putStoredObject(input: {
+  fileKey: string
+  body: Buffer
+  mimeType: string
+}): Promise<void> {
+  if (!input.fileKey.startsWith('institutions/')) {
+    throw badRequest('Invalid file key.')
+  }
+  if (env().STORAGE_DRIVER === 'r2') {
+    await r2Client().send(
+      new PutObjectCommand({
+        Bucket: env().R2_BUCKET!,
+        Key: input.fileKey,
+        Body: input.body,
+        ContentType: input.mimeType,
+      }),
+    )
+    return
+  }
+  const destination = localPathFor(input.fileKey)
+  mkdirSync(path.dirname(destination), { recursive: true })
+  await pipeline(Readable.from(input.body), createWriteStream(destination))
+}
+
+export async function readStoredObject(fileKey: string): Promise<Buffer | null> {
+  if (env().STORAGE_DRIVER === 'r2') {
+    try {
+      const result = await r2Client().send(
+        new GetObjectCommand({
+          Bucket: env().R2_BUCKET!,
+          Key: fileKey,
+        }),
+      )
+      const bytes = await result.Body?.transformToByteArray()
+      return bytes ? Buffer.from(bytes) : null
+    } catch {
+      return null
+    }
+  }
+  const filePath = localPathFor(fileKey)
+  if (!existsSync(filePath)) return null
+  return readFileSync(filePath)
+}
+
+/**
+ * Reads a bounded prefix of an object. Used to draft a description, never to
+ * serve the file: downloads still go through createDownloadUrl.
+ */
+export async function readStoredObjectSample(fileKey: string, maxBytes = 160_000): Promise<Buffer> {
+  if (env().STORAGE_DRIVER === 'r2') {
+    const result = await r2Client().send(
+      new GetObjectCommand({
+        Bucket: env().R2_BUCKET!,
+        Key: fileKey,
+        Range: `bytes=0-${maxBytes - 1}`,
+      }),
+    )
+    const bytes = await result.Body?.transformToByteArray()
+    if (!bytes) throw badRequest('That file is not available.')
+    return Buffer.from(bytes)
+  }
+
+  const filePath = localPathFor(fileKey)
+  if (!existsSync(filePath)) throw badRequest('That file is not available.')
+  const handle = openSync(filePath, 'r')
+  try {
+    const buf = Buffer.alloc(maxBytes)
+    const n = readSync(handle, buf, 0, maxBytes, 0)
+    return buf.subarray(0, n)
+  } finally {
+    closeSync(handle)
+  }
+}
+
 export function fileNameFromStorageKey(fileKey: string): string {
   const leaf = fileKey.split('/').pop() ?? fileKey
   const dash = leaf.indexOf('-')
   return dash >= 0 ? leaf.slice(dash + 1) : leaf
 }
 
-const LOGO_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
-
 export async function writeInstitutionLogo(input: {
   institutionId: string
   body: Buffer
   mimeType: string
 }): Promise<string> {
-  if (!LOGO_MIME_TYPES.has(input.mimeType)) {
-    throw badRequest('Upload a PNG, JPEG, WebP or SVG logo.')
-  }
-  if (input.body.byteLength > 2 * 1024 * 1024) {
+  if (!LOGO_EXTENSIONS[input.mimeType]) throw badRequest(LOGO_TYPE_MESSAGE)
+  if (input.body.byteLength > LOGO_MAX_BYTES) {
     throw badRequest('The logo must be 2 MB or smaller.')
   }
 
-  const fileKey = buildInstitutionLogoKey(input.institutionId)
+  const fileKey = buildInstitutionLogoKey(input.institutionId, input.mimeType)
 
   if (env().STORAGE_DRIVER === 'r2') {
     await r2Client().send(
@@ -351,17 +505,30 @@ export function openInstitutionLogo(fileKey: string): {
   const filePath = localPathFor(fileKey)
   if (!existsSync(filePath)) throw badRequest('That logo is not available.')
 
-  const ext = path.extname(filePath).toLowerCase()
-  const mimeType =
-    ext === '.png'
-      ? 'image/png'
-      : ext === '.jpg' || ext === '.jpeg'
-        ? 'image/jpeg'
-        : ext === '.webp'
-          ? 'image/webp'
-          : ext === '.svg'
-            ? 'image/svg+xml'
-            : 'application/octet-stream'
+  const extension = path.extname(filePath).toLowerCase()
+  // Logos uploaded before the extension was part of the key still have to be
+  // served with a real image type, so fall back to reading the file signature.
+  const mimeType = LOGO_MIME_BY_EXTENSION[extension] ?? sniffImageMimeType(filePath)
 
   return { stream: createReadStream(filePath), mimeType }
+}
+
+function sniffImageMimeType(filePath: string): string {
+  const head = Buffer.alloc(12)
+  const handle = openSync(filePath, 'r')
+  try {
+    readSync(handle, head, 0, head.byteLength, 0)
+  } finally {
+    closeSync(handle)
+  }
+
+  if (head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return 'image/png'
+  }
+  if (head[0] === 0xff && head[1] === 0xd8) return 'image/jpeg'
+  if (head.subarray(0, 4).toString('ascii') === 'RIFF' && head.subarray(8, 12).toString('ascii') === 'WEBP') {
+    return 'image/webp'
+  }
+  if (head.toString('utf8').trimStart().startsWith('<')) return 'image/svg+xml'
+  return 'application/octet-stream'
 }

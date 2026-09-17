@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Toaster } from 'sonner'
 import { InactivityLogoutNotice } from '@/components/InactivityLogoutNotice'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
+import { useInstitutionBrandTheme } from '@/hooks/useInstitutionBranding'
 import { dashboardHrefForPath } from '@/lib/auth/portals'
 import { handleChunkLoadError, isChunkLoadError } from '@/lib/chunk-reload'
 
@@ -40,6 +41,8 @@ function RootError({ error }: { error: Error }) {
 }
 
 function Root() {
+  useInstitutionBrandTheme()
+
   return (
     <>
       <Outlet />

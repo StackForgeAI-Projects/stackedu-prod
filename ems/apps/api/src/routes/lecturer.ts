@@ -1,9 +1,24 @@
 import { Hono } from 'hono'
 import {
+  createLecturerAnnouncementRequestSchema,
   createLecturerAssessmentRequestSchema,
+  createLecturerDiscussionRequestSchema,
+  createDiscussionPostRequestSchema,
+  updateLecturerDiscussionRequestSchema,
   createLecturerMaterialRequestSchema,
+  createLecturerModuleRequestSchema,
+  createLecturerQuestionRequestSchema,
+  describeLecturerMaterialRequestSchema,
   reserveLecturerMaterialUploadRequestSchema,
+  generateLecturerQuestionsRequestSchema,
+  createClassroomSessionRequestSchema,
+  saveClassroomWhiteboardRequestSchema,
+  reserveLecturerQuestionImportRequestSchema,
+  saveLecturerAssessmentItemsRequestSchema,
+  updateLecturerAnnouncementRequestSchema,
   updateLecturerMaterialRequestSchema,
+  updateLecturerModuleRequestSchema,
+  updateLecturerQuestionRequestSchema,
   resolveLecturerAtRiskRequestSchema,
   saveLecturerAttendanceRequestSchema,
   saveLecturerGradeRequestSchema,
@@ -15,9 +30,16 @@ import { validationFailed } from '../lib/errors'
 import { requireAuth, requireRole, type AuthVariables } from '../middleware/auth'
 import type { RequestVariables } from '../middleware/request-context'
 import {
+  createLecturerAnnouncement,
   createLecturerAssessment,
   createLecturerMaterial,
+  createLecturerModule,
+  deleteLecturerAnnouncement,
+  deleteLecturerAssessment,
   deleteLecturerMaterial,
+  deleteLecturerModule,
+  updateLecturerAnnouncement,
+  updateLecturerModule,
   getLecturerMaterialDownloadUrl,
   createLecturerTimetableSlot,
   deleteLecturerTimetableSlot,
@@ -46,6 +68,42 @@ import {
   updateLecturerMaterial,
   reserveLecturerMaterialUpload,
 } from '../services/lecturer'
+import { describeLecturerMaterial } from '../services/material-describe'
+import {
+  createLecturerDiscussion,
+  createLecturerDiscussionPost,
+  deleteLecturerDiscussion,
+  getLecturerDiscussion,
+  updateLecturerDiscussion,
+} from '../services/discussions'
+import {
+  createLecturerQuestion,
+  deleteLecturerQuestion,
+  generateLecturerQuestions,
+  listLecturerAssessmentItems,
+  listLecturerQuestions,
+  reserveLecturerQuestionImport,
+  saveLecturerAssessmentItems,
+  updateLecturerQuestion,
+} from '../services/question-bank'
+import {
+  cancelLecturerClassroomSession,
+  createLecturerClassroomSession,
+  draftClassroomSummary,
+  endLecturerClassroomSession,
+  getClassroomRecordingDownloadUrl,
+  getLecturerClassroomSession,
+  joinLecturerClassroomSession,
+  listLecturerClassroomSessions,
+  loadClassroomWhiteboard,
+  publishClassroomSummary,
+  saveClassroomWhiteboard,
+  startLecturerClassroomSession,
+  startLecturerRecording,
+  stopLecturerRecording,
+} from '../services/live-sessions'
+import { getLecturerCourseAnalytics } from '../services/course-analytics'
+import { registerLibraryReaderRoutes } from './library-reader'
 
 type Variables = RequestVariables & Partial<AuthVariables>
 
@@ -92,6 +150,12 @@ lecturerRoutes.post('/lecturer/materials', ...lecturerOnly, async (c) => {
   })
 })
 
+lecturerRoutes.post('/lecturer/materials/describe', ...lecturerOnly, async (c) => {
+  const parsed = describeLecturerMaterialRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json(await describeLecturerMaterial(c.get('user')!.institution.id, actor(c), parsed.data))
+})
+
 lecturerRoutes.post('/lecturer/materials/upload-target', ...lecturerOnly, async (c) => {
   const parsed = reserveLecturerMaterialUploadRequestSchema.safeParse(await c.req.json().catch(() => ({})))
   if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
@@ -123,6 +187,116 @@ lecturerRoutes.get('/lecturer/materials/:id/download', ...lecturerOnly, async (c
   const user = c.get('user')!
   return c.json({
     download: await getLecturerMaterialDownloadUrl(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/modules', ...lecturerOnly, async (c) => {
+  const parsed = createLecturerModuleRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json(
+    { module: await createLecturerModule(c.get('user')!.institution.id, actor(c), parsed.data) },
+    201,
+  )
+})
+
+lecturerRoutes.patch('/lecturer/modules/:id', ...lecturerOnly, async (c) => {
+  const parsed = updateLecturerModuleRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    module: await updateLecturerModule(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
+lecturerRoutes.delete('/lecturer/modules/:id', ...lecturerOnly, async (c) => {
+  await deleteLecturerModule(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
+})
+
+lecturerRoutes.post('/lecturer/announcements', ...lecturerOnly, async (c) => {
+  const parsed = createLecturerAnnouncementRequestSchema.safeParse(
+    await c.req.json().catch(() => ({})),
+  )
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json(
+    {
+      announcement: await createLecturerAnnouncement(
+        c.get('user')!.institution.id,
+        actor(c),
+        parsed.data,
+      ),
+    },
+    201,
+  )
+})
+
+lecturerRoutes.patch('/lecturer/announcements/:id', ...lecturerOnly, async (c) => {
+  const parsed = updateLecturerAnnouncementRequestSchema.safeParse(
+    await c.req.json().catch(() => ({})),
+  )
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    announcement: await updateLecturerAnnouncement(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
+lecturerRoutes.delete('/lecturer/announcements/:id', ...lecturerOnly, async (c) => {
+  await deleteLecturerAnnouncement(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
+})
+
+lecturerRoutes.post('/lecturer/discussions', ...lecturerOnly, async (c) => {
+  const parsed = createLecturerDiscussionRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    discussion: await createLecturerDiscussion(c.get('user')!.institution.id, actor(c), parsed.data),
+  }, 201)
+})
+
+lecturerRoutes.get('/lecturer/discussions/:id', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    discussion: await getLecturerDiscussion(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+lecturerRoutes.patch('/lecturer/discussions/:id', ...lecturerOnly, async (c) => {
+  const parsed = updateLecturerDiscussionRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    discussion: await updateLecturerDiscussion(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
+lecturerRoutes.delete('/lecturer/discussions/:id', ...lecturerOnly, async (c) => {
+  await deleteLecturerDiscussion(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
+})
+
+lecturerRoutes.post('/lecturer/discussions/:id/posts', ...lecturerOnly, async (c) => {
+  const parsed = createDiscussionPostRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    discussion: await createLecturerDiscussionPost(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
   })
 })
 
@@ -203,11 +377,87 @@ lecturerRoutes.post('/lecturer/assessments', ...lecturerOnly, async (c) => {
   })
 })
 
+lecturerRoutes.delete('/lecturer/assessments/:id', ...lecturerOnly, async (c) => {
+  await deleteLecturerAssessment(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
+})
+
 lecturerRoutes.get('/lecturer/assessments/:id', ...lecturerOnly, async (c) => {
   const user = c.get('user')!
   return c.json({
     assessment: await getLecturerAssessment(user.institution.id, user.id, c.req.param('id')),
   })
+})
+
+lecturerRoutes.get('/lecturer/assessments/:id/items', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    items: await listLecturerAssessmentItems(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+lecturerRoutes.put('/lecturer/assessments/:id/items', ...lecturerOnly, async (c) => {
+  const parsed = saveLecturerAssessmentItemsRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    items: await saveLecturerAssessmentItems(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
+lecturerRoutes.get('/lecturer/questions', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    questions: await listLecturerQuestions(user.institution.id, user.id, {
+      courseId: c.req.query('courseId') || undefined,
+      topic: c.req.query('topic') || undefined,
+    }),
+  })
+})
+
+lecturerRoutes.post('/lecturer/questions', ...lecturerOnly, async (c) => {
+  const parsed = createLecturerQuestionRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    question: await createLecturerQuestion(c.get('user')!.institution.id, actor(c), parsed.data),
+  }, 201)
+})
+
+lecturerRoutes.post('/lecturer/questions/generate', ...lecturerOnly, async (c) => {
+  const parsed = generateLecturerQuestionsRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json(await generateLecturerQuestions(c.get('user')!.institution.id, actor(c), parsed.data))
+})
+
+lecturerRoutes.post('/lecturer/questions/upload-target', ...lecturerOnly, async (c) => {
+  const parsed = reserveLecturerQuestionImportRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  return c.json({
+    upload: await reserveLecturerQuestionImport(user.institution.id, user.id, parsed.data),
+  })
+})
+
+lecturerRoutes.patch('/lecturer/questions/:id', ...lecturerOnly, async (c) => {
+  const parsed = updateLecturerQuestionRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    question: await updateLecturerQuestion(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
+lecturerRoutes.delete('/lecturer/questions/:id', ...lecturerOnly, async (c) => {
+  await deleteLecturerQuestion(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
 })
 
 lecturerRoutes.post('/lecturer/assessments/:id/grades', ...lecturerOnly, async (c) => {
@@ -300,3 +550,108 @@ lecturerRoutes.delete('/lecturer/timetable/:slotId', ...lecturerOnly, async (c) 
     ),
   })
 })
+
+lecturerRoutes.get('/lecturer/analytics/:offeringId', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    analytics: await getLecturerCourseAnalytics(user.institution.id, user.id, c.req.param('offeringId')),
+  })
+})
+
+lecturerRoutes.get('/lecturer/classroom', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    sessions: await listLecturerClassroomSessions(user.institution.id, user.id, c.req.query('offeringId')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom', ...lecturerOnly, async (c) => {
+  const parsed = createClassroomSessionRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    session: await createLecturerClassroomSession(c.get('user')!.institution.id, actor(c), parsed.data),
+  }, 201)
+})
+
+lecturerRoutes.get('/lecturer/classroom/:id', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    session: await getLecturerClassroomSession(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/start', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await startLecturerClassroomSession(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/end', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await endLecturerClassroomSession(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/cancel', ...lecturerOnly, async (c) => {
+  await cancelLecturerClassroomSession(c.get('user')!.institution.id, actor(c), c.req.param('id'))
+  return c.body(null, 204)
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/join', ...lecturerOnly, async (c) => {
+  return c.json({
+    join: await joinLecturerClassroomSession(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/record/start', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await startLecturerRecording(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/record/stop', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await stopLecturerRecording(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/summary', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await draftClassroomSummary(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/summary/publish', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await publishClassroomSummary(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.get('/lecturer/classroom/:id/whiteboard', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    scene: await loadClassroomWhiteboard(user.institution.id, user.id, user.role, c.req.param('id')),
+  })
+})
+
+lecturerRoutes.put('/lecturer/classroom/:id/whiteboard', ...lecturerOnly, async (c) => {
+  const parsed = saveClassroomWhiteboardRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  await saveClassroomWhiteboard(user.institution.id, user.id, user.role, c.req.param('id'), parsed.data.scene)
+  return c.body(null, 204)
+})
+
+lecturerRoutes.get('/lecturer/recordings/:id/download', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    download: await getClassroomRecordingDownloadUrl(
+      user.institution.id,
+      user.id,
+      user.role,
+      c.req.param('id'),
+    ),
+  })
+})
+
+registerLibraryReaderRoutes(lecturerRoutes, '/lecturer', lecturerOnly)

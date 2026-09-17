@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Plus, ChevronRight } from 'lucide-react'
 import type { LecturerAssessmentRow, LecturerCourseRow } from '@stackedu/shared'
+import { isQuizAssessmentType } from '@stackedu/shared'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { LecturerShell } from '@/components/LecturerShell'
+import { PagedList } from '@/components/ListPagination'
+import { AssessmentWeightField } from '@/components/AssessmentWeightField'
 import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -41,6 +45,7 @@ function AssignmentsPage() {
     queryKey: lecturerAssessmentsQueryKey(courseFilter === 'all' ? undefined : courseFilter),
     queryFn: () => listLecturerAssessments(courseFilter === 'all' ? undefined : courseFilter),
   })
+  const coursework = assessments.filter((row) => !isQuizAssessmentType(row.type))
 
   return (
     <LecturerShell pageTitle="Assignments" guide="Create coursework for your assigned courses and review student submissions.">
@@ -67,12 +72,17 @@ function AssignmentsPage() {
         {isPending ? <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading…</p> : null}
         {error ? <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load assignments.')}</p> : null}
 
-        {!isPending && assessments.length === 0 ? (
+        {!isPending && coursework.length === 0 ? (
           <p className="t-body-sm" style={{ color: 'var(--muted-foreground)' }}>No assignments yet. Create one for an assigned course.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {assessments.map((a) => <AssignmentCard key={a.id} assignment={a} courses={courses} />)}
-          </div>
+          <PagedList
+            items={coursework}
+            getKey={(row) => row.id}
+            defaultPageSize={5}
+            resetKey={courseFilter}
+            itemLabel="assignments"
+            renderItem={(a) => <AssignmentCard assignment={a} courses={courses} />}
+          />
         )}
       </div>
 
@@ -179,15 +189,31 @@ function CreateAssignmentForm({ courses, onClose }: { courses: LecturerCourseRow
             <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Max marks</label>
             <Input type="number" min={1} value={maxMarks} onChange={(e) => setMaxMarks(e.target.value)} />
           </div>
-          <div>
-            <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Weight %</label>
-            <Input type="number" min={0} max={100} value={weight} onChange={(e) => setWeight(e.target.value)} />
-          </div>
+          <AssessmentWeightField value={weight} onChange={setWeight} />
         </div>
       </div>
-      <div className="flex gap-3" style={{ padding: '16px 24px 24px' }}>
+      <div className="flex flex-col sm:flex-row gap-3" style={{ padding: '16px 24px 24px' }}>
         <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-        <Button className="flex-1" disabled={!title.trim() || !offeringId || create.isPending} onClick={() => create.mutate()} style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}>Create</Button>
+        <ConfirmAlertDialog
+          trigger={
+            <Button className="flex-1" disabled={!title.trim() || !offeringId || create.isPending} style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}>
+              {create.isPending ? 'Creating…' : 'Create'}
+            </Button>
+          }
+          title="Create this assignment?"
+          tone="success"
+          headlineLabel="Action"
+          headline="Publish assignment"
+          summary={`"${title.trim()}" will be published to ${courses.find((row) => row.offeringId === offeringId)?.code ?? 'the course'}.`}
+          notices={[
+            { icon: 'user', label: 'Enrolled students can submit a written response from their portal.' },
+            { icon: 'file', label: 'Quizzes belong on Assessment Builder, not this list.' },
+          ]}
+          confirmLabel="Create"
+          confirmVariant="brand"
+          loading={create.isPending}
+          onConfirm={() => create.mutate()}
+        />
       </div>
     </div>
   )

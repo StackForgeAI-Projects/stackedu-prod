@@ -23,3 +23,15 @@ export function integrationLastCheckLabel(status: string | null, checkedAt: stri
   if (!status && !when) return 'Not checked yet'
   return when ? `${readable} · ${when}` : readable
 }
+
+export function integrationCheckFailed(status: string | null): boolean {
+  if (!status) return false
+  const lower = status.toLowerCase()
+  return (
+    lower.includes('turned off')
+    || lower.startsWith('add ')
+    || lower.includes('rejected')
+    || lower.includes('could not reach')
+    || lower.includes('returned http')
+  )
+}

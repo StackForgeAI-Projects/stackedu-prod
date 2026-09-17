@@ -1,10 +1,13 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { randomInt } from 'node:crypto'
 import type {
+  CreateDiscussionPostRequest,
+  DiscussionThreadDetail,
   PaymentMethod,
   RegisterCoursesRequest,
   SaveOnboardingRequest,
   StudentAssessment,
+  StudentAssessmentDetail,
   StudentCourseDetail,
   StudentDashboard,
   StudentFees,
@@ -38,7 +41,6 @@ import {
   receipts,
   studentFeeAccounts,
 } from '../db/institution/schema/finance'
-import { libraryResources } from '../db/institution/schema/library'
 import { users } from '../db/institution/schema/people'
 import { enrolments, onboardingProgress, studentProfiles, students } from '../db/institution/schema/students'
 import {
@@ -46,18 +48,25 @@ import {
   attendanceRecords,
   attendanceSessions,
   courseMaterials,
+  courseMaterialViews,
+  courseModules,
   courseOfferings,
   courseRegistrations,
   lecturerAssignments,
   rooms,
   timetableSlots,
 } from '../db/institution/schema/teaching'
+
+type InstitutionDb = Awaited<ReturnType<typeof getInstitutionDb>>
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import { createDownloadUrl, fileNameFromStorageKey } from '../lib/storage'
 import { feeDescriptionForPayment, feeDescriptionFromLineItems } from '../lib/fee-description'
 import { readPaymentPolicy } from '../lib/payment-policy-store'
 import { initiatePaymentGateway } from './payment-gateway'
+import { countAssessmentItems, getStudentQuiz, submitStudentQuiz } from './question-bank'
+import { insertPost, listOfferingDiscussionSummaries, mapThreadDetail } from './discussions'
+import { listReadableLibrary } from './library'
 import {
   classifyFeeKindFromLineItems,
   allowsPartialPayment,
@@ -468,13 +477,17 @@ export async function getStudentCourse(
       .select({
         id: courseMaterials.id,
         title: courseMaterials.title,
+        moduleId: courseMaterials.moduleId,
         description: courseMaterials.description,
         moduleName: courseMaterials.moduleName,
+        bodyText: courseMaterials.bodyText,
+        sequence: courseMaterials.sequence,
         externalUrl: courseMaterials.externalUrl,
         fileKey: courseMaterials.fileKey,
       })
       .from(courseMaterials)
-      .where(and(eq(courseMaterials.courseOfferingId, offeringId), eq(courseMaterials.isPublished, true))),
+      .where(and(eq(courseMaterials.courseOfferingId, offeringId), eq(courseMaterials.isPublished, true)))
+      .orderBy(asc(courseMaterials.sequence), asc(courseMaterials.createdAt)),
     db
       .select({
         id: assessments.id,
@@ -505,6 +518,22 @@ export async function getStudentCourse(
 
   const present = attendance.filter((item) => item.status === 'Present' || item.status === 'Late').length
 
+  const viewedMaterialIds = await viewedMaterialIdsFor(db, profile.studentId, offeringId)
+  const modules = await buildStudentModules(db, offeringId, materials, viewedMaterialIds)
+  const courseAnnouncements = await db
+    .select({
+      id: announcements.id,
+      title: announcements.title,
+      body: announcements.body,
+      isPinned: announcements.isPinned,
+      publishedAt: announcements.publishedAt,
+    })
+    .from(announcements)
+    .where(
+      and(eq(announcements.courseOfferingId, offeringId), isNotNull(announcements.publishedAt)),
+    )
+    .orderBy(desc(announcements.isPinned), desc(announcements.publishedAt))
+
   return {
     offeringId: row.offeringId,
     courseId: row.courseId,
@@ -517,19 +546,149 @@ export async function getStudentCourse(
     status: row.status,
     description: row.description,
     semesterName: row.semesterName,
-    materials: materials.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      moduleName: item.moduleName,
-      externalUrl: item.externalUrl ?? null,
-      fileName: item.fileKey ? fileNameFromStorageKey(item.fileKey) : null,
-      hasFile: Boolean(item.fileKey),
-    })),
+    modules,
+    materials: materials.map((item) => {
+      const owning = item.moduleId
+        ? modules.find((module) => module.id === item.moduleId)
+        : null
+      const locked = Boolean(owning?.isLocked)
+      return {
+        id: item.id,
+        moduleId: item.moduleId ?? null,
+        title: item.title,
+        description: locked ? null : item.description,
+        moduleName: item.moduleName ?? owning?.title ?? null,
+        bodyText: locked ? null : item.bodyText ?? null,
+        sequence: item.sequence ?? 0,
+        externalUrl: locked ? null : item.externalUrl ?? null,
+        fileName: locked || !item.fileKey ? null : fileNameFromStorageKey(item.fileKey),
+        hasFile: locked ? false : Boolean(item.fileKey),
+        isViewed: viewedMaterialIds.has(item.id),
+      }
+    }),
+    announcements: courseAnnouncements,
+    discussions: await listOfferingDiscussionSummaries(db, offeringId, { publishedOnly: true }),
+    liveSessions: await (await import('./live-sessions')).listOfferingLiveSessionSummaries(db, offeringId, { studentView: true }),
     assessments: openAssessments,
     attendance,
     attendanceRate: attendance.length === 0 ? null : Math.round((present / attendance.length) * 100),
   }
+}
+
+/**
+ * Module progress and locking.
+ *
+ * A module is done once the student has opened every published material in
+ * it. A module naming an earlier one as its prerequisite stays shut until that
+ * earlier module is done. An empty prerequisite counts as done, because there
+ * is nothing in it to work through and a student should never be stuck behind
+ * a module the lecturer left empty.
+ */
+
+type StudentMaterialRow = { id: string; moduleId: string | null }
+
+async function viewedMaterialIdsFor(
+  db: InstitutionDb,
+  studentId: string,
+  offeringId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ materialId: courseMaterialViews.materialId })
+    .from(courseMaterialViews)
+    .innerJoin(courseMaterials, eq(courseMaterials.id, courseMaterialViews.materialId))
+    .where(
+      and(
+        eq(courseMaterialViews.studentId, studentId),
+        eq(courseMaterials.courseOfferingId, offeringId),
+      ),
+    )
+  return new Set(rows.map((row) => row.materialId))
+}
+
+async function buildStudentModules(
+  db: InstitutionDb,
+  offeringId: string,
+  materials: StudentMaterialRow[],
+  viewedMaterialIds: Set<string>,
+): Promise<StudentCourseDetail['modules']> {
+  const moduleRows = await db
+    .select({
+      id: courseModules.id,
+      title: courseModules.title,
+      summary: courseModules.summary,
+      sequence: courseModules.sequence,
+      prerequisiteModuleId: courseModules.prerequisiteModuleId,
+    })
+    .from(courseModules)
+    .where(and(eq(courseModules.courseOfferingId, offeringId), eq(courseModules.isPublished, true)))
+    .orderBy(asc(courseModules.sequence), asc(courseModules.createdAt))
+
+  const counts = new Map<string, { total: number; viewed: number }>()
+  for (const module of moduleRows) counts.set(module.id, { total: 0, viewed: 0 })
+  for (const material of materials) {
+    if (!material.moduleId) continue
+    const entry = counts.get(material.moduleId)
+    if (!entry) continue
+    entry.total += 1
+    if (viewedMaterialIds.has(material.id)) entry.viewed += 1
+  }
+
+  const titleById = new Map(moduleRows.map((module) => [module.id, module.title]))
+  const isComplete = (moduleId: string): boolean => {
+    const entry = counts.get(moduleId)
+    if (!entry) return true
+    return entry.viewed >= entry.total
+  }
+
+  return moduleRows.map((module) => {
+    const entry = counts.get(module.id) ?? { total: 0, viewed: 0 }
+    const blocking =
+      module.prerequisiteModuleId && !isComplete(module.prerequisiteModuleId)
+        ? titleById.get(module.prerequisiteModuleId) ?? null
+        : null
+
+    return {
+      id: module.id,
+      title: module.title,
+      summary: module.summary,
+      sequence: module.sequence,
+      isLocked: Boolean(blocking),
+      lockedReason: blocking ? `Finish "${blocking}" first to open this module.` : null,
+      materialCount: entry.total,
+      viewedCount: entry.viewed,
+    }
+  })
+}
+
+/**
+ * Refuses a material the student has not earned access to yet, and records
+ * that they opened it. Locking is enforced here on the server, not only hidden
+ * in the interface, because the download route is reachable on its own.
+ */
+async function assertMaterialUnlockedAndRecordView(
+  db: InstitutionDb,
+  input: { studentId: string; materialId: string; moduleId: string | null; offeringId: string },
+): Promise<void> {
+  if (input.moduleId) {
+    const viewed = await viewedMaterialIdsFor(db, input.studentId, input.offeringId)
+    const publishedMaterials = await db
+      .select({ id: courseMaterials.id, moduleId: courseMaterials.moduleId })
+      .from(courseMaterials)
+      .where(
+        and(
+          eq(courseMaterials.courseOfferingId, input.offeringId),
+          eq(courseMaterials.isPublished, true),
+        ),
+      )
+    const modules = await buildStudentModules(db, input.offeringId, publishedMaterials, viewed)
+    const owning = modules.find((module) => module.id === input.moduleId)
+    if (owning?.isLocked) throw forbidden(owning.lockedReason ?? 'That module is not open yet.')
+  }
+
+  await db
+    .insert(courseMaterialViews)
+    .values({ materialId: input.materialId, studentId: input.studentId })
+    .onConflictDoNothing()
 }
 
 export async function getStudentMaterialDownloadUrl(
@@ -543,6 +702,7 @@ export async function getStudentMaterialDownloadUrl(
     .select({
       id: courseMaterials.id,
       offeringId: courseMaterials.courseOfferingId,
+      moduleId: courseMaterials.moduleId,
       fileKey: courseMaterials.fileKey,
       isPublished: courseMaterials.isPublished,
     })
@@ -564,8 +724,59 @@ export async function getStudentMaterialDownloadUrl(
     .limit(1)
   if (!registration) throw forbidden('You are not enrolled in that course.')
 
+  await assertMaterialUnlockedAndRecordView(db, {
+    studentId: profile.studentId,
+    materialId,
+    moduleId: row.moduleId,
+    offeringId: row.offeringId,
+  })
+
   const download = await createDownloadUrl(row.fileKey)
   return { ...download, fileName: fileNameFromStorageKey(row.fileKey) }
+}
+
+/**
+ * Marks a material as opened without downloading a file. Pages and links have
+ * nothing to download, so without this they could never count toward finishing
+ * a module.
+ */
+export async function recordStudentMaterialView(
+  institutionId: string,
+  userId: string,
+  materialId: string,
+): Promise<void> {
+  const profile = await getStudentProfile(institutionId, userId)
+  const db = await getInstitutionDb(institutionId)
+  const [row] = await db
+    .select({
+      offeringId: courseMaterials.courseOfferingId,
+      moduleId: courseMaterials.moduleId,
+      isPublished: courseMaterials.isPublished,
+    })
+    .from(courseMaterials)
+    .where(eq(courseMaterials.id, materialId))
+    .limit(1)
+  if (!row || !row.isPublished) throw notFound('That course material')
+
+  const [registration] = await db
+    .select({ id: courseRegistrations.id })
+    .from(courseRegistrations)
+    .where(
+      and(
+        eq(courseRegistrations.studentId, profile.studentId),
+        eq(courseRegistrations.courseOfferingId, row.offeringId),
+        eq(courseRegistrations.status, 'Approved'),
+      ),
+    )
+    .limit(1)
+  if (!registration) throw forbidden('You are not enrolled in that course.')
+
+  await assertMaterialUnlockedAndRecordView(db, {
+    studentId: profile.studentId,
+    materialId,
+    moduleId: row.moduleId,
+    offeringId: row.offeringId,
+  })
 }
 
 export async function getRegistrationState(
@@ -1040,22 +1251,10 @@ export async function markNotificationRead(
 export async function listStudentLibrary(
   institutionId: string,
   userId: string,
+  query?: string,
 ): Promise<StudentLibraryResource[]> {
   await requireStudent(institutionId, userId)
-  const db = await getInstitutionDb(institutionId)
-  return db
-    .select({
-      id: libraryResources.id,
-      title: libraryResources.title,
-      author: libraryResources.author,
-      type: libraryResources.type,
-      description: libraryResources.description,
-      subjectTags: libraryResources.subjectTags,
-      publicationYear: libraryResources.publicationYear,
-    })
-    .from(libraryResources)
-    .where(eq(libraryResources.isPublished, true))
-    .orderBy(libraryResources.title)
+  return listReadableLibrary(institutionId, userId, query)
 }
 
 export async function getStudentOnboarding(
@@ -1135,6 +1334,7 @@ export async function listStudentAssessments(
       dueAt: assessments.dueAt,
       acceptsSubmissions: assessments.acceptsSubmissions,
       submissionId: submissions.id,
+      submissionStatus: submissions.status,
     })
     .from(assessments)
     .innerJoin(courseOfferings, eq(courseOfferings.id, assessments.courseOfferingId))
@@ -1154,6 +1354,8 @@ export async function listStudentAssessments(
     .where(and(eq(assessments.isPublished, true), eq(assessments.acceptsSubmissions, true)))
     .orderBy(assessments.dueAt)
 
+  const itemCounts = await countAssessmentItems(db, rows.map((row) => row.id))
+
   return rows.map((row) => ({
     id: row.id,
     offeringId: row.offeringId,
@@ -1163,8 +1365,29 @@ export async function listStudentAssessments(
     courseName: row.courseName,
     dueAt: row.dueAt,
     acceptsSubmissions: row.acceptsSubmissions,
-    submitted: Boolean(row.submissionId),
+    submitted: Boolean(row.submissionId) && row.submissionStatus !== 'Draft',
+    questionCount: itemCounts.get(row.id) ?? 0,
   }))
+}
+
+export async function getStudentAssessmentDetail(
+  institutionId: string,
+  userId: string,
+  assessmentId: string,
+): Promise<StudentAssessmentDetail> {
+  const profile = await getStudentProfile(institutionId, userId)
+  const list = await listStudentAssessments(institutionId, userId)
+  const summary = list.find((row) => row.id === assessmentId)
+  if (!summary) throw notFound('That assignment')
+  const quiz = summary.questionCount > 0
+    ? await getStudentQuiz(institutionId, profile.studentId, assessmentId)
+    : { questions: [], submitted: summary.submitted, score: null }
+  return {
+    ...summary,
+    submitted: quiz.submitted,
+    questions: quiz.questions,
+    score: quiz.score,
+  }
 }
 
 export async function submitStudentAssessment(
@@ -1178,6 +1401,12 @@ export async function submitStudentAssessment(
   const assessment = assessmentsList.find((row) => row.id === assessmentId)
   if (!assessment) throw notFound('That assignment')
   if (assessment.submitted) throw conflict('You have already submitted this assignment.')
+
+  if (assessment.questionCount > 0) {
+    await submitStudentQuiz(institutionId, profile.studentId, assessmentId, input)
+    return listStudentAssessments(institutionId, userId)
+  }
+  if (!input.textResponse?.trim()) throw badRequest('Write your answer before submitting.')
 
   const db = await getInstitutionDb(institutionId)
   await db.insert(submissions).values({
@@ -1204,4 +1433,31 @@ export async function listStudentAnnouncements(institutionId: string, userId: st
     .from(announcements)
     .where(eq(announcements.isPinned, true))
     .limit(10)
+}
+
+export async function getStudentDiscussion(
+  institutionId: string,
+  userId: string,
+  threadId: string,
+): Promise<DiscussionThreadDetail> {
+  const profile = await requireStudent(institutionId, userId)
+  const thread = await mapThreadDetail(profile.db, threadId)
+  const course = await getStudentCourse(institutionId, userId, thread.offeringId)
+  if (!course || !thread.isPublished) throw notFound('That discussion')
+  return thread
+}
+
+export async function createStudentDiscussionPost(
+  institutionId: string,
+  userId: string,
+  threadId: string,
+  input: CreateDiscussionPostRequest,
+): Promise<DiscussionThreadDetail> {
+  const profile = await requireStudent(institutionId, userId)
+  const thread = await mapThreadDetail(profile.db, threadId)
+  await getStudentCourse(institutionId, userId, thread.offeringId)
+  if (!thread.isPublished) throw notFound('That discussion')
+  if (thread.closedAt) throw conflict('This discussion is closed.')
+  await insertPost(profile.db, threadId, userId, input)
+  return mapThreadDetail(profile.db, threadId)
 }

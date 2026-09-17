@@ -92,7 +92,7 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
                 ? 'border-brand/50 bg-brand/5'
                 : 'hover:border-muted-foreground/40',
               // Focus state — brand green ring
-              'focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_rgba(15, 189, 59,0.25)]',
+              'focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_rgba(var(--brand-rgb),0.25)]',
               // Disabled
               'disabled:opacity-50 disabled:cursor-not-allowed',
             )}

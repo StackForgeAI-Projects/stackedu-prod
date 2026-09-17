@@ -33,7 +33,7 @@ const DEMO = {
 
 async function main() {
   if (env().NODE_ENV === 'production') {
-    process.stderr.write('Refusing to seed demo applicants in production.\n')
+    process.stderr.write('Demo seed data stays local. Refusing to seed demo applicants in production.\n')
     process.exit(1)
   }
 

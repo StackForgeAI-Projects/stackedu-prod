@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { BarChart2, Download } from 'lucide-react'
 import { LecturerShell } from '@/components/LecturerShell'
 import { Button } from '@/components/ui/button'
+import { brandColorValue } from '@/lib/brand-theme'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -153,7 +154,7 @@ function PublishedAssessmentBlock({
               <XAxis dataKey="grade" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', backgroundColor: 'var(--card)', fontSize: 12 }} />
-              <Bar dataKey="count" fill="#0FBD3B" radius={[3, 3, 0, 0]} name="Students" />
+              <Bar dataKey="count" fill={brandColorValue()} radius={[3, 3, 0, 0]} name="Students" />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -110,6 +110,25 @@ export async function notifyEnrolledStudentsOfMaterial(
   })
 }
 
+export async function notifyEnrolledStudentsOfAnnouncement(
+  db: InstitutionDb,
+  offeringId: string,
+  announcement: { title: string; body: string },
+): Promise<void> {
+  const studentIds = await enrolledStudentUserIds(db, offeringId)
+  if (studentIds.length === 0) return
+
+  const course = await offeringCourseSummary(db, offeringId)
+  const code = course?.courseCode ?? 'Course'
+
+  await notifyUserIds(db, studentIds, {
+    title: `${code}: ${announcement.title}`,
+    body: announcement.body,
+    category: 'Announcement',
+    actionUrl: `/student/course-detail?id=${offeringId}`,
+  })
+}
+
 export async function notifyEnrolledStudentsOfAssessment(
   db: InstitutionDb,
   offeringId: string,

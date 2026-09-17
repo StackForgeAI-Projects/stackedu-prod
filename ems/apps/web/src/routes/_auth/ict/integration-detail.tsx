@@ -21,7 +21,7 @@ function IntegrationDetailPage() {
   const item = data?.find((row) => row.id === id)
 
   return (
-    <IctShell pageTitle="Integration" guide="Enable or disable this service. Credentials are not entered in the browser.">
+    <IctShell pageTitle="Integration" guide="Save keys for this institution, then turn the service on. Secrets are hidden after save.">
       <div className="animate-fade-up" style={{ padding: '32px 16px 48px', maxWidth: 760, margin: '0 auto' }}>
         <Link to="/ict/integrations" className="t-caption mb-4 inline-block" style={{ color: 'var(--success)' }}>← Integrations</Link>
         {isPending ? (
@@ -32,7 +32,7 @@ function IntegrationDetailPage() {
           <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Choose an integration from the list.</p>
         ) : (
           <div className="p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
-            <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)' }}>{item.displayName}</h1>
+            <h1 className="t-h1 mb-4" style={{ fontFamily: 'var(--font-display)' }}>{item.displayName}</h1>
             <IntegrationActionsPanel item={item} />
           </div>
         )}

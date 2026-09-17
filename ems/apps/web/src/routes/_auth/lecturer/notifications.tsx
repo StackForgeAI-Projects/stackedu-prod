@@ -6,6 +6,7 @@ import {
   Bell, FileText, GraduationCap, AlertTriangle, ChevronRight,
 } from 'lucide-react'
 import { LecturerShell } from '@/components/LecturerShell'
+import { PagedList } from '@/components/ListPagination'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -92,37 +93,45 @@ function LecturerNotificationsPage() {
         {isPending ? <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading…</p> : null}
         {error ? <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load notifications.')}</p> : null}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((n) => {
-            const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.System
-            const Icon = cfg.icon
-            return (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => openNotif(n)}
-                className="flex items-start gap-3 text-left w-full"
-                style={{
-                  backgroundColor: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-xl)',
-                  padding: '14px 16px',
-                  opacity: n.read ? 0.7 : 1,
-                  cursor: 'pointer',
-                }}
-              >
-                <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: cfg.iconBg }}>
-                  <Icon style={{ width: 16, height: 16, color: cfg.iconColor }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{n.title}</p>
-                  <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{n.body}</p>
-                  <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{n.time}</p>
-                </div>
-                <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted-foreground)', marginTop: 4 }} />
-              </button>
-            )
-          })}
+        <div>
+          <PagedList
+            items={filtered}
+            getKey={(n) => n.id}
+            defaultPageSize={10}
+            resetKey={tab}
+            itemLabel="notifications"
+            gap={8}
+            empty={!isPending ? <p className="t-body text-center py-12" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p> : null}
+            renderItem={(n) => {
+              const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.System
+              const Icon = cfg.icon
+              return (
+                <button
+                  type="button"
+                  onClick={() => openNotif(n)}
+                  className="flex items-start gap-3 text-left w-full"
+                  style={{
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-xl)',
+                    padding: '14px 16px',
+                    opacity: n.read ? 0.7 : 1,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: cfg.iconBg }}>
+                    <Icon style={{ width: 16, height: 16, color: cfg.iconColor }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{n.title}</p>
+                    <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{n.body}</p>
+                    <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>{n.time}</p>
+                  </div>
+                  <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted-foreground)', marginTop: 4 }} />
+                </button>
+              )
+            }}
+          />
         </div>
       </div>
 

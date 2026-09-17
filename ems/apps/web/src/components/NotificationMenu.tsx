@@ -16,6 +16,7 @@ import {
 } from '@/lib/api/account'
 import { academicProfileQueryKey } from '@/lib/api/academic'
 import { ictProfileQueryKey } from '@/lib/api/ict'
+import { librarianProfileQueryKey } from '@/lib/api/library'
 import { studentProfileQueryKey } from '@/lib/api/student'
 import { cn, formatDateShort, parseAppDateTime } from '@/lib/utils'
 
@@ -51,6 +52,7 @@ export function NotificationMenu({ unreadCount = 0, notificationsHref }: Notific
     await queryClient.invalidateQueries({ queryKey: ictProfileQueryKey })
     await queryClient.invalidateQueries({ queryKey: academicProfileQueryKey })
     await queryClient.invalidateQueries({ queryKey: studentProfileQueryKey })
+    await queryClient.invalidateQueries({ queryKey: librarianProfileQueryKey })
   }
 
   return (

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { and, count, eq, gt, isNull, or } from 'drizzle-orm'
-import type { SessionUser } from '@stackedu/shared'
+import type { LogoutReason, SessionUser, UserRole } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions, loginAttempts, userDirectory } from '../db/platform/schema'
 import { sessions, users } from '../db/institution/schema'
@@ -8,6 +8,7 @@ import { invalidCredentials, tooManyRequests, badRequest } from '../lib/errors'
 import { fakeVerify, verifyPassword } from '../lib/password'
 import { createPending2faToken, parsePending2faToken } from '../lib/pending-2fa'
 import { verifyTotpCode } from '../lib/totp'
+import { writeAudit } from '../lib/audit'
 
 /**
  * Sessions.
@@ -87,6 +88,33 @@ async function recordAttempt(input: {
       userAgent: input.userAgent ?? null,
       failureReason: input.failureReason ?? null,
     })
+}
+
+/**
+ * Sessions belong in the audit trail as much as any other significant action:
+ * an institution has to be able to see who was signed in, from where, and how
+ * the session ended.
+ */
+async function auditSession(input: {
+  institutionId: string
+  user: { id: string; email: string; role: UserRole }
+  action: 'session.login' | 'session.logout' | 'session.logout.inactivity'
+  metadata?: Record<string, unknown>
+  ipAddress?: string | undefined
+  userAgent?: string | undefined
+}): Promise<void> {
+  await writeAudit({
+    institutionId: input.institutionId,
+    actorId: input.user.id,
+    actorEmail: input.user.email,
+    actorRole: input.user.role,
+    action: input.action,
+    targetType: 'session',
+    targetId: input.user.id,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  })
 }
 
 async function assertNotLockedOut(email: string): Promise<void> {
@@ -246,6 +274,15 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     userAgent,
   })
 
+  await auditSession({
+    institutionId: directory.institutionId,
+    user: account,
+    action: 'session.login',
+    metadata: { method: 'password' },
+    ipAddress,
+    userAgent,
+  })
+
   return {
     status: 'session',
     cookieValue: `${directory.institutionId}.${token}`,
@@ -336,6 +373,15 @@ export async function verifyTwoFactorLogin(input: {
     .set({ lastLoginAt: new Date().toISOString() })
     .where(eq(users.id, account.id))
 
+  await auditSession({
+    institutionId: pending.institutionId,
+    user: account,
+    action: 'session.login',
+    metadata: { method: 'two-factor' },
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  })
+
   return {
     status: 'session',
     cookieValue: `${pending.institutionId}.${token}`,
@@ -424,7 +470,10 @@ export async function resolveSession(cookieValue: string): Promise<SessionUser |
 }
 
 /** Ends a session. Safe to call with a cookie that is already invalid. */
-export async function logout(cookieValue: string): Promise<void> {
+export async function logout(
+  cookieValue: string,
+  context: { reason?: LogoutReason; ipAddress?: string | undefined; userAgent?: string | undefined } = {},
+): Promise<void> {
   const parsed = splitCookie(cookieValue)
   if (!parsed) return
 
@@ -437,9 +486,34 @@ export async function logout(cookieValue: string): Promise<void> {
   if (!institution) return
 
   const db = await getInstitutionDb(institution.id)
+  const token = hashToken(parsed.token)
 
-  await db
+  /**
+   * Only the call that actually ends a live session is audited. Several tabs
+   * can sign out at the same moment, and the audit log should show the session
+   * ending once, not once per tab.
+   */
+  const [revoked] = await db
     .update(sessions)
     .set({ revokedAt: new Date().toISOString() })
-    .where(eq(sessions.token, hashToken(parsed.token)))
+    .where(and(eq(sessions.token, token), isNull(sessions.revokedAt)))
+    .returning({ userId: sessions.userId })
+
+  if (!revoked) return
+
+  const [owner] = await db
+    .select({ id: users.id, email: users.email, role: users.role })
+    .from(users)
+    .where(eq(users.id, revoked.userId))
+    .limit(1)
+
+  if (!owner) return
+
+  await auditSession({
+    institutionId: institution.id,
+    user: owner,
+    action: context.reason === 'inactivity' ? 'session.logout.inactivity' : 'session.logout',
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  })
 }

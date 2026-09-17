@@ -36,7 +36,7 @@ function AcademicResultsPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <StatTile icon={TrendingUp} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="CGPA" value={data.cgpa?.toFixed(2) ?? '—'} />
+              <StatTile icon={TrendingUp} iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)" label="CGPA" value={data.cgpa?.toFixed(2) ?? '—'} />
               <StatTile icon={TrendingUp} iconColor="var(--info)" iconBg="var(--info-bg)" label="STANDING" value={data.standing ?? '—'} />
             </div>
             <select

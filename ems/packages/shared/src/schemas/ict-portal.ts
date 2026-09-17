@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { userRoleSchema } from '../enums'
 import { attendancePolicySchema } from '../attendance-policy'
 import { paymentPolicySchema } from '../payment-policy'
+import { aiProviderSchema, ictAiSettingsSchema } from '../ai-provider'
 import { emailSchema, isoDateTimeSchema, phoneSchema, uuidSchema } from '../primitives'
 
 export const ictStaffRoleSchema = z.enum([
@@ -125,6 +126,9 @@ export const ictAuditRowSchema = z.object({
   actorEmail: z.string().nullable(),
   actorRole: z.string().nullable(),
   action: z.string(),
+  /** Stable plain-English name of the action, used for grouping and filtering. */
+  actionLabel: z.string(),
+  /** The full sentence shown in the Action column, including record detail. */
   summary: z.string(),
   targetType: z.string().nullable(),
   targetId: z.string().nullable(),
@@ -138,6 +142,16 @@ export const ictAuditDetailSchema = ictAuditRowSchema.extend({
   requestId: z.string().nullable(),
 })
 
+/**
+ * The one colour the whole system is themed from, as `#RRGGBB`.
+ *
+ * `null` means the institution uses the StackEDU default palette.
+ */
+export const brandColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Choose a colour in #RRGGBB format.')
+
 export const ictSettingsSchema = z.object({
   name: z.string(),
   shortName: z.string(),
@@ -148,8 +162,10 @@ export const ictSettingsSchema = z.object({
   website: z.string().nullable(),
   location: z.string().nullable(),
   logoUrl: z.string().nullable(),
+  brandColor: z.string().nullable(),
   attendancePolicy: attendancePolicySchema,
   paymentPolicy: paymentPolicySchema,
+  ai: ictAiSettingsSchema,
 })
 
 export const updateIctSettingsRequestSchema = z.object({
@@ -160,8 +176,12 @@ export const updateIctSettingsRequestSchema = z.object({
   locale: z.enum(['en', 'fr', 'rw']).optional(),
   website: z.string().trim().max(500).nullable().optional(),
   location: z.string().trim().max(200).nullable().optional(),
+  brandColor: brandColorSchema.nullable().optional(),
   attendancePolicy: attendancePolicySchema.partial().optional(),
   paymentPolicy: paymentPolicySchema.partial().optional(),
+  aiProvider: aiProviderSchema.optional(),
+  aiModel: z.string().trim().max(80).nullable().optional(),
+  aiApiKey: z.string().trim().min(8).max(500).optional(),
 })
 
 export const publicInstitutionBrandingSchema = z.object({
@@ -171,20 +191,47 @@ export const publicInstitutionBrandingSchema = z.object({
   website: z.string().nullable(),
   location: z.string().nullable(),
   logoUrl: z.string().nullable(),
+  brandColor: z.string().nullable(),
+})
+
+export const integrationCategorySchema = z.enum(['payments', 'email', 'sms', 'classroom', 'ai'])
+
+export const integrationFieldSourceSchema = z.enum(['env', 'saved'])
+
+export const ictIntegrationFieldSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  hint: z.string().optional(),
+  secret: z.boolean(),
+  configured: z.boolean(),
+  source: integrationFieldSourceSchema.nullable(),
+  value: z.string().nullable(),
 })
 
 export const ictIntegrationSchema = z.object({
   id: uuidSchema,
   provider: z.string(),
   displayName: z.string(),
+  category: integrationCategorySchema,
+  description: z.string(),
+  docsUrl: z.string().nullable(),
+  setupSteps: z.array(z.string()),
   isEnabled: z.boolean(),
   lastStatus: z.string().nullable(),
   lastCheckedAt: isoDateTimeSchema.nullable(),
+  /** Set on a connection-check response: whether the vendor API accepted the keys. */
+  checkOk: z.boolean().optional(),
+  fields: z.array(ictIntegrationFieldSchema),
 })
 
-export const updateIntegrationRequestSchema = z.object({
-  isEnabled: z.boolean(),
-})
+export const updateIntegrationRequestSchema = z
+  .object({
+    isEnabled: z.boolean().optional(),
+    credentials: z.record(z.string().trim().max(500)).optional(),
+  })
+  .refine((value) => value.isEnabled !== undefined || (value.credentials && Object.keys(value.credentials).length > 0), {
+    message: 'Turn the service on or off, or save at least one field.',
+  })
 
 export const announcementAudienceSchema = z.object({
   everyone: z.boolean().optional(),
@@ -292,6 +339,8 @@ export type IctSettings = z.infer<typeof ictSettingsSchema>
 export type PublicInstitutionBranding = z.infer<typeof publicInstitutionBrandingSchema>
 export type UpdateIctSettingsRequest = z.infer<typeof updateIctSettingsRequestSchema>
 export type IctIntegration = z.infer<typeof ictIntegrationSchema>
+export type IctIntegrationField = z.infer<typeof ictIntegrationFieldSchema>
+export type UpdateIntegrationRequest = z.infer<typeof updateIntegrationRequestSchema>
 export type AnnouncementAudience = z.infer<typeof announcementAudienceSchema>
 export type IctAnnouncement = z.infer<typeof ictAnnouncementSchema>
 export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>

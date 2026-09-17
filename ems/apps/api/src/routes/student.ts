@@ -1,9 +1,12 @@
 import { Hono } from 'hono'
 import {
+  createDiscussionPostRequestSchema,
   registerCoursesRequestSchema,
   saveOnboardingRequestSchema,
   studentPayRequestSchema,
   submitAssessmentRequestSchema,
+  studyAssistantRequestSchema,
+  saveClassroomWhiteboardRequestSchema,
 } from '@stackedu/shared'
 import { validationFailed } from '../lib/errors'
 import { requireAuth, requireRole, type AuthVariables } from '../middleware/auth'
@@ -11,7 +14,11 @@ import type { RequestVariables } from '../middleware/request-context'
 import {
   getRegistrationState,
   getStudentCourse,
+  getStudentDiscussion,
+  createStudentDiscussionPost,
   getStudentMaterialDownloadUrl,
+  recordStudentMaterialView,
+  getStudentAssessmentDetail,
   getStudentDashboard,
   getStudentFees,
   getStudentOnboarding,
@@ -21,7 +28,6 @@ import {
   getStudentTranscript,
   listStudentAssessments,
   listStudentCourses,
-  listStudentLibrary,
   listStudentNotifications,
   markNotificationRead,
   payStudentFees,
@@ -29,6 +35,16 @@ import {
   saveStudentOnboarding,
   submitStudentAssessment,
 } from '../services/student'
+import {
+  getClassroomRecordingDownloadUrl,
+  getStudentClassroomSession,
+  joinStudentClassroomSession,
+  listStudentClassroomSessions,
+  loadClassroomWhiteboard,
+  saveClassroomWhiteboard,
+} from '../services/live-sessions'
+import { askStudyAssistant } from '../services/study-assistant'
+import { registerLibraryReaderRoutes } from './library-reader'
 
 type Variables = RequestVariables & Partial<AuthVariables>
 
@@ -62,11 +78,38 @@ studentRoutes.get('/student/courses/:offeringId', ...studentOnly, async (c) => {
   })
 })
 
+studentRoutes.get('/student/discussions/:id', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    discussion: await getStudentDiscussion(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+studentRoutes.post('/student/discussions/:id/posts', ...studentOnly, async (c) => {
+  const parsed = createDiscussionPostRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  return c.json({
+    discussion: await createStudentDiscussionPost(
+      user.institution.id,
+      user.id,
+      c.req.param('id'),
+      parsed.data,
+    ),
+  })
+})
+
 studentRoutes.get('/student/materials/:id/download', ...studentOnly, async (c) => {
   const user = c.get('user')!
   return c.json({
     download: await getStudentMaterialDownloadUrl(user.institution.id, user.id, c.req.param('id')),
   })
+})
+
+studentRoutes.post('/student/materials/:id/view', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  await recordStudentMaterialView(user.institution.id, user.id, c.req.param('id'))
+  return c.body(null, 204)
 })
 
 studentRoutes.get('/student/registration', ...studentOnly, async (c) => {
@@ -126,10 +169,7 @@ studentRoutes.post('/student/notifications/:id/read', ...studentOnly, async (c) 
   })
 })
 
-studentRoutes.get('/student/library', ...studentOnly, async (c) => {
-  const user = c.get('user')!
-  return c.json({ resources: await listStudentLibrary(user.institution.id, user.id) })
-})
+registerLibraryReaderRoutes(studentRoutes, '/student', studentOnly)
 
 studentRoutes.get('/student/onboarding', ...studentOnly, async (c) => {
   const user = c.get('user')!
@@ -150,6 +190,13 @@ studentRoutes.get('/student/assessments', ...studentOnly, async (c) => {
   return c.json({ assessments: await listStudentAssessments(user.institution.id, user.id) })
 })
 
+studentRoutes.get('/student/assessments/:id', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    assessment: await getStudentAssessmentDetail(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
 studentRoutes.post('/student/assessments/:id/submit', ...studentOnly, async (c) => {
   const parsed = submitAssessmentRequestSchema.safeParse(await c.req.json().catch(() => ({})))
   if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
@@ -161,5 +208,60 @@ studentRoutes.post('/student/assessments/:id/submit', ...studentOnly, async (c) 
       c.req.param('id'),
       parsed.data,
     ),
+  })
+})
+
+studentRoutes.get('/student/classroom', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({ sessions: await listStudentClassroomSessions(user.institution.id, user.id) })
+})
+
+studentRoutes.get('/student/classroom/:id', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    session: await getStudentClassroomSession(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+studentRoutes.post('/student/classroom/:id/join', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    join: await joinStudentClassroomSession(user.institution.id, user.id, c.req.param('id')),
+  })
+})
+
+studentRoutes.get('/student/classroom/:id/whiteboard', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    scene: await loadClassroomWhiteboard(user.institution.id, user.id, user.role, c.req.param('id')),
+  })
+})
+
+studentRoutes.put('/student/classroom/:id/whiteboard', ...studentOnly, async (c) => {
+  const parsed = saveClassroomWhiteboardRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  await saveClassroomWhiteboard(user.institution.id, user.id, user.role, c.req.param('id'), parsed.data.scene)
+  return c.body(null, 204)
+})
+
+studentRoutes.get('/student/recordings/:id/download', ...studentOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    download: await getClassroomRecordingDownloadUrl(
+      user.institution.id,
+      user.id,
+      user.role,
+      c.req.param('id'),
+    ),
+  })
+})
+
+studentRoutes.post('/student/study-assistant', ...studentOnly, async (c) => {
+  const parsed = studyAssistantRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  const user = c.get('user')!
+  return c.json({
+    answer: await askStudyAssistant(user.institution.id, user.id, user.role, parsed.data),
   })
 })

@@ -13,6 +13,8 @@ export async function writeAudit(input: {
   changes?: Record<string, { from: unknown; to: unknown }>
   metadata?: Record<string, unknown>
   requestId?: string
+  ipAddress?: string | undefined
+  userAgent?: string | undefined
 }): Promise<void> {
   const db = await getInstitutionDb(input.institutionId)
   await db.insert(auditLogs).values({
@@ -25,5 +27,7 @@ export async function writeAudit(input: {
     changes: input.changes ?? null,
     metadata: input.metadata ?? null,
     requestId: input.requestId ?? null,
+    ipAddress: input.ipAddress ?? null,
+    userAgent: input.userAgent ?? null,
   })
 }

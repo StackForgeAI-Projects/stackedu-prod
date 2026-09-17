@@ -25,6 +25,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: ['@excalidraw/excalidraw', 'livekit-client', '@livekit/components-react'],
+  },
   server: {
     // Fixed so the API's CORS allowlist can name the exact dev origin.
     port: 3000,

@@ -104,6 +104,33 @@ const envSchema = z
     EMAIL_REPLY_TO: z.string().email().optional(),
     /** Public web app origin for Track links in emails. */
     WEB_APP_URL: z.string().url().default('https://app.stackedu.rw'),
+
+    /**
+     * Optional vendor keys. ICT can also store a per-institution key.
+     * When neither is set, the in-built generator is used and requests never wait on a vendor.
+     */
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_MODEL: z.string().min(1).default('claude-3-5-haiku-latest'),
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_MODEL: z.string().min(1).default('gemini-2.0-flash'),
+    GROK_API_KEY: z.string().min(1).optional(),
+    XAI_API_KEY: z.string().min(1).optional(),
+    GROK_MODEL: z.string().min(1).default('grok-3-mini'),
+
+    /**
+     * Media server for live classroom video and audio.
+     * Same SDK works with LiveKit Cloud or a self-hosted LiveKit URL.
+     */
+    LIVEKIT_URL: z.string().url().optional(),
+    LIVEKIT_API_KEY: z.string().min(1).optional(),
+    LIVEKIT_API_SECRET: z.string().min(1).optional(),
+
+    /** WebSocket URL for the whiteboard sync server. */
+    HOCUSPOCUS_URL: z.string().min(1).optional(),
+    COLLAB_PORT: z.coerce.number().int().min(1).max(65_535).default(8081),
+    COLLAB_SECRET: z.string().min(16).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'production' && !value.COOKIE_DOMAIN) {

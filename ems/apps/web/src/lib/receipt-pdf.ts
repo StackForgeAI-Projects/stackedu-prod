@@ -1,4 +1,5 @@
 import type { PaymentMethod } from '@stackedu/shared'
+import { brandColorValue, parseHexColor } from '@/lib/brand-theme'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 export interface ReceiptPdfInput {
@@ -36,7 +37,8 @@ export async function downloadReceiptPdf(input: ReceiptPdfInput): Promise<void> 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  doc.setFillColor(15, 189, 59)
+  const brand = parseHexColor(brandColorValue()) ?? { r: 15, g: 189, b: 59 }
+  doc.setFillColor(brand.r, brand.g, brand.b)
   doc.rect(0, 0, pageWidth, 42, 'F')
 
   doc.setTextColor(255, 255, 255)

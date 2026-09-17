@@ -21,8 +21,8 @@ export function PageGuide({ pageKey, title = 'On this page', children }: PageGui
     <div
       className="mb-6 flex gap-3 p-4"
       style={{
-        backgroundColor: 'rgba(15, 189, 59, 0.06)',
-        border: '1px solid rgba(15, 189, 59, 0.18)',
+        backgroundColor: 'rgba(var(--brand-rgb), 0.06)',
+        border: '1px solid rgba(var(--brand-rgb), 0.18)',
         borderRadius: 'var(--radius-xl)',
       }}
     >

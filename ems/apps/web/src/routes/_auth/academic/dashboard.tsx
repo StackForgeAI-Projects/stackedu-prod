@@ -59,7 +59,7 @@ function AcademicDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-              <StatTile icon={Users} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="TOTAL ENROLLED" value={String(data.stats.totalEnrolled)} delta="Current enrolment" deltaColor="var(--success)" animationDelay={0} />
+              <StatTile icon={Users} iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)" label="TOTAL ENROLLED" value={String(data.stats.totalEnrolled)} delta="Current enrolment" deltaColor="var(--success)" animationDelay={0} />
               <StatTile icon={FileText} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="PENDING APPLICATIONS" value={String(data.stats.pendingApplications)} delta="Awaiting review" deltaColor="var(--warning)" animationDelay={60} />
               <StatTile icon={ClipboardList} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="RESULTS PENDING APPROVAL" value={String(data.stats.resultsPendingApproval)} delta="Lecturer submissions" deltaColor="var(--warning)" animationDelay={120} />
               <StatTile icon={AlertTriangle} iconColor="var(--error)" iconBg="var(--error-bg)" label="AT-RISK STUDENTS" value={String(data.stats.atRiskStudents)} delta="Flagged this semester" deltaColor="var(--error)" animationDelay={180} />
@@ -204,7 +204,7 @@ function AiAssistantCard({ shortName }: { shortName: string }) {
       </div>
       <div className="flex flex-col gap-2 mb-3" style={{ maxHeight: 140, overflowY: 'auto' }}>
         {messages.map((msg, i) => (
-          <div key={i} className="text-sm px-3 py-2.5" style={{ backgroundColor: msg.role === 'assistant' ? 'var(--ink-surface)' : 'rgba(15, 189, 59,0.12)', borderRadius: 'var(--radius-md)', color: 'var(--ink-foreground)', lineHeight: 1.5, alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>{msg.text}</div>
+          <div key={i} className="text-sm px-3 py-2.5" style={{ backgroundColor: msg.role === 'assistant' ? 'var(--ink-surface)' : 'rgba(var(--brand-rgb),0.12)', borderRadius: 'var(--radius-md)', color: 'var(--ink-foreground)', lineHeight: 1.5, alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>{msg.text}</div>
         ))}
         {sending && <div className="text-sm px-3 py-2.5" style={{ backgroundColor: 'var(--ink-surface)', borderRadius: 'var(--radius-md)', color: 'var(--ink-muted)' }}>Thinking…</div>}
       </div>

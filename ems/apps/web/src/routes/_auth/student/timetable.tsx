@@ -91,7 +91,7 @@ function TimetablePage() {
                         className="flex-1 text-center py-3"
                         style={{
                           borderRight: index < DAYS.length - 1 ? '1px solid var(--border)' : 'none',
-                          backgroundColor: isToday ? 'rgba(15, 189, 59,0.06)' : 'transparent',
+                          backgroundColor: isToday ? 'rgba(var(--brand-rgb),0.06)' : 'transparent',
                         }}
                       >
                         <p className="t-label" style={{ color: isToday ? 'var(--brand)' : 'var(--muted-foreground)' }}>
@@ -134,7 +134,7 @@ function TimetablePage() {
                             className="flex-1 relative"
                             style={{
                               borderRight: dayIndex < ISO_WEEKDAYS.length - 1 ? '1px solid var(--border)' : 'none',
-                              backgroundColor: isToday ? 'rgba(15, 189, 59,0.03)' : 'transparent',
+                              backgroundColor: isToday ? 'rgba(var(--brand-rgb),0.03)' : 'transparent',
                             }}
                           >
                             {entry && !occupied ? (
@@ -183,7 +183,7 @@ function TimetablePage() {
                       backgroundColor: 'var(--card)',
                       borderRadius: 'var(--radius-xl)',
                       boxShadow: 'var(--shadow-sm)',
-                      border: isToday ? '1px solid rgba(15, 189, 59,0.3)' : '1px solid var(--border)',
+                      border: isToday ? '1px solid rgba(var(--brand-rgb),0.3)' : '1px solid var(--border)',
                       overflow: 'hidden',
                     }}
                   >
@@ -191,7 +191,7 @@ function TimetablePage() {
                       className="px-5 py-3 flex items-center justify-between"
                       style={{
                         borderBottom: '1px solid var(--border)',
-                        backgroundColor: isToday ? 'rgba(15, 189, 59,0.06)' : 'var(--muted)',
+                        backgroundColor: isToday ? 'rgba(var(--brand-rgb),0.06)' : 'var(--muted)',
                       }}
                     >
                       <p className="t-h3" style={{ fontFamily: 'var(--font-display)', color: isToday ? 'var(--brand)' : 'var(--foreground)' }}>

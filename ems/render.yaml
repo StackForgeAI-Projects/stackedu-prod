@@ -60,6 +60,52 @@ services:
         sync: false
       - key: WEB_APP_URL
         value: https://app.stackedu.rw
+      # Set in the Render dashboard (LiveKit Cloud).
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: HOCUSPOCUS_URL
+        sync: false
+      - key: COLLAB_SECRET
+        sync: false
+
+  - type: web
+    name: stackedu-collab
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    rootDir: .
+    buildCommand: bun install --frozen-lockfile && bun run --filter '@stackedu/api' build
+    startCommand: node apps/api/dist/collab.js
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COLLAB_PORT
+        value: 8081
+      - key: LOG_LEVEL
+        value: info
+      - key: PLATFORM_DATABASE_URL
+        sync: false
+      - key: ADMIN_DATABASE_URL
+        sync: false
+      - key: STORAGE_DRIVER
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: COLLAB_SECRET
+        sync: false
 
   # Cache and rate limiting. On Render's private network in the same region, so
   # there is no public internet hop.

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { LecturerShell } from '@/components/LecturerShell'
+import { PagedList } from '@/components/ListPagination'
 import { Button } from '@/components/ui/button'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import {
@@ -90,11 +91,17 @@ function AtRiskPage() {
         {isPending ? <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading…</p> : null}
         {error ? <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load at-risk students.')}</p> : null}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {active.map((s) => {
+        <PagedList
+          items={active}
+          getKey={(s) => s.id}
+          defaultPageSize={5}
+          resetKey={`${courseFilter}:${riskTab}`}
+          itemLabel="alerts"
+          empty={!isPending && !error ? <p className="t-body-sm" style={{ color: 'var(--muted-foreground)' }}>No open alerts for this filter.</p> : null}
+          renderItem={(s) => {
             const style = RISK_STYLE[s.riskLevel] ?? RISK_STYLE.Medium
             return (
-              <div key={s.id} style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px 18px' }}>
+              <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px 18px' }}>
                 <div className="flex items-start gap-3">
                   <div className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: style.bg }}>
                     <AlertTriangle style={{ width: 16, height: 16, color: style.color }} />
@@ -127,8 +134,8 @@ function AtRiskPage() {
                 </div>
               </div>
             )
-          })}
-        </div>
+          }}
+        />
 
         {resolved.length > 0 && (
           <div className="mt-8">

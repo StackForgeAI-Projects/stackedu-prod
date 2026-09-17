@@ -1,22 +1,26 @@
 import { and, eq } from 'drizzle-orm'
 import { academicYears, courses, departments, programmes, semesters } from '../institution/schema/academic'
-import { assessments, resultBatches, results } from '../institution/schema/assessment'
+import { assessments, assessmentItems, questions, questionVersions, resultBatches, results } from '../institution/schema/assessment'
 import { notifications } from '../institution/schema/communication'
 import { invoices, payments, receipts, studentFeeAccounts, feeItems, feeStructures } from '../institution/schema/finance'
 import { libraryResources } from '../institution/schema/library'
 import { users } from '../institution/schema/people'
 import { enrolments, studentProfiles, students } from '../institution/schema/students'
 import {
+  announcements,
   attendanceRecords,
   attendanceSessions,
   courseMaterials,
+  courseModules,
   courseOfferings,
   courseRegistrations,
   lecturerAssignments,
   rooms,
   timetableSlots,
+  liveSessions,
 } from '../institution/schema/teaching'
 import { getInstitutionDb } from '../connection'
+import { env } from '../../config/env'
 import { feeItemsApplyToStudent, invoicePayloadFromFeeItems } from '../../lib/fee-invoice'
 
 const COURSE_CATALOGUE = [
@@ -32,6 +36,9 @@ const COURSE_CATALOGUE = [
  * notifications so the student portal has real rows to read. Idempotent.
  */
 export async function seedStudentPortal(institutionId: string, studentUserId: string): Promise<void> {
+  if (env().NODE_ENV === 'production') {
+    throw new Error('Demo seed data stays local. Refusing to run in production.')
+  }
   const db = await getInstitutionDb(institutionId)
 
   const [student] = await db
@@ -276,6 +283,44 @@ export async function seedStudentPortal(institutionId: string, studentUserId: st
 
   const firstOffering = offeringIds[0]
   if (firstOffering) {
+    await seedCourseModules(db, firstOffering)
+    await seedCourseAnnouncements(db, firstOffering)
+    const [existingLive] = await db
+      .select({ id: liveSessions.id })
+      .from(liveSessions)
+      .where(eq(liveSessions.courseOfferingId, firstOffering))
+      .limit(1)
+    if (!existingLive) {
+      const [created] = await db
+        .insert(liveSessions)
+        .values({
+          courseOfferingId: firstOffering,
+          title: 'Week 3 live class',
+          status: 'Scheduled',
+          roomName: `tmp-${crypto.randomUUID()}`,
+          scheduledAt: new Date().toISOString(),
+        })
+        .returning({ id: liveSessions.id })
+      if (created) {
+        await db
+          .update(liveSessions)
+          .set({ roomName: `session-${created.id}` })
+          .where(eq(liveSessions.id, created.id))
+      }
+    }
+    const [offeringCourse] = await db
+      .select({ courseId: courseOfferings.courseId })
+      .from(courseOfferings)
+      .where(eq(courseOfferings.id, firstOffering))
+      .limit(1)
+    if (offeringCourse) {
+      await seedQuestionBank(db, {
+        courseId: offeringCourse.courseId,
+        offeringId: firstOffering,
+        createdBy: lecturer?.id,
+      })
+    }
+
     const [material] = await db
       .select({ id: courseMaterials.id })
       .from(courseMaterials)
@@ -511,4 +556,268 @@ export async function seedStudentPortal(institutionId: string, studentUserId: st
   }
 
   process.stdout.write('Student portal demo data ready\n')
+}
+
+type InstitutionDb = Awaited<ReturnType<typeof getInstitutionDb>>
+
+/**
+ * Three modules in a chain, so the demo shows a student both an open module
+ * and one still held shut by the module before it.
+ */
+async function seedCourseModules(db: InstitutionDb, offeringId: string): Promise<void> {
+  const [existing] = await db
+    .select({ id: courseModules.id })
+    .from(courseModules)
+    .where(eq(courseModules.courseOfferingId, offeringId))
+    .limit(1)
+  if (existing) return
+
+  const now = new Date().toISOString()
+  const [foundations] = await db
+    .insert(courseModules)
+    .values({
+      courseOfferingId: offeringId,
+      title: 'Module 1: Foundations',
+      summary: 'What computing is, and how this course will run.',
+      sequence: 0,
+      isPublished: true,
+      publishedAt: now,
+    })
+    .returning({ id: courseModules.id })
+
+  const [algorithms] = await db
+    .insert(courseModules)
+    .values({
+      courseOfferingId: offeringId,
+      title: 'Module 2: Thinking in algorithms',
+      summary: 'Breaking a problem into steps a machine can follow.',
+      sequence: 1,
+      prerequisiteModuleId: foundations!.id,
+      isPublished: true,
+      publishedAt: now,
+    })
+    .returning({ id: courseModules.id })
+
+  await db.insert(courseModules).values({
+    courseOfferingId: offeringId,
+    title: 'Module 3: Writing your first program',
+    summary: 'Putting the first two modules into practice.',
+    sequence: 2,
+    prerequisiteModuleId: algorithms!.id,
+    isPublished: true,
+    publishedAt: now,
+  })
+
+  await db.insert(courseMaterials).values([
+    {
+      courseOfferingId: offeringId,
+      moduleId: foundations!.id,
+      title: 'What is computer science?',
+      description: 'A short read before the first lecture.',
+      bodyText:
+        'Computer science is the study of what problems can be solved by following a set of '
+        + 'precise steps, and how quickly. This course starts with those steps, called '
+        + 'algorithms, and only later worries about any particular programming language.',
+      sequence: 0,
+      isPublished: true,
+      publishedAt: now,
+    },
+    {
+      courseOfferingId: offeringId,
+      moduleId: foundations!.id,
+      title: 'How this course is assessed',
+      description: 'Weighting of coursework, practicals and the final paper.',
+      bodyText:
+        'Coursework carries 20 percent, practical work 20 percent, and the final paper 60 '
+        + 'percent. Attendance is recorded every session and is used to spot students who may '
+        + 'need support, not as a mark in itself.',
+      sequence: 1,
+      isPublished: true,
+      publishedAt: now,
+    },
+    {
+      courseOfferingId: offeringId,
+      moduleId: algorithms!.id,
+      title: 'Flowcharts and pseudocode',
+      description: 'Two ways of writing an algorithm down before you code it.',
+      bodyText:
+        'Before writing code, write the steps in plain language. If you cannot describe the '
+        + 'steps to another person, the program will not describe them to a computer either.',
+      sequence: 0,
+      isPublished: true,
+      publishedAt: now,
+    },
+  ])
+}
+
+async function seedCourseAnnouncements(db: InstitutionDb, offeringId: string): Promise<void> {
+  const [existing] = await db
+    .select({ id: announcements.id })
+    .from(announcements)
+    .where(eq(announcements.courseOfferingId, offeringId))
+    .limit(1)
+  if (existing) return
+
+  const now = new Date()
+  const daysAgo = (days: number) =>
+    new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+
+  await db.insert(announcements).values([
+    {
+      courseOfferingId: offeringId,
+      title: 'Read Module 1 before the first lab',
+      body:
+        'Both readings in Module 1 must be opened before Tuesday. Module 2 stays closed until '
+        + 'you have been through them.',
+      audienceRoles: ['Student'],
+      isPinned: true,
+      publishedAt: daysAgo(6),
+    },
+    {
+      courseOfferingId: offeringId,
+      title: 'Lab session moved to Thursday this week',
+      body: 'The Wednesday lab clashes with the faculty assembly, so this week it runs Thursday at 10:00 in Lab 2.',
+      audienceRoles: ['Student'],
+      isPinned: false,
+      publishedAt: daysAgo(2),
+    },
+    {
+      courseOfferingId: offeringId,
+      title: 'Assignment 2 deadline reminder',
+      body: 'Assignment 2 is due at the end of next week. Submit through the course page, not by email.',
+      audienceRoles: ['Student'],
+      isPinned: false,
+      publishedAt: daysAgo(1),
+    },
+  ])
+}
+
+async function seedQuestionBank(
+  db: InstitutionDb,
+  input: { courseId: string; offeringId: string; createdBy?: string },
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: questions.id })
+    .from(questions)
+    .where(eq(questions.courseId, input.courseId))
+    .limit(1)
+  if (existing) return
+
+  const bank = [
+    {
+      type: 'MultipleChoice' as const,
+      stem: 'What is an algorithm?',
+      options: [
+        'A set of precise steps to solve a problem',
+        'A brand of computer',
+        'A type of computer virus',
+        'The name of a programming language',
+      ],
+      correctAnswer: 'A set of precise steps to solve a problem',
+      marks: '2.00',
+    },
+    {
+      type: 'MultipleChoice' as const,
+      stem: 'Which of these is a loop?',
+      options: ['if', 'while', 'return', 'class'],
+      correctAnswer: 'while',
+      marks: '2.00',
+    },
+    {
+      type: 'TrueFalse' as const,
+      stem: 'A program is a sequence of steps a machine can follow.',
+      options: ['True', 'False'],
+      correctAnswer: 'True',
+      marks: '1.00',
+    },
+    {
+      type: 'ShortAnswer' as const,
+      stem: 'Name one programming language used in this course.',
+      options: null as string[] | null,
+      correctAnswer: 'Python',
+      marks: '2.00',
+    },
+    {
+      type: 'MultipleChoice' as const,
+      stem: 'What does a flowchart describe?',
+      options: ['The colour of the screen', 'The order of steps in a process', 'A student timetable', 'A fee invoice'],
+      correctAnswer: 'The order of steps in a process',
+      marks: '2.00',
+    },
+  ]
+
+  const created: Array<{ questionId: string; versionId: string }> = []
+  for (const item of bank) {
+    const [question] = await db
+      .insert(questions)
+      .values({
+        courseId: input.courseId,
+        topic: 'Foundations',
+        type: item.type,
+        currentVersion: 1,
+        createdBy: input.createdBy ?? null,
+      })
+      .returning({ id: questions.id })
+    const [version] = await db
+      .insert(questionVersions)
+      .values({
+        questionId: question!.id,
+        version: 1,
+        stem: item.stem,
+        options: item.options,
+        correctAnswer: item.correctAnswer,
+        marks: item.marks,
+        createdBy: input.createdBy ?? null,
+      })
+      .returning({ id: questionVersions.id })
+    created.push({ questionId: question!.id, versionId: version!.id })
+  }
+
+  const [quiz] = await db
+    .select({ id: assessments.id })
+    .from(assessments)
+    .where(and(eq(assessments.courseOfferingId, input.offeringId), eq(assessments.title, 'Week 3 quiz')))
+    .limit(1)
+  const quizId =
+    quiz?.id
+    ?? (
+      await db
+        .insert(assessments)
+        .values({
+          courseOfferingId: input.offeringId,
+          title: 'Week 3 quiz',
+          description: 'Ten minutes on the first module. Objective items are marked as soon as you submit.',
+          type: 'Quiz',
+          weight: '10.00',
+          totalMarks: '7.00',
+          dueAt: '2026-02-28T17:00:00.000Z',
+          acceptsSubmissions: true,
+          isPublished: true,
+          createdBy: input.createdBy ?? null,
+        })
+        .returning({ id: assessments.id })
+    )[0]!.id
+
+  const [item] = await db
+    .select({ id: assessmentItems.id })
+    .from(assessmentItems)
+    .where(eq(assessmentItems.assessmentId, quizId))
+    .limit(1)
+  if (item) return
+
+  await db.insert(assessmentItems).values([
+    {
+      assessmentId: quizId,
+      sequence: 0,
+      questionId: created[0]!.questionId,
+      questionVersionId: created[0]!.versionId,
+    },
+    {
+      assessmentId: quizId,
+      sequence: 1,
+      drawTopic: 'Foundations',
+      drawCourseId: input.courseId,
+      drawCount: 2,
+    },
+  ])
 }

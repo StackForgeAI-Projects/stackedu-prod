@@ -45,7 +45,7 @@ function IctDashboardPage() {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <StatTile icon={Users} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="PLATFORM USERS" value={String(data.totalUsers)} />
+            <StatTile icon={Users} iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)" label="PLATFORM USERS" value={String(data.totalUsers)} />
             <StatTile icon={Activity} iconColor="var(--success)" iconBg="var(--success-bg)" label="ACTIVE ACCOUNTS" value={String(data.activeUsers)} />
             <StatTile icon={UserPlus} iconColor="var(--info)" iconBg="var(--info-bg)" label="OPEN SESSIONS" value={String(data.activeSessions)} />
             <StatTile icon={UserX} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="ACTIVE REVOCATIONS" value={String(data.pendingRevocations)} />

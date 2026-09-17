@@ -168,6 +168,9 @@
    uses the unprefixed design-system names (e.g. var(--brand)). */
 :root {
   --brand:             #0FBD3B;
+  /* Channels of --brand, so tints can be written as rgba(var(--brand-rgb), a).
+     ICT can repoint --brand and --brand-rgb to re-theme the whole system. */
+  --brand-rgb:         15, 189, 59;
   --brand-ink:         #05131D;
   --ink:               #05131D;
   --background:        #F8FAFC;
@@ -193,7 +196,7 @@
   --input-border:      #E9EEF4;
 
   /* Focus ring — brand green, kept soft */
-  --shadow-focus: 0 0 0 3px rgba(15, 189, 59, 0.18);
+  --shadow-focus: 0 0 0 3px rgba(var(--brand-rgb), 0.18);
 
   /* Motion */
   --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
@@ -678,7 +681,7 @@ h6 {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-xl);
-  background-color: rgba(15, 189, 59, 0.08);
+  background-color: rgba(var(--brand-rgb), 0.08);
 }
 
 .select-card--active .select-card__icon-wrap {
@@ -711,8 +714,8 @@ h6 {
 /* ── App scrollbar (same as the sidebar menu: slim forest-green pill) ── */
 :root {
   --scrollbar-size: 5px;
-  --scrollbar-thumb: rgba(15, 189, 59, 0.45);
-  --scrollbar-thumb-hover: rgba(15, 189, 59, 0.65);
+  --scrollbar-thumb: rgba(var(--brand-rgb), 0.45);
+  --scrollbar-thumb-hover: rgba(var(--brand-rgb), 0.65);
 }
 
 * {

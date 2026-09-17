@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
+import { auditLogs } from '../src/db/institution/schema/settings'
 import { users } from '../src/db/institution/schema/people'
 import { AppError } from '../src/lib/errors'
 import { hashPassword, verifyPassword } from '../src/lib/password'
@@ -168,6 +169,88 @@ describe('authentication', () => {
 
     await logout(result.cookieValue)
     expect(await resolveSession(result.cookieValue)).toBeNull()
+  })
+
+  /**
+   * Who was signed in, and when they stopped being signed in, is exactly the
+   * kind of thing an institution asks the audit log after an incident.
+   */
+  describe('the audit trail', () => {
+    async function actionsFor(userId: string): Promise<string[]> {
+      const db = await getInstitutionDb(alphaId)
+      const rows = await db
+        .select({ action: auditLogs.action, createdAt: auditLogs.createdAt })
+        .from(auditLogs)
+        .where(eq(auditLogs.actorId, userId))
+        .orderBy(desc(auditLogs.createdAt))
+      return rows.map((row) => row.action)
+    }
+
+    it('records a sign-in, with how the password was proved', async () => {
+      const result = await login({ identifier: 'alpha.student@alpha.test', password })
+      if (result.status !== 'session') throw new Error('Expected a session.')
+
+      const db = await getInstitutionDb(alphaId)
+      const [entry] = await db
+        .select({ action: auditLogs.action, metadata: auditLogs.metadata, role: auditLogs.actorRole })
+        .from(auditLogs)
+        .where(eq(auditLogs.actorId, result.user.id))
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(1)
+
+      expect(entry?.action).toBe('session.login')
+      expect(entry?.metadata).toMatchObject({ method: 'password' })
+      expect(entry?.role).toBe('Student')
+    })
+
+    it('records a deliberate sign-out separately from an idle one', async () => {
+      const manual = await login({ identifier: 'alpha.student@alpha.test', password })
+      if (manual.status !== 'session') throw new Error('Expected a session.')
+      await logout(manual.cookieValue)
+      expect(await actionsFor(manual.user.id)).toContain('session.logout')
+
+      const idle = await login({ identifier: 'alpha.student@alpha.test', password })
+      if (idle.status !== 'session') throw new Error('Expected a session.')
+      await logout(idle.cookieValue, { reason: 'inactivity' })
+      expect(await actionsFor(idle.user.id)).toContain('session.logout.inactivity')
+    })
+
+    /**
+     * Several tabs sign out at the same moment when the idle timer fires, and
+     * the log should say the session ended once.
+     */
+    it('records a session ending once, however many times sign-out is called', async () => {
+      const db = await getInstitutionDb(alphaId)
+      const result = await login({ identifier: 'alpha.student@alpha.test', password })
+      if (result.status !== 'session') throw new Error('Expected a session.')
+
+      const countLogouts = async () => {
+        const rows = await db
+          .select({ action: auditLogs.action })
+          .from(auditLogs)
+          .where(eq(auditLogs.actorId, result.user.id))
+        return rows.filter((row) => row.action === 'session.logout').length
+      }
+
+      const before = await countLogouts()
+      await Promise.all([
+        logout(result.cookieValue),
+        logout(result.cookieValue),
+        logout(result.cookieValue),
+      ])
+
+      expect(await countLogouts()).toBe(before + 1)
+    })
+
+    it('records nothing for a cookie that was never a session', async () => {
+      const db = await getInstitutionDb(alphaId)
+      const before = await db.select({ action: auditLogs.action }).from(auditLogs)
+
+      await logout(`${alphaId}.not-a-real-token`)
+
+      const after = await db.select({ action: auditLogs.action }).from(auditLogs)
+      expect(after).toHaveLength(before.length)
+    })
   })
 
   it('will not register the same email address twice', async () => {

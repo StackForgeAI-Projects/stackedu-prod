@@ -1,5 +1,6 @@
 import { env } from '../config/env'
 import { createLogger } from './logger'
+import { resolveCredential } from './integration-credentials'
 import { isIntegrationEnabled } from './integrations'
 
 const log = createLogger('info', { service: 'stackedu-api', component: 'sms' })
@@ -10,21 +11,22 @@ export async function sendSmsMessage(
   to: string,
   body: string,
 ): Promise<boolean> {
-  const settings = env()
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } = settings
+  const accountSid = await resolveCredential(institutionId, 'Twilio', 'accountSid')
+  const authToken = await resolveCredential(institutionId, 'Twilio', 'authToken')
+  const fromNumber = await resolveCredential(institutionId, 'Twilio', 'fromNumber')
 
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
+  if (!accountSid || !authToken || !fromNumber) {
     return false
   }
 
-  if (settings.PAYMENT_MODE !== 'sandbox' && !(await isIntegrationEnabled(institutionId, 'Twilio'))) {
+  if (env().PAYMENT_MODE !== 'sandbox' && !(await isIntegrationEnabled(institutionId, 'Twilio'))) {
     return false
   }
 
   try {
-    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
       {
         method: 'POST',
         headers: {
@@ -33,7 +35,7 @@ export async function sendSmsMessage(
         },
         body: new URLSearchParams({
           To: to,
-          From: TWILIO_FROM_NUMBER,
+          From: fromNumber,
           Body: body,
         }),
       },

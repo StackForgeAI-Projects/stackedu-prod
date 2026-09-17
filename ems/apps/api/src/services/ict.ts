@@ -24,22 +24,30 @@ import type {
   IctUserRow,
   UpdateIctSettingsRequest,
   UpdateIctUserRequest,
+  UpdateIntegrationRequest,
   UserRole,
 } from '@stackedu/shared'
 import {
   ATTENDANCE_POLICY_SETTING_KEY,
   attendancePolicySchema,
+  auditActionLabel,
   auditSummary,
   DEFAULT_ATTENDANCE_POLICY,
   DEFAULT_PAYMENT_POLICY,
+  INTEGRATION_CATALOG,
+  integrationCatalogItem,
+  isIntegrationCatalogProvider,
   paymentPolicySchema,
   titleAndFirstName,
 } from '@stackedu/shared'
-import { env } from '../config/env'
+import { publicLogoUrl } from '../lib/branding'
+import { readPublicAiSettings, writeAiRuntime } from '../lib/ai-complete'
+import { publicIntegrationFields, saveIntegrationCredentials } from '../lib/integration-credentials'
+import { probeIntegration } from '../lib/integration-probe'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { readInstitutionSetting, upsertInstitutionSetting } from '../lib/institution-settings'
 import { readPaymentPolicy, writePaymentPolicy } from '../lib/payment-policy-store'
-import { writeInstitutionLogo } from '../lib/storage'
+import { deleteStoredObject, writeInstitutionLogo } from '../lib/storage'
 import { institutions, userDirectory } from '../db/platform/schema'
 import { programmes } from '../db/institution/schema/academic'
 import { announcements } from '../db/institution/schema/teaching'
@@ -68,14 +76,11 @@ import {
   resolveAudienceUserIds,
 } from './announcement-audience'
 
-const DEFAULT_INTEGRATIONS = [
-  { provider: 'MTNMoMo', displayName: 'MTN MoMo (PawaPay)' },
-  { provider: 'AirtelMoney', displayName: 'Airtel Money (PawaPay)' },
-  { provider: 'PawaPay', displayName: 'PawaPay' },
-  { provider: 'Flutterwave', displayName: 'Flutterwave (Card)' },
-  { provider: 'Twilio', displayName: 'Twilio SMS' },
-  { provider: 'Resend', displayName: 'Resend Email' },
-] as const
+const DEFAULT_INTEGRATIONS = INTEGRATION_CATALOG.map((item) => ({
+  provider: item.provider,
+  displayName: item.displayName,
+  isEnabled: item.provider === 'LiveKit' || item.provider === 'AI',
+}))
 
 function temporaryPassword(): string {
   return `Tmp#${randomBytes(4).toString('hex')}`
@@ -90,9 +95,10 @@ function withAuditSummary<T extends {
   createdAt?: string
   changes?: Record<string, { from?: unknown; to?: unknown }> | null
   metadata?: Record<string, unknown> | null
-}>(row: T): T & { summary: string } {
+}>(row: T): T & { actionLabel: string; summary: string } {
   return {
     ...row,
+    actionLabel: auditActionLabel(row.action),
     summary: auditSummary(row),
   }
 }
@@ -268,41 +274,6 @@ export async function getIctAnalytics(institutionId: string): Promise<IctAnalyti
   }
 }
 
-function integrationHealthMessage(provider: string, isEnabled: boolean): string {
-  if (!isEnabled) return 'Service is turned off'
-  const settings = env()
-  if (provider === 'Resend') {
-    return settings.RESEND_API_KEY && settings.EMAIL_FROM
-      ? 'Email service is configured on the server'
-      : 'Email API key or sender address is missing on the server'
-  }
-  if (provider === 'PawaPay') {
-    return settings.PAWAPAY_API_TOKEN
-      ? settings.PAYMENT_MODE === 'sandbox'
-        ? 'PawaPay token set — sandbox still completes payments instantly'
-        : 'PawaPay is configured for live mobile money'
-      : 'Add PAWAPAY_API_TOKEN on the server'
-  }
-  if (provider === 'Flutterwave') {
-    return settings.FLUTTERWAVE_SECRET_KEY
-      ? settings.PAYMENT_MODE === 'sandbox'
-        ? 'Flutterwave keys set — sandbox still completes card payments instantly'
-        : 'Flutterwave is configured for live card payments'
-      : 'Add FLUTTERWAVE_SECRET_KEY on the server'
-  }
-  if (provider === 'Twilio') {
-    return settings.TWILIO_ACCOUNT_SID && settings.TWILIO_AUTH_TOKEN && settings.TWILIO_FROM_NUMBER
-      ? 'Twilio SMS is configured on the server'
-      : 'Twilio credentials are missing on the server'
-  }
-  if (provider === 'MTNMoMo' || provider === 'AirtelMoney') {
-    return settings.PAYMENT_MODE === 'sandbox'
-      ? 'Sandbox mode — payments complete instantly for testing'
-      : 'Live mode — enable PawaPay and set credentials on the server'
-  }
-  return 'Configuration looks ready'
-}
-
 export async function checkIctIntegration(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },
@@ -322,7 +293,8 @@ export async function checkIctIntegration(
     .limit(1)
   if (!existing) throw notFound('That integration')
 
-  const lastStatus = integrationHealthMessage(existing.provider, existing.isEnabled)
+  const probe = await probeIntegration(institutionId, existing.provider, existing.isEnabled)
+  const lastStatus = probe.message
   const lastCheckedAt = new Date().toISOString()
   const [updated] = await db
     .update(integrations)
@@ -348,7 +320,8 @@ export async function checkIctIntegration(
     metadata: { integrationName: existing.displayName, provider: existing.provider, lastStatus },
   })
 
-  return updated!
+  const mapped = await toPublicIntegration(institutionId, updated!)
+  return { ...mapped, checkOk: probe.ok }
 }
 
 export async function listIctUsers(institutionId: string): Promise<IctUserRow[]> {
@@ -804,7 +777,7 @@ async function enrichAuditRow<T extends {
   createdAt?: string
   changes?: Record<string, { from?: unknown; to?: unknown }> | null
   metadata?: Record<string, unknown> | null
-}>(institutionId: string, row: T): Promise<T & { summary: string }> {
+}>(institutionId: string, row: T): Promise<T & { actionLabel: string; summary: string }> {
   const db = await getInstitutionDb(institutionId)
   const metadata = { ...(row.metadata ?? {}) }
 
@@ -892,6 +865,7 @@ export async function getIctAuditEntry(institutionId: string, id: string): Promi
     actorEmail: enriched.actorEmail,
     actorRole: enriched.actorRole,
     action: enriched.action,
+    actionLabel: enriched.actionLabel,
     summary: enriched.summary,
     targetType: enriched.targetType,
     targetId: enriched.targetId,
@@ -915,6 +889,8 @@ export async function getIctSettings(institutionId: string): Promise<IctSettings
       website: institutions.website,
       location: institutions.location,
       logoFileKey: institutions.logoFileKey,
+      brandColor: institutions.brandColor,
+      updatedAt: institutions.updatedAt,
     })
     .from(institutions)
     .where(eq(institutions.id, institutionId))
@@ -929,12 +905,8 @@ export async function getIctSettings(institutionId: string): Promise<IctSettings
     DEFAULT_ATTENDANCE_POLICY,
   )
   const paymentPolicy = await readPaymentPolicy(db)
-  return mapIctSettings(row, attendancePolicy, paymentPolicy)
-}
-
-function publicLogoUrl(slug: string, logoFileKey: string | null): string | null {
-  if (!logoFileKey) return null
-  return `${env().API_PUBLIC_URL.replace(/\/$/, '')}/public/institution/${slug}/logo`
+  const ai = await readPublicAiSettings(institutionId)
+  return mapIctSettings(row, attendancePolicy, paymentPolicy, ai)
 }
 
 function mapIctSettings(
@@ -948,9 +920,16 @@ function mapIctSettings(
     website: string | null
     location: string | null
     logoFileKey: string | null
+    brandColor: string | null
+    updatedAt: string
   },
   attendancePolicy = DEFAULT_ATTENDANCE_POLICY,
   paymentPolicy = DEFAULT_PAYMENT_POLICY,
+  ai: IctSettings['ai'] = {
+    provider: 'builtin',
+    model: null,
+    providers: [],
+  },
 ): IctSettings {
   return {
     name: row.name,
@@ -961,9 +940,11 @@ function mapIctSettings(
     slug: row.slug,
     website: row.website,
     location: row.location,
-    logoUrl: publicLogoUrl(row.slug, row.logoFileKey),
+    logoUrl: publicLogoUrl(row),
+    brandColor: row.brandColor,
     attendancePolicy,
     paymentPolicy,
+    ai,
   }
 }
 
@@ -986,18 +967,24 @@ export async function updateIctSettings(
 ): Promise<IctSettings> {
   const current = await getIctSettings(institutionId)
   const website = normaliseWebsite(input.website)
-  await getPlatformDb()
-    .update(institutions)
-    .set({
-      ...(input.name ? { name: input.name } : {}),
-      ...(input.shortName ? { shortName: input.shortName } : {}),
-      ...(input.contactEmail ? { contactEmail: input.contactEmail } : {}),
-      ...(input.timezone ? { timezone: input.timezone } : {}),
-      ...(input.locale ? { locale: input.locale } : {}),
-      ...(website !== undefined ? { website } : {}),
-      ...(input.location !== undefined ? { location: input.location?.trim() || null } : {}),
-    })
-    .where(eq(institutions.id, institutionId))
+  const platformPatch = {
+    ...(input.name ? { name: input.name } : {}),
+    ...(input.shortName ? { shortName: input.shortName } : {}),
+    ...(input.contactEmail ? { contactEmail: input.contactEmail } : {}),
+    ...(input.timezone ? { timezone: input.timezone } : {}),
+    ...(input.locale ? { locale: input.locale } : {}),
+    ...(website !== undefined ? { website } : {}),
+    ...(input.location !== undefined ? { location: input.location?.trim() || null } : {}),
+    ...(input.brandColor !== undefined
+      ? { brandColor: input.brandColor ? input.brandColor.toUpperCase() : null }
+      : {}),
+  }
+  if (Object.keys(platformPatch).length > 0) {
+    await getPlatformDb()
+      .update(institutions)
+      .set(platformPatch)
+      .where(eq(institutions.id, institutionId))
+  }
 
   if (input.attendancePolicy) {
     const db = await getInstitutionDb(institutionId)
@@ -1026,6 +1013,14 @@ export async function updateIctSettings(
     await writePaymentPolicy(db, nextPolicy, actor.id)
   }
 
+  if (input.aiProvider !== undefined || input.aiModel !== undefined || input.aiApiKey) {
+    await writeAiRuntime(institutionId, actor.id, {
+      provider: input.aiProvider,
+      model: input.aiModel,
+      apiKey: input.aiApiKey,
+    })
+  }
+
   await writeAudit({
     institutionId,
     actorId: actor.id,
@@ -1036,6 +1031,12 @@ export async function updateIctSettings(
     targetId: institutionId,
     changes: {
       ...(input.name && input.name !== current.name ? { name: { from: current.name, to: input.name } } : {}),
+      ...(input.brandColor !== undefined && (input.brandColor ?? null) !== current.brandColor
+        ? { brandColor: { from: current.brandColor, to: input.brandColor ?? null } }
+        : {}),
+      ...(input.aiProvider && input.aiProvider !== current.ai.provider
+        ? { aiProvider: { from: current.ai.provider, to: input.aiProvider } }
+        : {}),
     },
   })
 
@@ -1047,6 +1048,12 @@ export async function uploadInstitutionLogo(
   actor: { id: string; email: string; role: UserRole },
   input: { body: Buffer; mimeType: string },
 ): Promise<IctSettings> {
+  const [existing] = await getPlatformDb()
+    .select({ logoFileKey: institutions.logoFileKey })
+    .from(institutions)
+    .where(eq(institutions.id, institutionId))
+    .limit(1)
+
   const logoFileKey = await writeInstitutionLogo({
     institutionId,
     body: input.body,
@@ -1057,6 +1064,12 @@ export async function uploadInstitutionLogo(
     .update(institutions)
     .set({ logoFileKey })
     .where(eq(institutions.id, institutionId))
+
+  // A logo saved in a different format lands under a different key, so the
+  // previous file would otherwise be left behind for good.
+  if (existing?.logoFileKey && existing.logoFileKey !== logoFileKey) {
+    await deleteStoredObject(existing.logoFileKey).catch(() => undefined)
+  }
 
   await writeAudit({
     institutionId,
@@ -1073,18 +1086,53 @@ export async function uploadInstitutionLogo(
 
 async function ensureIntegrations(institutionId: string) {
   const db = await getInstitutionDb(institutionId)
-  const existing = await db.select({ provider: integrations.provider }).from(integrations)
-  const have = new Set(existing.map((row) => row.provider))
+  const existing = await db
+    .select({ id: integrations.id, provider: integrations.provider, displayName: integrations.displayName })
+    .from(integrations)
+  const have = new Map(existing.map((row) => [row.provider, row]))
   const missing = DEFAULT_INTEGRATIONS.filter((item) => !have.has(item.provider))
   if (missing.length) {
-    await db.insert(integrations).values(missing.map((item) => ({ ...item, isEnabled: false })))
+    await db.insert(integrations).values(missing)
+  }
+  for (const item of DEFAULT_INTEGRATIONS) {
+    const row = have.get(item.provider)
+    if (row && row.displayName !== item.displayName) {
+      await db.update(integrations).set({ displayName: item.displayName }).where(eq(integrations.id, row.id))
+    }
+  }
+}
+
+async function toPublicIntegration(
+  institutionId: string,
+  row: {
+    id: string
+    provider: string
+    displayName: string
+    isEnabled: boolean
+    lastStatus: string | null
+    lastCheckedAt: string | null
+  },
+): Promise<IctIntegration> {
+  const catalog = integrationCatalogItem(row.provider)
+  return {
+    id: row.id,
+    provider: row.provider,
+    displayName: catalog?.displayName ?? row.displayName,
+    category: catalog?.category ?? 'payments',
+    description: catalog?.description ?? 'Connected service.',
+    docsUrl: catalog?.docsUrl ?? null,
+    setupSteps: catalog?.setupSteps ?? [],
+    isEnabled: row.isEnabled,
+    lastStatus: row.lastStatus,
+    lastCheckedAt: row.lastCheckedAt,
+    fields: await publicIntegrationFields(institutionId, row.provider),
   }
 }
 
 export async function listIctIntegrations(institutionId: string): Promise<IctIntegration[]> {
   await ensureIntegrations(institutionId)
   const db = await getInstitutionDb(institutionId)
-  return db
+  const rows = await db
     .select({
       id: integrations.id,
       provider: integrations.provider,
@@ -1094,19 +1142,57 @@ export async function listIctIntegrations(institutionId: string): Promise<IctInt
       lastCheckedAt: integrations.lastCheckedAt,
     })
     .from(integrations)
-    .orderBy(integrations.displayName)
+
+  const catalogOrder = new Map(INTEGRATION_CATALOG.map((item, index) => [item.provider, index]))
+  rows.sort((a, b) => (catalogOrder.get(a.provider) ?? 99) - (catalogOrder.get(b.provider) ?? 99))
+  return Promise.all(rows.map((row) => toPublicIntegration(institutionId, row)))
 }
 
 export async function updateIctIntegration(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },
   integrationId: string,
-  isEnabled: boolean,
+  input: UpdateIntegrationRequest,
 ): Promise<IctIntegration> {
   const db = await getInstitutionDb(institutionId)
+  const [existing] = await db
+    .select({
+      id: integrations.id,
+      provider: integrations.provider,
+      displayName: integrations.displayName,
+      isEnabled: integrations.isEnabled,
+      lastStatus: integrations.lastStatus,
+      lastCheckedAt: integrations.lastCheckedAt,
+    })
+    .from(integrations)
+    .where(eq(integrations.id, integrationId))
+    .limit(1)
+  if (!existing) throw notFound('That integration')
+
+  if (input.credentials && Object.keys(input.credentials).length > 0) {
+    if (!isIntegrationCatalogProvider(existing.provider)) {
+      throw badRequest('That integration cannot store credentials.')
+    }
+    await saveIntegrationCredentials(institutionId, actor.id, existing.provider, input.credentials)
+  }
+
+  const isEnabled = input.isEnabled ?? existing.isEnabled
+  const lastStatus =
+    input.isEnabled === undefined
+      ? existing.lastStatus
+      : input.isEnabled
+        ? 'Enabled'
+        : 'Disabled'
+  const lastCheckedAt = input.isEnabled === undefined ? existing.lastCheckedAt : new Date().toISOString()
+
   const [updated] = await db
     .update(integrations)
-    .set({ isEnabled, lastCheckedAt: new Date().toISOString(), lastStatus: isEnabled ? 'Enabled' : 'Disabled' })
+    .set({
+      isEnabled,
+      lastStatus,
+      lastCheckedAt,
+      displayName: integrationCatalogItem(existing.provider)?.displayName ?? existing.displayName,
+    })
     .where(eq(integrations.id, integrationId))
     .returning({
       id: integrations.id,
@@ -1127,10 +1213,17 @@ export async function updateIctIntegration(
     targetType: 'integration',
     targetId: integrationId,
     metadata: { integrationName: updated.displayName, provider: updated.provider },
-    changes: { isEnabled: { from: !isEnabled, to: isEnabled } },
+    changes: {
+      ...(input.isEnabled !== undefined && input.isEnabled !== existing.isEnabled
+        ? { isEnabled: { from: existing.isEnabled, to: input.isEnabled } }
+        : {}),
+      ...(input.credentials && Object.keys(input.credentials).length > 0
+        ? { credentials: { from: 'hidden', to: 'updated' } }
+        : {}),
+    },
   })
 
-  return updated
+  return toPublicIntegration(institutionId, updated)
 }
 
 export async function listIctAnnouncements(institutionId: string): Promise<IctAnnouncement[]> {

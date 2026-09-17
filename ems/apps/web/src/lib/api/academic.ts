@@ -21,6 +21,7 @@ import type {
   ChangeAcademicStudentStatusRequest,
   BulkCreateAcademicCoursesRequest,
   RejectResultBatchRequest,
+  StudentEngagementRow,
   UpdateAcademicCalendarEventRequest,
   UpdateAcademicCourseRequest,
   UpdateAcademicProgrammeRequest,
@@ -31,6 +32,7 @@ export const academicProfileQueryKey = ['academic', 'me'] as const
 export const academicDashboardQueryKey = ['academic', 'dashboard'] as const
 export const academicStudentsQueryKey = ['academic', 'students'] as const
 export const academicStudentQueryKey = (id: string) => ['academic', 'student', id] as const
+export const academicStudentEngagementQueryKey = (id: string) => ['academic', 'student-engagement', id] as const
 export const academicCoursesQueryKey = ['academic', 'courses'] as const
 export const academicProgrammesQueryKey = ['academic', 'programmes'] as const
 export const academicProgrammeQueryKey = (id: string) => ['academic', 'programme', id] as const
@@ -63,6 +65,13 @@ export async function listAcademicStudents(): Promise<AcademicStudentRow[]> {
 export async function getAcademicStudent(id: string): Promise<AcademicStudentDetail> {
   const { student } = await api.get<{ student: AcademicStudentDetail }>(`/academic/students/${id}`)
   return student
+}
+
+export async function getAcademicStudentEngagement(id: string): Promise<StudentEngagementRow[]> {
+  const { engagement } = await api.get<{ engagement: StudentEngagementRow[] }>(
+    `/academic/students/${id}/engagement`,
+  )
+  return engagement
 }
 
 export async function changeAcademicStudentStatus(

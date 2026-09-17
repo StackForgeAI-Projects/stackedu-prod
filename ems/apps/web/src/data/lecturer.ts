@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  LayoutDashboard, BookOpen, CalendarDays, ClipboardList, BarChart2, FileText, TrendingUp, Bell,
+  LayoutDashboard, BookOpen, Layers, Video, Library, CalendarDays, ClipboardList, BarChart2, FileText, ListChecks, TrendingUp, Bell,
 } from 'lucide-react'
 
 export const LECTURER = {
@@ -18,12 +18,16 @@ export const LECTURER = {
 // ── Navigation ────────────────────────────────────────────────────────────────
 
 export const LECTURER_NAV = [
-  { label: 'Dashboard',     to: '/lecturer/dashboard',     icon: LayoutDashboard },
-  { label: 'My Courses',    to: '/lecturer/courses',       icon: BookOpen        },
-  { label: 'Timetable',     to: '/lecturer/timetable',     icon: CalendarDays    },
+  { label: 'Dashboard',     to: '/lecturer/dashboard',           icon: LayoutDashboard },
+  { label: 'My Courses',    to: '/lecturer/courses',             icon: BookOpen        },
+  { label: 'Course Management', to: '/lecturer/course-management', icon: Layers       },
+  { label: 'Classroom',     to: '/lecturer/classroom',           icon: Video          },
+  { label: 'E-Library',     to: '/lecturer/library',             icon: Library        },
+  { label: 'Timetable',     to: '/lecturer/timetable',           icon: CalendarDays    },
   { label: 'Attendance',    to: '/lecturer/attendance',    icon: ClipboardList   },
   { label: 'Results',       to: '/lecturer/results',       icon: BarChart2       },
   { label: 'Assignments',   to: '/lecturer/assignments',   icon: FileText        },
+  { label: 'Assessment Builder', to: '/lecturer/assessment-builder', icon: ListChecks },
   { label: 'Analytics',     to: '/lecturer/analytics',     icon: TrendingUp      },
   { label: 'Notifications', to: '/lecturer/notifications', icon: Bell            },
 ]

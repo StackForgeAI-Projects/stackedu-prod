@@ -404,7 +404,7 @@ function FeeStructurePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <StatTile icon={BookOpen} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TUITION" value={formatCurrency(totalTuition)} delta="Tuition category only" deltaColor="var(--muted-foreground)" animationDelay={0} />
                 <StatTile icon={BookOpen} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="OTHER FEES" value={formatCurrency(totalOtherFees)} delta="All non-tuition fees" deltaColor="var(--muted-foreground)" animationDelay={60} />
-                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={`${filterSummary}${selectedAcademicYear ? ` · ${selectedAcademicYear.name}` : ''}`} deltaColor="var(--muted-foreground)" animationDelay={120} />
+                <StatTile icon={BookOpen} iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)" label="GRAND TOTAL PER STUDENT" value={formatCurrency(grandTotal)} delta={`${filterSummary}${selectedAcademicYear ? ` · ${selectedAcademicYear.name}` : ''}`} deltaColor="var(--muted-foreground)" animationDelay={120} />
               </div>
 
               {Object.keys(grouped).length === 0 ? (

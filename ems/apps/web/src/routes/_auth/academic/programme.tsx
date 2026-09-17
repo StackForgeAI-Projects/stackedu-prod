@@ -22,7 +22,7 @@ function courseCodeColor(code: string) {
   switch (prefix) {
     case 'CSC': return { bg: 'var(--info-bg)', color: 'var(--info)' }
     case 'MTH': return { bg: 'var(--warning-bg)', color: 'var(--warning)' }
-    case 'ENG': return { bg: 'rgba(15, 189, 59,0.10)', color: '#16A34A' }
+    case 'ENG': return { bg: 'rgba(var(--brand-rgb),0.10)', color: '#16A34A' }
     case 'BUS': return { bg: 'var(--error-bg)', color: 'var(--error)' }
     case 'ITN': return { bg: 'rgba(124,58,237,0.10)', color: '#7C3AED' }
     default: return { bg: 'var(--muted)', color: 'var(--muted-foreground)' }

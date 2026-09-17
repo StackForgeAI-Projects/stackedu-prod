@@ -11,8 +11,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { primaryKeyColumn, timestamps } from '../../columns'
-import { semesters } from './academic'
-import { assessmentTypeEnum, gradeEnum, resultBatchStatusEnum, submissionStatusEnum } from './enums'
+import { courses, semesters } from './academic'
+import { assessmentTypeEnum, gradeEnum, questionTypeEnum, resultBatchStatusEnum, submissionStatusEnum } from './enums'
 import { users } from './people'
 import { students } from './students'
 import { courseOfferings } from './teaching'
@@ -237,4 +237,108 @@ export const gpaSnapshots = pgTable(
     createdAt: timestamps().createdAt,
   },
   (t) => [uniqueIndex('gpa_snapshots_key').on(t.studentId, t.semesterId)],
+)
+
+/**
+ * Institution-owned question bank. Tagged by catalogue course and topic so a
+ * quiz can draw a random subset without copying questions into the quiz row.
+ * Versions exist because an edit after a student has answered must not rewrite
+ * the paper they sat.
+ */
+export const questions = pgTable(
+  'questions',
+  {
+    id: primaryKeyColumn(),
+    courseId: uuid('course_id').references(() => courses.id, { onDelete: 'set null' }),
+    topic: text('topic').notNull().default(''),
+    type: questionTypeEnum('type').notNull(),
+    currentVersion: integer('current_version').notNull().default(1),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('questions_course_idx').on(t.courseId, t.topic),
+    index('questions_topic_idx').on(t.topic),
+  ],
+)
+
+export const questionVersions = pgTable(
+  'question_versions',
+  {
+    id: primaryKeyColumn(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    stem: text('stem').notNull(),
+    options: jsonb('options').$type<string[]>(),
+    correctAnswer: text('correct_answer').notNull(),
+    marks: numeric('marks', { precision: 6, scale: 2 }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamps().createdAt,
+  },
+  (t) => [
+    uniqueIndex('question_versions_key').on(t.questionId, t.version),
+    index('question_versions_question_idx').on(t.questionId),
+  ],
+)
+
+export const assessmentItems = pgTable(
+  'assessment_items',
+  {
+    id: primaryKeyColumn(),
+    assessmentId: uuid('assessment_id')
+      .notNull()
+      .references(() => assessments.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull().default(0),
+    questionId: uuid('question_id').references(() => questions.id, { onDelete: 'restrict' }),
+    questionVersionId: uuid('question_version_id').references(() => questionVersions.id, {
+      onDelete: 'restrict',
+    }),
+    drawTopic: text('draw_topic'),
+    drawCourseId: uuid('draw_course_id').references(() => courses.id, { onDelete: 'set null' }),
+    drawCount: integer('draw_count'),
+    ...timestamps(),
+  },
+  (t) => [index('assessment_items_assessment_idx').on(t.assessmentId, t.sequence)],
+)
+
+export const submissionQuestionPicks = pgTable(
+  'submission_question_picks',
+  {
+    id: primaryKeyColumn(),
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => submissions.id, { onDelete: 'cascade' }),
+    questionVersionId: uuid('question_version_id')
+      .notNull()
+      .references(() => questionVersions.id, { onDelete: 'restrict' }),
+    sequence: integer('sequence').notNull().default(0),
+    createdAt: timestamps().createdAt,
+  },
+  (t) => [
+    uniqueIndex('submission_question_picks_key').on(t.submissionId, t.questionVersionId),
+    index('submission_question_picks_submission_idx').on(t.submissionId),
+  ],
+)
+
+export const submissionAnswers = pgTable(
+  'submission_answers',
+  {
+    id: primaryKeyColumn(),
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => submissions.id, { onDelete: 'cascade' }),
+    questionVersionId: uuid('question_version_id')
+      .notNull()
+      .references(() => questionVersions.id, { onDelete: 'restrict' }),
+    response: text('response').notNull(),
+    isCorrect: boolean('is_correct'),
+    score: numeric('score', { precision: 6, scale: 2 }),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('submission_answers_key').on(t.submissionId, t.questionVersionId),
+    index('submission_answers_submission_idx').on(t.submissionId),
+  ],
 )

@@ -56,6 +56,7 @@ describe('schema contracts', () => {
     expect(await enumValues('user_role')).toEqual([...userRoleSchema.options])
     expect(await enumValues('payment_status')).toEqual([...paymentStatusSchema.options])
     expect(await enumValues('grade')).toEqual([...gradeSchema.options])
+    expect(await enumValues('question_type')).toEqual(['MultipleChoice', 'TrueFalse', 'ShortAnswer'])
   })
 
   it('rejects a role the shared enum does not define', async () => {

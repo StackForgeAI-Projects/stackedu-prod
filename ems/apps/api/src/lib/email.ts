@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { env } from '../config/env'
+import { resolveCredential } from './integration-credentials'
 import { isIntegrationEnabled } from './integrations'
 import { createLogger } from './logger'
 
@@ -30,8 +31,12 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
     return false
   }
 
-  if (!config.RESEND_API_KEY || !config.EMAIL_FROM) {
-    log.debug('Email skipped — RESEND_API_KEY or EMAIL_FROM not set', {
+  const apiKey = await resolveCredential(input.institutionId, 'Resend', 'apiKey')
+  const from = await resolveCredential(input.institutionId, 'Resend', 'from')
+  const replyTo = await resolveCredential(input.institutionId, 'Resend', 'replyTo')
+
+  if (!apiKey || !from) {
+    log.debug('Email skipped — Resend API key or sender address is not set', {
       to: input.to,
       subject: input.subject,
     })
@@ -39,11 +44,11 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   }
 
   try {
-    const resend = new Resend(config.RESEND_API_KEY)
+    const resend = new Resend(apiKey)
     const { error } = await resend.emails.send({
-      from: config.EMAIL_FROM,
+      from,
       to: [input.to],
-      ...(config.EMAIL_REPLY_TO ? { replyTo: config.EMAIL_REPLY_TO } : {}),
+      ...(replyTo ? { replyTo } : {}),
       subject: input.subject,
       text: input.text,
       html: input.html,

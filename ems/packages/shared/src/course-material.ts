@@ -36,8 +36,10 @@ export function formatMaterialFileSize(bytes: number | null | undefined): string
 export function materialSourceLabel(input: {
   fileKey: string | null
   externalUrl: string | null
-}): 'File' | 'Link' | 'Notes' {
+  bodyText?: string | null
+}): 'File' | 'Link' | 'Page' | 'Notes' {
   if (input.fileKey) return 'File'
   if (input.externalUrl) return 'Link'
+  if (input.bodyText?.trim()) return 'Page'
   return 'Notes'
 }

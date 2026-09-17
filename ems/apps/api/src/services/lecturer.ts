@@ -1,8 +1,14 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type {
   AttendancePolicy,
+  CreateLecturerAnnouncementRequest,
   CreateLecturerAssessmentRequest,
   CreateLecturerMaterialRequest,
+  CreateLecturerModuleRequest,
+  LecturerCourseAnnouncement,
+  LecturerCourseModule,
+  UpdateLecturerAnnouncementRequest,
+  UpdateLecturerModuleRequest,
   Grade,
   LecturerAssessmentDetail,
   LecturerAssessmentRow,
@@ -46,15 +52,18 @@ import {
   departments,
   semesters,
 } from '../db/institution/schema/academic'
-import { assessments, grades, resultBatches, results, submissions } from '../db/institution/schema/assessment'
+import { assessmentComponents, assessmentItems, assessments, grades, resultBatches, results, submissions } from '../db/institution/schema/assessment'
 import { notifications } from '../db/institution/schema/communication'
+import { listOfferingDiscussionSummaries } from './discussions'
 import { riskInterventions, riskScores } from '../db/institution/schema/ai'
 import { users } from '../db/institution/schema/people'
 import { students } from '../db/institution/schema/students'
 import {
+  announcements,
   attendanceRecords,
   attendanceSessions,
   courseMaterials,
+  courseModules,
   courseOfferings,
   courseRegistrations,
   lecturerAssignments,
@@ -63,12 +72,13 @@ import {
 } from '../db/institution/schema/teaching'
 import {
   notifyAcademicAdminsOfResultSubmit,
+  notifyEnrolledStudentsOfAnnouncement,
   notifyEnrolledStudentsOfAssessment,
   notifyEnrolledStudentsOfMaterial,
 } from './role-notifications'
 import { writeAudit } from '../lib/audit'
 import { courseColor, formatClock } from '../lib/course-color'
-import { badRequest, forbidden, notFound } from '../lib/errors'
+import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import {
   buildCourseMaterialFileKey,
   createDownloadUrl,
@@ -148,7 +158,7 @@ function nextClassFrom(
   }
 }
 
-async function requireLecturer(institutionId: string, userId: string) {
+export async function requireLecturer(institutionId: string, userId: string) {
   const db = await getInstitutionDb(institutionId)
   const [user] = await db
     .select({
@@ -184,7 +194,7 @@ async function assignedOfferingIds(
   return rows.map((row) => row.offeringId)
 }
 
-async function requireAssignedOffering(
+export async function requireAssignedOffering(
   db: InstitutionDb,
   lecturerId: string,
   offeringId: string,
@@ -611,9 +621,12 @@ export async function getLecturerCourse(
   const materialRows = await db
     .select({
       id: courseMaterials.id,
+      moduleId: courseMaterials.moduleId,
       title: courseMaterials.title,
       description: courseMaterials.description,
       moduleName: courseMaterials.moduleName,
+      bodyText: courseMaterials.bodyText,
+      sequence: courseMaterials.sequence,
       externalUrl: courseMaterials.externalUrl,
       fileKey: courseMaterials.fileKey,
       mimeType: courseMaterials.mimeType,
@@ -625,6 +638,9 @@ export async function getLecturerCourse(
     .from(courseMaterials)
     .where(eq(courseMaterials.courseOfferingId, offeringId))
     .orderBy(desc(courseMaterials.createdAt))
+
+  const moduleRows = await listModuleRows(db, offeringId)
+  const announcementRows = await listOfferingAnnouncementRows(db, offeringId)
 
   const assessmentRows = await db
     .select({
@@ -654,7 +670,19 @@ export async function getLecturerCourse(
         riskLevel: riskByStudent.get(student.studentId) ?? null,
       }
     }),
-    materials: materialRows.map(mapLecturerMaterial),
+    modules: moduleRows,
+    materials: materialRows.map((row) => {
+      const moduleTitle = row.moduleId
+        ? moduleRows.find((module) => module.id === row.moduleId)?.title
+        : null
+      return mapLecturerMaterial({
+        ...row,
+        moduleName: row.moduleName ?? moduleTitle ?? null,
+      })
+    }),
+    announcements: announcementRows,
+    discussions: await listOfferingDiscussionSummaries(db, offeringId),
+    liveSessions: await (await import('./live-sessions')).listOfferingLiveSessionSummaries(db, offeringId),
     assessments: assessmentRows.map((row) => ({
       id: row.id,
       title: row.title,
@@ -673,9 +701,12 @@ function courseMaterialKeyPrefix(institutionId: string, offeringId: string): str
 
 function mapLecturerMaterial(row: {
   id: string
+  moduleId?: string | null
   title: string
   description: string | null
   moduleName: string | null
+  bodyText?: string | null
+  sequence?: number | null
   externalUrl?: string | null
   fileKey?: string | null
   mimeType?: string | null
@@ -686,9 +717,12 @@ function mapLecturerMaterial(row: {
 }): LecturerCourseMaterial {
   return {
     id: row.id,
+    moduleId: row.moduleId ?? null,
     title: row.title,
     description: row.description,
     moduleName: row.moduleName,
+    bodyText: row.bodyText ?? null,
+    sequence: row.sequence ?? 0,
     externalUrl: row.externalUrl ?? null,
     fileKey: row.fileKey ?? null,
     fileName: row.fileKey ? fileNameFromStorageKey(row.fileKey) : null,
@@ -698,6 +732,388 @@ function mapLecturerMaterial(row: {
     publishedAt: row.publishedAt,
     createdAt: row.createdAt,
   }
+}
+
+/**
+ * Course modules.
+ *
+ * A module is a unit of the course holding materials in a set order. It may
+ * point at an earlier module as its prerequisite, which is what keeps it shut
+ * for a student who has not worked through that earlier one yet.
+ */
+
+async function listModuleRows(
+  db: InstitutionDb,
+  offeringId: string,
+): Promise<LecturerCourseModule[]> {
+  const rows = await db
+    .select({
+      id: courseModules.id,
+      title: courseModules.title,
+      summary: courseModules.summary,
+      sequence: courseModules.sequence,
+      prerequisiteModuleId: courseModules.prerequisiteModuleId,
+      isPublished: courseModules.isPublished,
+      publishedAt: courseModules.publishedAt,
+      createdAt: courseModules.createdAt,
+      materialCount: count(courseMaterials.id),
+    })
+    .from(courseModules)
+    .leftJoin(
+      courseMaterials,
+      and(eq(courseMaterials.moduleId, courseModules.id), eq(courseMaterials.isPublished, true)),
+    )
+    .where(eq(courseModules.courseOfferingId, offeringId))
+    .groupBy(courseModules.id)
+    .orderBy(asc(courseModules.sequence), asc(courseModules.createdAt))
+
+  return rows.map((row) => ({ ...row, materialCount: Number(row.materialCount) }))
+}
+
+async function requireOwnModule(
+  db: InstitutionDb,
+  lecturerId: string,
+  moduleId: string,
+): Promise<{ offeringId: string; title: string }> {
+  const [row] = await db
+    .select({ offeringId: courseModules.courseOfferingId, title: courseModules.title })
+    .from(courseModules)
+    .where(eq(courseModules.id, moduleId))
+    .limit(1)
+  if (!row) throw notFound('That module')
+  await requireAssignedOffering(db, lecturerId, row.offeringId)
+  return row
+}
+
+/**
+ * A prerequisite has to be another module on the same course, and the chain
+ * has to stay acyclic. Without the cycle check two modules could each wait on
+ * the other and neither would ever open for a student.
+ */
+async function assertUsablePrerequisite(
+  db: InstitutionDb,
+  input: { moduleId: string | null; offeringId: string; prerequisiteModuleId: string },
+): Promise<void> {
+  if (input.moduleId && input.prerequisiteModuleId === input.moduleId) {
+    throw badRequest('A module cannot be its own prerequisite.')
+  }
+
+  const [prerequisite] = await db
+    .select({
+      offeringId: courseModules.courseOfferingId,
+      prerequisiteModuleId: courseModules.prerequisiteModuleId,
+    })
+    .from(courseModules)
+    .where(eq(courseModules.id, input.prerequisiteModuleId))
+    .limit(1)
+
+  if (!prerequisite || prerequisite.offeringId !== input.offeringId) {
+    throw badRequest('Choose a prerequisite module from this course.')
+  }
+
+  if (!input.moduleId) return
+
+  const seen = new Set<string>([input.moduleId])
+  let cursor = prerequisite.prerequisiteModuleId
+  while (cursor) {
+    if (seen.has(cursor)) {
+      throw badRequest('That prerequisite would create a loop between modules.')
+    }
+    seen.add(cursor)
+    const [next] = await db
+      .select({ prerequisiteModuleId: courseModules.prerequisiteModuleId })
+      .from(courseModules)
+      .where(eq(courseModules.id, cursor))
+      .limit(1)
+    cursor = next?.prerequisiteModuleId ?? null
+  }
+}
+
+export async function createLecturerModule(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  input: CreateLecturerModuleRequest,
+): Promise<LecturerCourseModule> {
+  const db = await getInstitutionDb(institutionId)
+  await requireAssignedOffering(db, actor.id, input.offeringId)
+
+  if (input.prerequisiteModuleId) {
+    await assertUsablePrerequisite(db, {
+      moduleId: null,
+      offeringId: input.offeringId,
+      prerequisiteModuleId: input.prerequisiteModuleId,
+    })
+  }
+
+  const [created] = await db
+    .insert(courseModules)
+    .values({
+      courseOfferingId: input.offeringId,
+      title: input.title,
+      summary: input.summary ?? null,
+      sequence: input.sequence ?? (await nextModuleSequence(db, input.offeringId)),
+      prerequisiteModuleId: input.prerequisiteModuleId ?? null,
+      isPublished: input.publish ?? false,
+      publishedAt: input.publish ? new Date().toISOString() : null,
+      createdBy: actor.id,
+    })
+    .returning({ id: courseModules.id })
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'modules.write',
+    targetType: 'course_module',
+    targetId: created!.id,
+    metadata: { title: input.title, offeringId: input.offeringId },
+  })
+
+  const modules = await listModuleRows(db, input.offeringId)
+  return modules.find((row) => row.id === created!.id)!
+}
+
+async function nextModuleSequence(db: InstitutionDb, offeringId: string): Promise<number> {
+  const [row] = await db
+    .select({ highest: sql<number>`coalesce(max(${courseModules.sequence}), -1)` })
+    .from(courseModules)
+    .where(eq(courseModules.courseOfferingId, offeringId))
+  return Number(row?.highest ?? -1) + 1
+}
+
+export async function updateLecturerModule(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  moduleId: string,
+  input: UpdateLecturerModuleRequest,
+): Promise<LecturerCourseModule> {
+  const db = await getInstitutionDb(institutionId)
+  const existing = await requireOwnModule(db, actor.id, moduleId)
+
+  if (input.prerequisiteModuleId) {
+    await assertUsablePrerequisite(db, {
+      moduleId,
+      offeringId: existing.offeringId,
+      prerequisiteModuleId: input.prerequisiteModuleId,
+    })
+  }
+
+  await db
+    .update(courseModules)
+    .set({
+      ...(input.title === undefined ? {} : { title: input.title }),
+      ...(input.summary === undefined ? {} : { summary: input.summary }),
+      ...(input.sequence === undefined ? {} : { sequence: input.sequence }),
+      ...(input.prerequisiteModuleId === undefined
+        ? {}
+        : { prerequisiteModuleId: input.prerequisiteModuleId }),
+      ...(input.publish === undefined
+        ? {}
+        : {
+            isPublished: input.publish,
+            publishedAt: input.publish ? new Date().toISOString() : null,
+          }),
+    })
+    .where(eq(courseModules.id, moduleId))
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'modules.write',
+    targetType: 'course_module',
+    targetId: moduleId,
+    metadata: { title: input.title ?? existing.title, offeringId: existing.offeringId },
+  })
+
+  const modules = await listModuleRows(db, existing.offeringId)
+  return modules.find((row) => row.id === moduleId)!
+}
+
+/**
+ * Materials in a deleted module are kept and fall back to being loose in the
+ * course. Losing a module heading should never lose the teaching content.
+ */
+export async function deleteLecturerModule(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  moduleId: string,
+): Promise<void> {
+  const db = await getInstitutionDb(institutionId)
+  const existing = await requireOwnModule(db, actor.id, moduleId)
+
+  await db.delete(courseModules).where(eq(courseModules.id, moduleId))
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'modules.delete',
+    targetType: 'course_module',
+    targetId: moduleId,
+    metadata: { title: existing.title, offeringId: existing.offeringId },
+  })
+}
+
+/**
+ * Per-course announcements.
+ *
+ * These reuse the existing announcements table. An institution-wide notice has
+ * a null offering; setting the offering is what turns a row into a course feed
+ * entry, which is why the ICT list filters those rows out.
+ */
+
+async function listOfferingAnnouncementRows(
+  db: InstitutionDb,
+  offeringId: string,
+): Promise<LecturerCourseAnnouncement[]> {
+  return db
+    .select({
+      id: announcements.id,
+      title: announcements.title,
+      body: announcements.body,
+      isPinned: announcements.isPinned,
+      publishedAt: announcements.publishedAt,
+      createdAt: announcements.createdAt,
+    })
+    .from(announcements)
+    .where(eq(announcements.courseOfferingId, offeringId))
+    .orderBy(desc(announcements.isPinned), desc(announcements.createdAt))
+}
+
+async function requireOwnAnnouncement(
+  db: InstitutionDb,
+  lecturerId: string,
+  announcementId: string,
+): Promise<{ offeringId: string; title: string; isPublished: boolean }> {
+  const [row] = await db
+    .select({
+      offeringId: announcements.courseOfferingId,
+      title: announcements.title,
+      publishedAt: announcements.publishedAt,
+    })
+    .from(announcements)
+    .where(eq(announcements.id, announcementId))
+    .limit(1)
+  if (!row?.offeringId) throw notFound('That announcement')
+  await requireAssignedOffering(db, lecturerId, row.offeringId)
+  return { offeringId: row.offeringId, title: row.title, isPublished: Boolean(row.publishedAt) }
+}
+
+export async function createLecturerAnnouncement(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  input: CreateLecturerAnnouncementRequest,
+): Promise<LecturerCourseAnnouncement> {
+  const db = await getInstitutionDb(institutionId)
+  await requireAssignedOffering(db, actor.id, input.offeringId)
+
+  const publish = input.publish ?? true
+  const [created] = await db
+    .insert(announcements)
+    .values({
+      courseOfferingId: input.offeringId,
+      title: input.title,
+      body: input.body,
+      audienceRoles: ['Student'],
+      isPinned: input.isPinned ?? false,
+      publishedAt: publish ? new Date().toISOString() : null,
+      createdBy: actor.id,
+    })
+    .returning({ id: announcements.id })
+
+  if (publish) {
+    await notifyEnrolledStudentsOfAnnouncement(db, input.offeringId, {
+      title: input.title,
+      body: input.body,
+    })
+  }
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: publish ? 'course.announcement.publish' : 'course.announcement.draft',
+    targetType: 'announcement',
+    targetId: created!.id,
+    metadata: { title: input.title, offeringId: input.offeringId },
+  })
+
+  const rows = await listOfferingAnnouncementRows(db, input.offeringId)
+  return rows.find((row) => row.id === created!.id)!
+}
+
+export async function updateLecturerAnnouncement(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  announcementId: string,
+  input: UpdateLecturerAnnouncementRequest,
+): Promise<LecturerCourseAnnouncement> {
+  const db = await getInstitutionDb(institutionId)
+  const existing = await requireOwnAnnouncement(db, actor.id, announcementId)
+
+  await db
+    .update(announcements)
+    .set({
+      ...(input.title === undefined ? {} : { title: input.title }),
+      ...(input.body === undefined ? {} : { body: input.body }),
+      ...(input.isPinned === undefined ? {} : { isPinned: input.isPinned }),
+      ...(input.publish === undefined
+        ? {}
+        : { publishedAt: input.publish ? new Date().toISOString() : null }),
+    })
+    .where(eq(announcements.id, announcementId))
+
+  // Students are told once, when it first goes live, never again on an edit.
+  if (input.publish === true && !existing.isPublished) {
+    await notifyEnrolledStudentsOfAnnouncement(db, existing.offeringId, {
+      title: input.title ?? existing.title,
+      body: input.body ?? '',
+    })
+  }
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action:
+      input.publish === true && !existing.isPublished
+        ? 'course.announcement.publish'
+        : 'course.announcement.update',
+    targetType: 'announcement',
+    targetId: announcementId,
+    metadata: { title: input.title ?? existing.title, offeringId: existing.offeringId },
+  })
+
+  const rows = await listOfferingAnnouncementRows(db, existing.offeringId)
+  return rows.find((row) => row.id === announcementId)!
+}
+
+export async function deleteLecturerAnnouncement(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  announcementId: string,
+): Promise<void> {
+  const db = await getInstitutionDb(institutionId)
+  const existing = await requireOwnAnnouncement(db, actor.id, announcementId)
+
+  await db.delete(announcements).where(eq(announcements.id, announcementId))
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'course.announcement.delete',
+    targetType: 'announcement',
+    targetId: announcementId,
+    metadata: { title: existing.title, offeringId: existing.offeringId },
+  })
 }
 
 function parseExternalUrl(value: string | undefined): string | null {
@@ -776,6 +1192,24 @@ export async function reserveLecturerMaterialUpload(
   return { fileKey, ...target }
 }
 
+/** A material may only join a module that belongs to the same course offering. */
+async function resolveMaterialModuleId(
+  db: InstitutionDb,
+  offeringId: string,
+  moduleId: string | null | undefined,
+): Promise<string | null> {
+  if (!moduleId) return null
+  const [row] = await db
+    .select({ offeringId: courseModules.courseOfferingId })
+    .from(courseModules)
+    .where(eq(courseModules.id, moduleId))
+    .limit(1)
+  if (!row || row.offeringId !== offeringId) {
+    throw badRequest('Choose a module from this course.')
+  }
+  return moduleId
+}
+
 export async function createLecturerMaterial(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },
@@ -793,15 +1227,20 @@ export async function createLecturerMaterial(
     offeringId: input.offeringId,
   })
 
+  const moduleId = await resolveMaterialModuleId(db, input.offeringId, input.moduleId)
+
   const publish = input.publish ?? true
   const now = new Date().toISOString()
   const [created] = await db
     .insert(courseMaterials)
     .values({
       courseOfferingId: input.offeringId,
+      moduleId,
       title: input.title,
       description: input.description ?? null,
       moduleName: input.moduleName ?? null,
+      bodyText: input.bodyText ?? null,
+      sequence: input.sequence ?? 0,
       externalUrl,
       fileKey: file?.fileKey ?? null,
       mimeType: file?.mimeType ?? null,
@@ -812,9 +1251,12 @@ export async function createLecturerMaterial(
     })
     .returning({
       id: courseMaterials.id,
+      moduleId: courseMaterials.moduleId,
       title: courseMaterials.title,
       description: courseMaterials.description,
       moduleName: courseMaterials.moduleName,
+      bodyText: courseMaterials.bodyText,
+      sequence: courseMaterials.sequence,
       externalUrl: courseMaterials.externalUrl,
       fileKey: courseMaterials.fileKey,
       mimeType: courseMaterials.mimeType,
@@ -885,12 +1327,20 @@ export async function updateLecturerMaterial(
         ? null
         : existing.publishedAt
 
+  const nextModuleId =
+    input.moduleId === undefined
+      ? undefined
+      : await resolveMaterialModuleId(db, existing.offeringId, input.moduleId)
+
   const [updated] = await db
     .update(courseMaterials)
     .set({
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.description !== undefined ? { description: input.description ?? null } : {}),
       ...(input.moduleName !== undefined ? { moduleName: input.moduleName ?? null } : {}),
+      ...(nextModuleId !== undefined ? { moduleId: nextModuleId } : {}),
+      ...(input.bodyText !== undefined ? { bodyText: input.bodyText ?? null } : {}),
+      ...(input.sequence !== undefined ? { sequence: input.sequence } : {}),
       ...(externalUrl !== undefined ? { externalUrl } : {}),
       ...(input.clearFile ? { fileKey: null, mimeType: null, fileSizeBytes: null } : {}),
       ...(nextFile
@@ -905,9 +1355,12 @@ export async function updateLecturerMaterial(
     .where(eq(courseMaterials.id, materialId))
     .returning({
       id: courseMaterials.id,
+      moduleId: courseMaterials.moduleId,
       title: courseMaterials.title,
       description: courseMaterials.description,
       moduleName: courseMaterials.moduleName,
+      bodyText: courseMaterials.bodyText,
+      sequence: courseMaterials.sequence,
       externalUrl: courseMaterials.externalUrl,
       fileKey: courseMaterials.fileKey,
       mimeType: courseMaterials.mimeType,
@@ -1530,6 +1983,19 @@ export async function listLecturerAssessments(
     .where(inArray(assessments.courseOfferingId, ids))
     .orderBy(desc(assessments.createdAt))
 
+  const itemCounts = new Map<string, number>()
+  if (rows.length > 0) {
+    const counts = await db
+      .select({
+        assessmentId: assessmentItems.assessmentId,
+        total: sql<number>`coalesce(sum(coalesce(${assessmentItems.drawCount}, 1)), 0)`,
+      })
+      .from(assessmentItems)
+      .where(inArray(assessmentItems.assessmentId, rows.map((row) => row.id)))
+      .groupBy(assessmentItems.assessmentId)
+    for (const row of counts) itemCounts.set(row.assessmentId, Number(row.total))
+  }
+
   const output: LecturerAssessmentRow[] = []
   for (const row of rows) {
     const roster = await enrolledRoster(db, row.offeringId)
@@ -1558,6 +2024,7 @@ export async function listLecturerAssessments(
       acceptsSubmissions: row.acceptsSubmissions,
       submittedCount: submitted,
       totalCount: roster.length,
+      itemCount: itemCounts.get(row.id) ?? 0,
       status: assessmentStatus(row, submitted, roster.length, gradeRows.length),
     })
   }
@@ -1609,6 +2076,51 @@ export async function createLecturerAssessment(
   return row
 }
 
+export async function deleteLecturerAssessment(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  assessmentId: string,
+): Promise<void> {
+  const { db } = await requireLecturer(institutionId, actor.id)
+  const [row] = await db
+    .select({ offeringId: assessments.courseOfferingId, title: assessments.title })
+    .from(assessments)
+    .where(eq(assessments.id, assessmentId))
+    .limit(1)
+  if (!row) throw notFound('That assessment')
+  await requireAssignedOffering(db, actor.id, row.offeringId)
+
+  const [sat] = await db
+    .select({ id: submissions.id })
+    .from(submissions)
+    .where(and(eq(submissions.assessmentId, assessmentId), ne(submissions.status, 'Draft')))
+    .limit(1)
+  if (sat) {
+    throw conflict('Students have already handed this in, so it cannot be deleted.')
+  }
+
+  const [marked] = await db
+    .select({ id: grades.id })
+    .from(grades)
+    .where(eq(grades.assessmentId, assessmentId))
+    .limit(1)
+  if (marked) {
+    throw conflict('This assessment already has marks, so it cannot be deleted.')
+  }
+
+  await db.delete(assessments).where(eq(assessments.id, assessmentId))
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'assessments.delete',
+    targetType: 'assessment',
+    targetId: assessmentId,
+    metadata: { title: row.title, offeringId: row.offeringId },
+  })
+}
+
 export async function getLecturerAssessment(
   institutionId: string,
   userId: string,
@@ -1634,6 +2146,7 @@ export async function getLecturerAssessment(
       status: submissions.status,
       submittedAt: submissions.submittedAt,
       isLate: submissions.isLate,
+      textResponse: submissions.textResponse,
     })
     .from(submissions)
     .where(eq(submissions.assessmentId, assessmentId))
@@ -1642,15 +2155,32 @@ export async function getLecturerAssessment(
       studentId: grades.studentId,
       score: grades.score,
       feedback: grades.feedback,
+      componentScores: grades.componentScores,
     })
     .from(grades)
     .where(eq(grades.assessmentId, assessmentId))
+  const componentRows = await db
+    .select({
+      id: assessmentComponents.id,
+      name: assessmentComponents.name,
+      maxScore: assessmentComponents.maxScore,
+      sequence: assessmentComponents.sequence,
+    })
+    .from(assessmentComponents)
+    .where(eq(assessmentComponents.assessmentId, assessmentId))
+    .orderBy(asc(assessmentComponents.sequence))
 
   const submissionByStudent = new Map(submissionRows.map((item) => [item.studentId, item]))
   const gradeByStudent = new Map(gradeRows.map((item) => [item.studentId, item]))
 
   return {
     ...summary,
+    components: componentRows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      maxScore: asNumber(item.maxScore) ?? 0,
+      sequence: item.sequence,
+    })),
     submissions: roster.map((student) => {
       const submission = submissionByStudent.get(student.studentId)
       const grade = gradeByStudent.get(student.studentId)
@@ -1664,7 +2194,10 @@ export async function getLecturerAssessment(
         studentName: student.name,
         status,
         submittedAt: submission?.submittedAt ?? null,
+        isLate: submission?.isLate ?? false,
+        textResponse: submission?.textResponse ?? null,
         score: asNumber(grade?.score ?? null),
+        componentScores: grade?.componentScores ?? null,
         feedback: grade?.feedback ?? null,
       }
     }),
@@ -1690,7 +2223,36 @@ export async function saveLecturerGrade(
   await requireAssignedOffering(db, actor.id, assessment.offeringId)
 
   const max = asNumber(assessment.totalMarks) ?? 0
-  if (input.score > max) throw badRequest(`Marks cannot exceed ${max}.`)
+  const components = await db
+    .select({
+      id: assessmentComponents.id,
+      name: assessmentComponents.name,
+      maxScore: assessmentComponents.maxScore,
+    })
+    .from(assessmentComponents)
+    .where(eq(assessmentComponents.assessmentId, assessmentId))
+    .orderBy(asc(assessmentComponents.sequence))
+
+  let score = input.score
+  let componentScores = input.componentScores ?? null
+  if (components.length > 0 && input.componentScores) {
+    let total = 0
+    for (const component of components) {
+      const part = input.componentScores[component.id] ?? input.componentScores[component.name] ?? 0
+      const cap = asNumber(component.maxScore) ?? 0
+      if (part > cap) throw badRequest(`Marks for ${component.name} cannot exceed ${cap}.`)
+      total += part
+    }
+    score = total
+    componentScores = Object.fromEntries(
+      components.map((component) => [
+        component.id,
+        input.componentScores?.[component.id] ?? input.componentScores?.[component.name] ?? 0,
+      ]),
+    )
+  }
+  if (score == null) throw badRequest('Enter a mark.')
+  if (score > max) throw badRequest(`Marks cannot exceed ${max}.`)
 
   const roster = await enrolledRoster(db, assessment.offeringId)
   if (!roster.some((student) => student.studentId === input.studentId)) {
@@ -1702,7 +2264,8 @@ export async function saveLecturerGrade(
     .values({
       assessmentId,
       studentId: input.studentId,
-      score: input.score.toFixed(2),
+      score: score.toFixed(2),
+      componentScores,
       feedback: input.feedback ?? null,
       gradedBy: actor.id,
       gradedAt: new Date().toISOString(),
@@ -1710,14 +2273,118 @@ export async function saveLecturerGrade(
     .onConflictDoUpdate({
       target: [grades.assessmentId, grades.studentId],
       set: {
-        score: input.score.toFixed(2),
+        score: score.toFixed(2),
+        componentScores,
         feedback: input.feedback ?? null,
         gradedBy: actor.id,
         gradedAt: new Date().toISOString(),
       },
     })
 
+  await syncDraftResultFromGrades(db, institutionId, assessment.offeringId, input.studentId)
+
   return getLecturerAssessment(institutionId, actor.id, assessmentId)
+}
+
+export async function syncDraftResultFromGrades(
+  db: InstitutionDb,
+  institutionId: string,
+  offeringId: string,
+  studentId: string,
+): Promise<void> {
+  const [batch] = await db
+    .select({
+      id: resultBatches.id,
+      status: resultBatches.status,
+    })
+    .from(resultBatches)
+    .where(eq(resultBatches.courseOfferingId, offeringId))
+    .limit(1)
+  if (batch && !['Draft', 'Rejected'].includes(batch.status)) return
+
+  const semester = await currentSemester(institutionId)
+  if (!semester) return
+
+  const [course] = await db
+    .select({ credits: courses.credits })
+    .from(courseOfferings)
+    .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
+    .where(eq(courseOfferings.id, offeringId))
+    .limit(1)
+  if (!course) return
+
+  const assessmentRows = await db
+    .select({
+      id: assessments.id,
+      weight: assessments.weight,
+      totalMarks: assessments.totalMarks,
+    })
+    .from(assessments)
+    .where(eq(assessments.courseOfferingId, offeringId))
+  if (assessmentRows.length === 0) return
+
+  const gradeRows = await db
+    .select({
+      assessmentId: grades.assessmentId,
+      score: grades.score,
+    })
+    .from(grades)
+    .where(and(eq(grades.studentId, studentId), inArray(grades.assessmentId, assessmentRows.map((row) => row.id))))
+  const scoreByAssessment = new Map(gradeRows.map((row) => [row.assessmentId, asNumber(row.score)]))
+
+  let earned = 0
+  let weightSum = 0
+  for (const item of assessmentRows) {
+    const score = scoreByAssessment.get(item.id)
+    const total = asNumber(item.totalMarks) ?? 0
+    const weight = asNumber(item.weight) ?? 0
+    if (score == null || total <= 0 || weight <= 0) continue
+    earned += (score / total) * weight
+    weightSum += weight
+  }
+  if (weightSum <= 0) return
+
+  const totalScore = (earned / weightSum) * 100
+  const scored = gradeFromScore(totalScore)
+
+  let batchId = batch?.id
+  if (!batchId) {
+    const [created] = await db
+      .insert(resultBatches)
+      .values({
+        courseOfferingId: offeringId,
+        semesterId: semester.id,
+        status: 'Draft',
+      })
+      .returning({ id: resultBatches.id })
+    batchId = created!.id
+  } else if (batch?.status === 'Rejected') {
+    await db.update(resultBatches).set({ status: 'Draft', rejectionReason: null }).where(eq(resultBatches.id, batchId))
+  }
+
+  await db
+    .insert(results)
+    .values({
+      resultBatchId: batchId,
+      studentId,
+      courseOfferingId: offeringId,
+      totalScore: totalScore.toFixed(2),
+      grade: scored.grade,
+      gradePoint: scored.gradePoint,
+      creditsEarned: scored.isPassed ? course.credits : 0,
+      isPassed: scored.isPassed,
+    })
+    .onConflictDoUpdate({
+      target: [results.studentId, results.courseOfferingId],
+      set: {
+        resultBatchId: batchId,
+        totalScore: totalScore.toFixed(2),
+        grade: scored.grade,
+        gradePoint: scored.gradePoint,
+        creditsEarned: scored.isPassed ? course.credits : 0,
+        isPassed: scored.isPassed,
+      },
+    })
 }
 
 export async function listLecturerAtRiskStudents(

@@ -424,10 +424,10 @@ function ApplySidebar({
             const active    = currentStep === step.id
 
             const bg = active
-              ? 'rgba(15, 189, 59, 0.15)'
+              ? 'rgba(var(--brand-rgb), 0.15)'
               : 'transparent'
             const border = active
-              ? '1px solid rgba(15, 189, 59, 0.25)'
+              ? '1px solid rgba(var(--brand-rgb), 0.25)'
               : '1px solid transparent'
 
             const numBg    = completed ? 'var(--success-bg)' : active ? 'var(--brand)' : 'var(--ink-surface)'

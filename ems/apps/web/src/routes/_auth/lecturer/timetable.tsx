@@ -6,6 +6,7 @@ import type { LecturerTimetableSlot, SaveLecturerTimetableSlotRequest } from '@s
 import { LecturerShell } from '@/components/LecturerShell'
 import { CourseCodePill } from '@/components/CourseCodePill'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { PagedList } from '@/components/ListPagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -227,10 +228,13 @@ function LecturerTimetablePage() {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {sortedSlots.map((slot) => (
+          <PagedList
+            items={sortedSlots}
+            getKey={(slot) => slot.id}
+            defaultPageSize={5}
+            itemLabel="slots"
+            renderItem={(slot) => (
               <div
-                key={slot.id}
                 className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl"
                 style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
               >
@@ -265,8 +269,8 @@ function LecturerTimetablePage() {
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
 
         <p className="t-caption mt-6" style={{ color: 'var(--muted-foreground)' }}>

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import {
   loginRequestSchema,
+  logoutRequestSchema,
   verifyTwoFactorRequestSchema,
   type LoginResponse,
   type SessionResponse,
@@ -87,7 +88,15 @@ authRoutes.get('/auth/session', requireAuth, (c) =>
 
 authRoutes.post('/auth/logout', async (c) => {
   const cookie = getCookie(c, SESSION_COOKIE)
-  if (cookie) await logout(cookie)
+  const parsed = logoutRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+
+  if (cookie) {
+    await logout(cookie, {
+      reason: parsed.success ? parsed.data.reason : 'manual',
+      ipAddress: clientIp(c.req.header('x-forwarded-for')),
+      userAgent: c.req.header('user-agent'),
+    })
+  }
 
   deleteCookie(c, SESSION_COOKIE, sessionCookieOptions(env()))
   deleteCookie(c, PENDING_2FA_COOKIE, sessionCookieOptions(env()))

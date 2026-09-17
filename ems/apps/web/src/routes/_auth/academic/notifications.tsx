@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { AcademicShell } from '@/components/AcademicShell'
+import { PagedList } from '@/components/ListPagination'
 import {
   academicNotificationsQueryKey,
   academicProfileQueryKey,
@@ -47,7 +48,7 @@ function typeIcon(type: string) {
 function typeColors(type: string) {
   switch (type) {
     case 'Applications': return { bg: 'var(--info-bg)', color: 'var(--info)' }
-    case 'Results': return { bg: 'rgba(15, 189, 59,0.10)', color: '#16A34A' }
+    case 'Results': return { bg: 'rgba(var(--brand-rgb),0.10)', color: '#16A34A' }
     case 'Registration': return { bg: 'var(--info-bg)', color: 'var(--info)' }
     case 'At-Risk': return { bg: 'var(--error-bg)', color: 'var(--error)' }
     default: return { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
@@ -142,37 +143,48 @@ function AcademicNotificationsPage() {
         <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)' }}>
           {isPending ? (
             <p className="t-body text-center py-16" style={{ color: 'var(--muted-foreground)' }}>Loading notifications…</p>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16">
-              <Bell style={{ width: 32, height: 32, color: 'var(--muted-foreground)', margin: '0 auto 12px' }} />
-              <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No notifications in this category</p>
-            </div>
-          ) : filtered.map((n, i) => {
-            const Icon = typeIcon(n.type)
-            const tc = typeColors(n.type)
-            return (
-              <button key={n.id} type="button" onClick={() => openNotif(n)} className="w-full text-left flex items-start gap-4"
-                style={{ padding: '16px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', backgroundColor: !n.read ? 'rgba(15, 189, 59,0.03)' : 'transparent', border: 'none', cursor: 'pointer' }}>
-                <div className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: tc.bg }}>
-                  <Icon style={{ width: 15, height: 15, color: tc.color }} />
+          ) : (
+            <PagedList
+              items={filtered}
+              getKey={(n) => n.id}
+              defaultPageSize={10}
+              resetKey={String(activeTab)}
+              itemLabel="notifications"
+              gap={0}
+              empty={
+                <div className="text-center py-16">
+                  <Bell style={{ width: 32, height: 32, color: 'var(--muted-foreground)', margin: '0 auto 12px' }} />
+                  <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No notifications in this category</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4">
-                    <p className="text-sm font-semibold">{n.title}</p>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="t-caption" style={{ whiteSpace: 'nowrap' }}>{n.time}</span>
-                      {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--brand)', display: 'inline-block' }} />}
+              }
+              renderItem={(n, i) => {
+                const Icon = typeIcon(n.type)
+                const tc = typeColors(n.type)
+                return (
+                  <button type="button" onClick={() => openNotif(n)} className="w-full text-left flex items-start gap-4"
+                    style={{ padding: '16px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', backgroundColor: !n.read ? 'rgba(var(--brand-rgb),0.03)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <div className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: tc.bg }}>
+                      <Icon style={{ width: 15, height: 15, color: tc.color }} />
                     </div>
-                  </div>
-                  <p className="t-body-sm mt-1 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>{n.body}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: tc.bg, color: tc.color, borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{n.type}</span>
-                    {n.urgent && <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: 'var(--error-bg)', color: 'var(--error)', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>Urgent</span>}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="text-sm font-semibold">{n.title}</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="t-caption" style={{ whiteSpace: 'nowrap' }}>{n.time}</span>
+                          {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--brand)', display: 'inline-block' }} />}
+                        </div>
+                      </div>
+                      <p className="t-body-sm mt-1 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>{n.body}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: tc.bg, color: tc.color, borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{n.type}</span>
+                        {n.urgent && <span className="t-label px-1.5 py-0.5" style={{ backgroundColor: 'var(--error-bg)', color: 'var(--error)', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>Urgent</span>}
+                      </div>
+                    </div>
+                  </button>
+                )
+              }}
+            />
+          )}
         </div>
       </div>
 

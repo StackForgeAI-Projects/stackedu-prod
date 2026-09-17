@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { brandColorValue } from '@/lib/brand-theme'
 import { formatCurrency } from '@/lib/utils'
 import { bursarReportsQueryKey, getBursarReports } from '@/lib/api/bursar'
 import { BURSAR_GUIDES } from '@/lib/bursar-guides'
@@ -116,7 +117,7 @@ function ReportsPage() {
                   }}
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center justify-center rounded-xl" style={{ width: 44, height: 44, backgroundColor: isActive ? 'rgba(15, 189, 59,0.12)' : 'var(--muted)' }}>
+                    <div className="flex items-center justify-center rounded-xl" style={{ width: 44, height: 44, backgroundColor: isActive ? 'rgba(var(--brand-rgb),0.12)' : 'var(--muted)' }}>
                       <Icon style={{ width: 20, height: 20, color: isActive ? 'var(--brand)' : 'var(--muted-foreground)' }} />
                     </div>
                   </div>
@@ -245,7 +246,7 @@ function ReportsPage() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatTile icon={TrendingUp} iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)" label="TOTAL COLLECTED" value={formatCurrency(data.totalCollected)} delta={data.label} deltaColor="var(--muted-foreground)" animationDelay={0} />
+                <StatTile icon={TrendingUp} iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)" label="TOTAL COLLECTED" value={formatCurrency(data.totalCollected)} delta={data.label} deltaColor="var(--muted-foreground)" animationDelay={0} />
                 <StatTile icon={AlertCircle} iconColor="var(--warning)" iconBg="var(--warning-bg)" label="TOTAL OUTSTANDING" value={formatCurrency(data.totalOutstanding)} delta="Across programmes" deltaColor="var(--warning)" animationDelay={60} />
                 <StatTile icon={CreditCard} iconColor="var(--success)" iconBg="var(--success-bg)" label="COLLECTION RATE" value={`${data.successRate}%`} delta="Paid vs total" deltaColor="var(--success)" animationDelay={120} />
                 <StatTile icon={FileText} iconColor="var(--info)" iconBg="var(--info-bg)" label="TOTAL TRANSACTIONS" value={String(data.paymentCount)} delta="All payment statuses" deltaColor="var(--muted-foreground)" animationDelay={180} />
@@ -259,8 +260,8 @@ function ReportsPage() {
                   <AreaChart data={data.trend}>
                     <defs>
                       <linearGradient id="brandGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0FBD3B" stopOpacity={0.18} />
-                        <stop offset="95%" stopColor="#0FBD3B" stopOpacity={0} />
+                        <stop offset="5%" stopColor={brandColorValue()} stopOpacity={0.18} />
+                        <stop offset="95%" stopColor={brandColorValue()} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

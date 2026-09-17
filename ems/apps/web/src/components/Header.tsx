@@ -91,8 +91,8 @@ export function Header({
             transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out, width 150ms ease-out',
           }}
           onFocusCapture={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(15, 189, 59, 0.4)'
-            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 189, 59, 0.08)'
+            e.currentTarget.style.borderColor = 'rgba(var(--brand-rgb), 0.4)'
+            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(var(--brand-rgb), 0.08)'
           }}
           onBlurCapture={(e) => {
             e.currentTarget.style.borderColor = 'var(--border)'

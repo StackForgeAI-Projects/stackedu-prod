@@ -53,6 +53,7 @@ export const DEFAULT_PERMISSIONS: PermissionDefinition[] = [
   // Teaching
   { key: 'attendance.record', module: 'Teaching', description: 'Take attendance', roles: ['Lecturer'] },
   { key: 'materials.write', module: 'Teaching', description: 'Upload course materials', roles: ['Lecturer', 'AcademicAdmin'] },
+  { key: 'classroom.host', module: 'Teaching', description: 'Start and run a live class', roles: ['Lecturer'] },
   { key: 'registrations.approve', module: 'Teaching', description: 'Approve course registrations', roles: ['AcademicAdmin'] },
 
   // Assessment

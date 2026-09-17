@@ -161,7 +161,7 @@ function IdentityLockedNotice() {
   return (
     <div
       className="flex gap-3 rounded-xl px-3.5 py-3"
-      style={{ backgroundColor: 'rgba(15, 189, 59, 0.08)', border: '1px solid rgba(15, 189, 59, 0.2)' }}
+      style={{ backgroundColor: 'rgba(var(--brand-rgb), 0.08)', border: '1px solid rgba(var(--brand-rgb), 0.2)' }}
       role="note"
     >
       <AlertCircle size={18} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--brand)' }} />

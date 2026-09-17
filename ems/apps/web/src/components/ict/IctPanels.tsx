@@ -1,8 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { IctAnnouncement, IctAuditDetail, IctIntegration, IctRevocation } from '@stackedu/shared'
+import {
+  AI_PROVIDER_LABELS,
+  AI_PROVIDERS,
+  type AiProvider,
+  type IctAnnouncement,
+  type IctAuditDetail,
+  type IctIntegration,
+  type IctRevocation,
+  type UpdateIntegrationRequest,
+} from '@stackedu/shared'
 import { buildAuditDetail } from '@stackedu/shared'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,6 +23,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
   checkIctIntegration,
@@ -32,6 +49,7 @@ import {
 import { apiErrorMessage } from '@/lib/api/client'
 import {
   displayRole,
+  integrationCheckFailed,
   integrationLastCheckLabel,
   integrationStatusLabel,
 } from '@/lib/humanize'
@@ -75,7 +93,7 @@ export function TableActionButton({
         event.stopPropagation()
         onClick()
       }}
-      className="text-sm font-medium px-2 py-1 rounded-lg transition-colors hover:bg-[rgba(15,189,59,0.08)]"
+      className="text-sm font-medium px-2 py-1 rounded-lg transition-colors hover:bg-[rgba(var(--brand-rgb),0.08)]"
       style={{ color: 'var(--success)' }}
     >
       {children}
@@ -296,46 +314,186 @@ export function RevocationBody({
 
 export function IntegrationActionsPanel({ item }: { item: IctIntegration }) {
   const queryClient = useQueryClient()
-  const toggleMutation = useMutation({
-    mutationFn: (isEnabled: boolean) => updateIctIntegration(item.id, isEnabled),
+  const [enabled, setEnabled] = useState(item.isEnabled)
+  const [values, setValues] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setEnabled(item.isEnabled)
+    setValues(Object.fromEntries(item.fields.map((field) => [field.key, field.secret ? '' : (field.value ?? '')])))
+  }, [item])
+
+  const saveMutation = useMutation({
+    mutationFn: (input: UpdateIntegrationRequest) => updateIctIntegration(item.id, input),
     onSuccess: async () => {
-      toast.success(item.isEnabled ? 'Service turned off.' : 'Service turned on.')
+      toast.success('Integration saved.')
+      setValues((current) => {
+        const next = { ...current }
+        for (const field of item.fields) {
+          if (field.secret) next[field.key] = ''
+        }
+        return next
+      })
       await queryClient.invalidateQueries({ queryKey: ictIntegrationsQueryKey })
     },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not update that service.')),
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not save that service.')),
   })
   const checkMutation = useMutation({
     mutationFn: () => checkIctIntegration(item.id),
-    onSuccess: async () => {
-      toast.success('Connection check completed.')
+    onSuccess: async (result) => {
+      if (result.checkOk) {
+        toast.success(result.lastStatus ?? 'Connected.')
+      } else {
+        toast.error(result.lastStatus ?? 'Connection check failed.')
+      }
       await queryClient.invalidateQueries({ queryKey: ictIntegrationsQueryKey })
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not check that service.')),
   })
 
+  const buildPayload = (): UpdateIntegrationRequest => {
+    const credentials: Record<string, string> = {}
+    for (const field of item.fields) {
+      const value = (values[field.key] ?? '').trim()
+      if (field.secret) {
+        if (value) credentials[field.key] = value
+        continue
+      }
+      if (value !== (field.value ?? '').trim()) credentials[field.key] = value
+    }
+    return {
+      isEnabled: enabled,
+      ...(Object.keys(credentials).length > 0 ? { credentials } : {}),
+    }
+  }
+
+  const secretPlaceholder = (configured: boolean) =>
+    configured ? 'Key saved — paste a new one to replace it' : 'Paste the API key'
+
   return (
-    <DetailSection title={item.displayName}>
-      <DetailRow label="Status" value={integrationStatusLabel(item.isEnabled)} />
-      <DetailRow label="Last check" value={integrationLastCheckLabel(item.lastStatus, item.lastCheckedAt)} />
-      <div className="flex items-center justify-between gap-4 pt-3">
+    <div className="flex flex-col gap-5">
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
+        {item.description}
+      </p>
+      {item.setupSteps.length > 0 ? (
+        <ol className="flex flex-col gap-2 pl-4 text-sm leading-relaxed list-decimal" style={{ color: 'var(--foreground)' }}>
+          {item.setupSteps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      ) : null}
+      {item.docsUrl ? (
+        <a
+          href={item.docsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm font-medium"
+          style={{ color: 'var(--brand)' }}
+        >
+          Open setup docs
+        </a>
+      ) : null}
+
+      <div>
+        <p className="t-caption mb-0.5" style={{ color: 'var(--muted-foreground)' }}>Last check</p>
+        <p
+          className="text-sm leading-relaxed"
+          style={{ color: integrationCheckFailed(item.lastStatus) ? 'var(--error)' : 'var(--foreground)' }}
+        >
+          {integrationLastCheckLabel(item.lastStatus, item.lastCheckedAt)}
+        </p>
+      </div>
+
+      {item.fields.map((field) => {
+        if (item.provider === 'AI' && field.key === 'provider') {
+          return (
+            <div key={field.key}>
+              <Label htmlFor={`${item.id}-${field.key}`}>{field.label}</Label>
+              {field.hint ? (
+                <p className="t-caption mt-0.5 mb-1.5" style={{ color: 'var(--muted-foreground)' }}>{field.hint}</p>
+              ) : null}
+              <Select
+                value={values.provider || 'builtin'}
+                onValueChange={(value) => setValues((current) => ({ ...current, provider: value, apiKey: '' }))}
+              >
+                <SelectTrigger id={`${item.id}-${field.key}`} className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDERS.map((id: AiProvider) => {
+                    const savedProvider = item.fields.find((row) => row.key === 'provider')?.value
+                    const keySaved = id !== 'builtin' && savedProvider === id && item.fields.find((row) => row.key === 'apiKey')?.configured
+                    return (
+                      <SelectItem key={id} value={id}>
+                        {AI_PROVIDER_LABELS[id]}{keySaved ? ' · key saved' : ''}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )
+        }
+        if (item.provider === 'AI' && field.key === 'apiKey' && (values.provider || 'builtin') === 'builtin') {
+          return null
+        }
+        return (
+          <div key={field.key}>
+            <Label htmlFor={`${item.id}-${field.key}`}>{field.label}</Label>
+            {field.hint ? (
+              <p className="t-caption mt-0.5 mb-1.5" style={{ color: 'var(--muted-foreground)' }}>{field.hint}</p>
+            ) : null}
+            <Input
+              id={`${item.id}-${field.key}`}
+              type={field.secret ? 'password' : 'text'}
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-1.5"
+              value={values[field.key] ?? ''}
+              onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+              placeholder={field.secret ? secretPlaceholder(field.configured) : undefined}
+            />
+            {field.secret && field.configured ? (
+              <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                {field.source === 'env' ? 'A key is already set in the server environment.' : 'A key is saved for this institution.'}
+              </p>
+            ) : null}
+          </div>
+        )
+      })}
+
+      <div className="flex items-center justify-between gap-4 pt-1">
         <div>
           <p className="text-sm font-medium">Turn this service on</p>
           <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-            API keys stay on the server and are never shown here.
+            {integrationStatusLabel(enabled)}
           </p>
         </div>
-        <Switch
-          checked={item.isEnabled}
-          disabled={toggleMutation.isPending}
-          onCheckedChange={(checked) => toggleMutation.mutate(Boolean(checked))}
-        />
+        <Switch checked={enabled} onCheckedChange={(checked) => setEnabled(Boolean(checked))} />
       </div>
-      <div className="pt-3">
-        <Button variant="outline" disabled={checkMutation.isPending} onClick={() => checkMutation.mutate()}>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <ConfirmAlertDialog
+          trigger={
+            <Button type="button" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          }
+          title="Save this integration?"
+          tone="success"
+          headlineLabel="Action"
+          headline={`Update ${item.displayName}`}
+          summary="The on/off setting and any keys you typed will be stored for this institution."
+          notices={[
+            { icon: 'lock', label: 'API secrets are never shown again after you save. Paste a new value to replace one.' },
+          ]}
+          confirmLabel="Save"
+          confirmVariant="brand"
+          loading={saveMutation.isPending}
+          onConfirm={() => saveMutation.mutate(buildPayload())}
+        />
+        <Button type="button" variant="outline" disabled={checkMutation.isPending} onClick={() => checkMutation.mutate()}>
           Check connection
         </Button>
       </div>
-    </DetailSection>
+    </div>
   )
 }
 

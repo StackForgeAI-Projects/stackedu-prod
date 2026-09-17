@@ -98,7 +98,7 @@ function ApplyConfirmationPage() {
                 style={{
                   width:           32,
                   height:          32,
-                  backgroundColor: copied ? 'rgba(15, 189, 59,0.15)' : 'rgba(255,255,255,0.08)',
+                  backgroundColor: copied ? 'rgba(var(--brand-rgb),0.15)' : 'rgba(255,255,255,0.08)',
                   border:          'none',
                   cursor:          'pointer',
                   color:           copied ? 'var(--brand)' : 'var(--ink-muted)',

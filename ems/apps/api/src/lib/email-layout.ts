@@ -2,11 +2,14 @@ import { eq } from 'drizzle-orm'
 import { env } from '../config/env'
 import { getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
+import { publicLogoUrl } from './branding'
 import { escapeHtml } from './email'
 
 /** Shown in email footers when ICT settings have not set location / website yet. */
 const DEMO_LOCATION = 'KG 11 Ave, Nyarugenge, Kigali, Rwanda'
 const DEMO_WEBSITE = 'https://sfu.ac.rw'
+/** Matches the portal default when ICT has not set a system colour. */
+const DEFAULT_EMAIL_BRAND_COLOR = '#0FBD3B'
 
 export interface InstitutionEmailBranding {
   name: string
@@ -15,6 +18,7 @@ export interface InstitutionEmailBranding {
   location: string
   website: string
   logoUrl: string
+  brandColor: string
 }
 
 export interface BrandedEmailInput {
@@ -33,11 +37,6 @@ export interface BrandedEmailInput {
   trackUrl?: string
 }
 
-function publicLogoUrl(slug: string, logoFileKey: string | null): string | null {
-  if (!logoFileKey) return null
-  return `${env().API_PUBLIC_URL.replace(/\/$/, '')}/public/institution/${slug}/logo`
-}
-
 function defaultLogoUrl(): string {
   return `${env().WEB_APP_URL.replace(/\/$/, '')}/stackedu-logo.png`
 }
@@ -53,13 +52,19 @@ export async function getInstitutionEmailBranding(
       website: institutions.website,
       location: institutions.location,
       logoFileKey: institutions.logoFileKey,
+      brandColor: institutions.brandColor,
+      updatedAt: institutions.updatedAt,
     })
     .from(institutions)
     .where(eq(institutions.id, institutionId))
     .limit(1)
 
   const slug = row?.slug ?? 'sfu'
-  const logoFromStorage = publicLogoUrl(slug, row?.logoFileKey ?? null)
+  const logoFromStorage = publicLogoUrl({
+    slug,
+    logoFileKey: row?.logoFileKey ?? null,
+    updatedAt: row?.updatedAt,
+  })
 
   return {
     name: row?.name ?? 'StackForgeAI University',
@@ -68,6 +73,7 @@ export async function getInstitutionEmailBranding(
     location: row?.location?.trim() || DEMO_LOCATION,
     website: row?.website?.trim() || DEMO_WEBSITE,
     logoUrl: logoFromStorage ?? defaultLogoUrl(),
+    brandColor: row?.brandColor?.trim() || DEFAULT_EMAIL_BRAND_COLOR,
   }
 }
 
@@ -88,6 +94,7 @@ function footerLines(branding: InstitutionEmailBranding): string[] {
 
 function buildEmailFooterHtml(branding: InstitutionEmailBranding): string {
   const websiteLabel = branding.website.replace(/^https?:\/\//, '')
+  const accent = escapeHtml(branding.brandColor)
   return `
     <div style="text-align:center">
       <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#374151">${escapeHtml(branding.name)}</p>
@@ -95,11 +102,11 @@ function buildEmailFooterHtml(branding: InstitutionEmailBranding): string {
       <p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:#6b7280">${escapeHtml(branding.location)}</p>
       <p style="margin:0 0 6px;font-size:12px;color:#6b7280">
         Email:
-        <a href="mailto:${escapeHtml(branding.contactEmail)}" style="color:#2563eb;text-decoration:none">${escapeHtml(branding.contactEmail)}</a>
+        <a href="mailto:${escapeHtml(branding.contactEmail)}" style="color:${accent};text-decoration:none">${escapeHtml(branding.contactEmail)}</a>
       </p>
       <p style="margin:0 0 12px;font-size:12px;color:#6b7280">
         Website:
-        <a href="${escapeHtml(branding.website)}" style="color:#2563eb;text-decoration:none">${escapeHtml(websiteLabel)}</a>
+        <a href="${escapeHtml(branding.website)}" style="color:${accent};text-decoration:none">${escapeHtml(websiteLabel)}</a>
       </p>
       <p style="margin:0;font-size:11px;line-height:1.5;color:#9ca3af">Need help? Contact us using the details above.</p>
       <p style="margin:8px 0 0;font-size:11px;color:#9ca3af">Powered by StackEDU</p>
@@ -128,13 +135,15 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
     ...footerLines(input.branding),
   ].join('\n')
 
+  const accent = escapeHtml(input.branding.brandColor)
+
   const htmlParagraphs = input.paragraphs
     .map((p) => `<p style="margin:0 0 12px;line-height:1.5;color:#1a1a1a">${escapeHtml(p)}</p>`)
     .join('')
 
   const trackButton = showTrack
     ? `<p style="margin:20px 0 0">
-        <a href="${escapeHtml(track)}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">
+        <a href="${escapeHtml(track)}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">
           ${escapeHtml(ctaLabel)}
         </a>
       </p>`
@@ -152,7 +161,7 @@ export function buildBrandedEmail(input: BrandedEmailInput): { text: string; htm
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
           <tr>
-            <td style="padding:20px 24px;background:#111827;border-bottom:3px solid #16a34a">
+            <td style="padding:20px 24px;background:#111827;border-bottom:3px solid ${accent}">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="padding-right:12px;vertical-align:middle">

@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { primaryKeyColumn, timestamps } from '../../columns'
 import { courses, semesters } from './academic'
-import { attendanceStatusEnum, registrationStatusEnum } from './enums'
+import { attendanceStatusEnum, liveSessionStatusEnum, recordingStatusEnum, registrationStatusEnum } from './enums'
 import { users } from './people'
 import { students } from './students'
 
@@ -173,6 +173,42 @@ export const attendanceRecords = pgTable(
   ],
 )
 
+/**
+ * A unit of a course, holding materials in a deliberate order.
+ *
+ * A module may name an earlier module as its prerequisite, which keeps the
+ * later one shut until a student has worked through the earlier one. Unlike
+ * Canvas, the prerequisite is enough on its own: the lecturer does not also
+ * have to configure completion requirements on the earlier module for the
+ * lock to take effect.
+ */
+export const courseModules = pgTable(
+  'course_modules',
+  {
+    id: primaryKeyColumn(),
+    courseOfferingId: uuid('course_offering_id')
+      .notNull()
+      .references(() => courseOfferings.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    summary: text('summary'),
+    /** Display order within the course, lowest first. */
+    sequence: integer('sequence').notNull().default(0),
+    /**
+     * Must be another module on the same offering. Self-referencing, so the
+     * foreign key is declared in the migration rather than inline.
+     */
+    prerequisiteModuleId: uuid('prerequisite_module_id'),
+    isPublished: boolean('is_published').notNull().default(false),
+    publishedAt: timestamp('published_at', { withTimezone: true, mode: 'string' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('course_modules_offering_idx').on(t.courseOfferingId, t.sequence),
+    index('course_modules_prerequisite_idx').on(t.prerequisiteModuleId),
+  ],
+)
+
 export const courseMaterials = pgTable(
   'course_materials',
   {
@@ -180,10 +216,20 @@ export const courseMaterials = pgTable(
     courseOfferingId: uuid('course_offering_id')
       .notNull()
       .references(() => courseOfferings.id, { onDelete: 'cascade' }),
+    /**
+     * The module this material belongs to. Null means it is loose in the
+     * course, which is how every material created before modules existed
+     * behaves, and how a lecturer who does not want modules can carry on.
+     */
+    moduleId: uuid('module_id').references(() => courseModules.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description'),
-    /** Groups materials into weeks or units within the course. */
+    /** Free-text week or unit label, kept for materials with no module row. */
     moduleName: text('module_name'),
+    /** Set when the material is a page written in the portal rather than a file or link. */
+    bodyText: text('body_text'),
+    /** Display order within the module, lowest first. */
+    sequence: integer('sequence').notNull().default(0),
     fileKey: text('file_key'),
     externalUrl: text('external_url'),
     fileSizeBytes: integer('file_size_bytes'),
@@ -194,7 +240,38 @@ export const courseMaterials = pgTable(
     downloadCount: integer('download_count').notNull().default(0),
     ...timestamps(),
   },
-  (t) => [index('course_materials_offering_idx').on(t.courseOfferingId, t.isPublished)],
+  (t) => [
+    index('course_materials_offering_idx').on(t.courseOfferingId, t.isPublished),
+    index('course_materials_module_idx').on(t.moduleId, t.sequence),
+  ],
+)
+
+/**
+ * Which materials a student has opened.
+ *
+ * This is what makes a module prerequisite mean something: a module counts as
+ * done once the student has opened every published material in it. Only the
+ * first open is recorded, because the question is whether the student got to
+ * the material, not how often they came back.
+ */
+export const courseMaterialViews = pgTable(
+  'course_material_views',
+  {
+    id: primaryKeyColumn(),
+    materialId: uuid('material_id')
+      .notNull()
+      .references(() => courseMaterials.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    firstViewedAt: timestamp('first_viewed_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('course_material_views_key').on(t.materialId, t.studentId),
+    index('course_material_views_student_idx').on(t.studentId),
+  ],
 )
 
 export const announcements = pgTable(
@@ -219,4 +296,72 @@ export const announcements = pgTable(
     index('announcements_offering_idx').on(t.courseOfferingId),
     index('announcements_published_idx').on(t.publishedAt),
   ],
+)
+
+export const liveSessions = pgTable(
+  'live_sessions',
+  {
+    id: primaryKeyColumn(),
+    courseOfferingId: uuid('course_offering_id')
+      .notNull()
+      .references(() => courseOfferings.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    status: liveSessionStatusEnum('status').notNull().default('Scheduled'),
+    /** LiveKit room name. Generic so Cloud vs self-host is only an env change. */
+    roomName: text('room_name').notNull(),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true, mode: 'string' }),
+    startedAt: timestamp('started_at', { withTimezone: true, mode: 'string' }),
+    endedAt: timestamp('ended_at', { withTimezone: true, mode: 'string' }),
+    startedBy: uuid('started_by').references(() => users.id, { onDelete: 'set null' }),
+    whiteboardFileKey: text('whiteboard_file_key'),
+    summaryText: text('summary_text'),
+    summaryPublishedAt: timestamp('summary_published_at', { withTimezone: true, mode: 'string' }),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('live_sessions_room_key').on(t.roomName),
+    index('live_sessions_offering_idx').on(t.courseOfferingId, t.createdAt),
+    index('live_sessions_status_idx').on(t.status),
+  ],
+)
+
+export const liveSessionParticipants = pgTable(
+  'live_session_participants',
+  {
+    id: primaryKeyColumn(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => liveSessions.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('participant'),
+    joinedAt: timestamp('joined_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    leftAt: timestamp('left_at', { withTimezone: true, mode: 'string' }),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('live_session_participants_key').on(t.sessionId, t.userId),
+    index('live_session_participants_user_idx').on(t.userId),
+  ],
+)
+
+export const sessionRecordings = pgTable(
+  'session_recordings',
+  {
+    id: primaryKeyColumn(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => liveSessions.id, { onDelete: 'cascade' }),
+    fileKey: text('file_key'),
+    fileName: text('file_name'),
+    mimeType: text('mime_type'),
+    byteSize: integer('byte_size'),
+    durationSeconds: integer('duration_seconds'),
+    /** Provider job id from the media server, not a Cloud-specific type. */
+    jobId: text('job_id'),
+    status: recordingStatusEnum('status').notNull().default('Pending'),
+    ...timestamps(),
+  },
+  (t) => [index('session_recordings_session_idx').on(t.sessionId, t.createdAt)],
 )

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
+import { ListPagination } from '@/components/ListPagination'
 import { cn } from '@/lib/utils'
 
 export interface DataTableColumn<T> {
@@ -112,8 +113,6 @@ export function DataTable<T>({
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const from = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
-  const to = Math.min(currentPage * pageSize, filtered.length)
 
   function resetPage() {
     setPage(1)
@@ -233,55 +232,19 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3"
-        style={{ borderTop: '1px solid var(--border)' }}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>Show</span>
-          <select
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value))
-              setPage(1)
-            }}
-            className="h-8 rounded-lg px-2 text-sm outline-none"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>{size}</option>
-            ))}
-          </select>
-          <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-            per page · {filtered.length} {filtered.length === 1 ? 'row' : 'rows'}
-            {filtered.length !== rows.length ? ` of ${rows.length}` : ''}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-            {filtered.length === 0 ? '0 rows' : `Showing ${from}–${to} of ${filtered.length}`}
-          </span>
-          <button
-            type="button"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-lg"
-            style={{ border: '1px solid var(--border)', color: 'var(--foreground)', opacity: currentPage <= 1 ? 0.4 : 1 }}
-            disabled={currentPage <= 1}
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-lg"
-            style={{ border: '1px solid var(--border)', color: 'var(--foreground)', opacity: currentPage >= totalPages ? 0.4 : 1 }}
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="px-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <ListPagination
+          page={currentPage}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          pageSizeOptions={pageSizeOptions}
+          itemLabel="rows"
+        />
       </div>
     </div>
   )

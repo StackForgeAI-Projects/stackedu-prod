@@ -9,9 +9,11 @@ import { DataTable } from '@/components/DataTable'
 import { studentStatusColors, gradeColors } from '@/data/academic'
 import {
   academicStudentQueryKey,
+  academicStudentEngagementQueryKey,
   academicStudentsQueryKey,
   changeAcademicStudentStatus,
   getAcademicStudent,
+  getAcademicStudentEngagement,
   listAcademicProgrammes,
   academicProgrammesQueryKey,
 } from '@/lib/api/academic'
@@ -45,6 +47,11 @@ function StudentProfilePage() {
   const { data: s, isPending, error } = useQuery({
     queryKey: academicStudentQueryKey(id),
     queryFn: () => getAcademicStudent(id),
+    enabled: Boolean(id),
+  })
+  const { data: engagement = [] } = useQuery({
+    queryKey: academicStudentEngagementQueryKey(id),
+    queryFn: () => getAcademicStudentEngagement(id),
     enabled: Boolean(id),
   })
 
@@ -261,6 +268,21 @@ function StudentProfilePage() {
                   </div>
                   <span className="t-label px-3 py-1.5" style={{ backgroundColor: standingColors.bg, color: standingColors.color, borderRadius: 'var(--radius-sm)' }}>{s.standing}</span>
                 </div>
+
+                {engagement.length > 0 ? (
+                  <div className="mt-4" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 20 }}>
+                    <h2 className="t-h3 mb-3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Engagement</h2>
+                    {engagement.map((row) => (
+                      <div key={row.offeringId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2" style={{ borderTop: '1px solid var(--border)' }}>
+                        <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{row.courseCode} {row.courseName}</p>
+                        <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+                          Att {row.attendanceRate ?? '—'}% · Eng {row.engagementRate ?? '—'}% · Score {row.averageScore ?? '—'} · {formatCurrency(row.feeBalance)}
+                          {row.riskLevel ? ` · ${row.riskLevel}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
 

@@ -62,7 +62,7 @@ function DashboardBody({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <StatTile
             icon={BookOpen}
-            iconColor="var(--brand)" iconBg="rgba(15, 189, 59,0.08)"
+            iconColor="var(--brand)" iconBg="rgba(var(--brand-rgb),0.08)"
             label="ASSIGNED COURSES" value={String(data.stats.assignedCourses)}
             delta={data.stats.semesterLabel} deltaColor="var(--muted-foreground)"
             animationDelay={0}
@@ -164,7 +164,7 @@ function RecentAttendanceCard({ sessions }: { sessions: LecturerDashboard['recen
                 <div className="flex items-center gap-3 mb-2">
                   <span
                     className="t-label px-2 py-0.5 flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(15, 189, 59, 0.10)', color: 'var(--brand)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: 10 }}
+                    style={{ backgroundColor: 'rgba(var(--brand-rgb), 0.10)', color: 'var(--brand)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: 10 }}
                   >
                     {s.courseCode}
                   </span>
@@ -195,7 +195,7 @@ function TodayScheduleCard({ items }: { items: LecturerDashboard['todaySchedule'
   const typeColors: Record<string, { bg: string; color: string }> = {
     Lecture: { bg: 'var(--info-bg)', color: 'var(--info)' },
     Tutorial: { bg: 'var(--warning-bg)', color: 'var(--warning)' },
-    Lab: { bg: 'rgba(15, 189, 59,0.08)', color: 'var(--brand)' },
+    Lab: { bg: 'rgba(var(--brand-rgb),0.08)', color: 'var(--brand)' },
   }
 
   return (

@@ -1,310 +1,667 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
-import { Upload, Plus, Trash2, Pin } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Pencil, Pin, Plus, Trash2, Upload } from 'lucide-react'
+import type {
+  LecturerCourseAnnouncement,
+  LecturerCourseMaterial,
+  LecturerCourseModule,
+} from '@stackedu/shared'
+import { formatMaterialFileSize, materialSourceLabel } from '@stackedu/shared'
 import { LecturerShell } from '@/components/LecturerShell'
+import { ClassroomSessionList } from '@/components/classroom/ClassroomSessionList'
+import { CourseDiscussionBoard } from '@/components/course/CourseDiscussionBoard'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { PagedList } from '@/components/ListPagination'
+import { MaterialForm, MaterialRowActions, TableIconButton } from '@/components/lecturer/CourseMaterialEditor'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from 'sonner'
+import { apiErrorMessage } from '@/lib/api/client'
 import {
-  LECTURER_COURSES, COURSE_MATERIALS, ANNOUNCEMENTS,
-  type CourseMaterial, type CourseAnnouncement,
-} from '@/data/lecturer'
+  createLecturerAnnouncement,
+  createLecturerModule,
+  deleteLecturerAnnouncement,
+  deleteLecturerModule,
+  getLecturerCourse,
+  lecturerCourseQueryKey,
+  listLecturerCourses,
+  lecturerCoursesQueryKey,
+  updateLecturerAnnouncement,
+  updateLecturerModule,
+} from '@/lib/api/lecturer'
+import { formatDateShort } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_auth/lecturer/course-management')({
   component: CourseManagementPage,
 })
 
-const TYPE_BADGE: Record<CourseMaterial['type'], { bg: string; color: string }> = {
-  PDF:  { bg: 'var(--error-bg)',   color: 'var(--error)'   },
-  PPTX: { bg: 'var(--warning-bg)', color: 'var(--warning)' },
-  DOCX: { bg: 'var(--info-bg)',    color: 'var(--info)'    },
-  ZIP:  { bg: 'var(--muted)',      color: 'var(--muted-foreground)' },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+const NO_PREREQUISITE = 'none'
 
 function CourseManagementPage() {
-  const [courseId,       setCourseId]       = useState(LECTURER_COURSES[0].id)
-  const [uploadOpen,     setUploadOpen]     = useState(false)
-  const [announceOpen,   setAnnounceOpen]   = useState(false)
-  const [materials,      setMaterials]      = useState<CourseMaterial[]>(COURSE_MATERIALS)
-  const [announcements,  setAnnouncements]  = useState<CourseAnnouncement[]>(ANNOUNCEMENTS)
+  const queryClient = useQueryClient()
+  const { data: courses = [], isPending, error } = useQuery({
+    queryKey: lecturerCoursesQueryKey,
+    queryFn: listLecturerCourses,
+  })
+  const [offeringId, setOfferingId] = useState('')
+  const [moduleOpen, setModuleOpen] = useState(false)
+  const [editingModule, setEditingModule] = useState<LecturerCourseModule | null>(null)
+  const [materialOpen, setMaterialOpen] = useState(false)
+  const [editingMaterial, setEditingMaterial] = useState<LecturerCourseMaterial | null>(null)
+  const [announceOpen, setAnnounceOpen] = useState(false)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<LecturerCourseAnnouncement | null>(null)
 
-  const filteredMaterials = materials.filter(m => m.courseId === courseId)
-  const filteredAnnouncements = announcements.filter(a => a.courseId === courseId)
+  useEffect(() => {
+    if (!offeringId && courses[0]) setOfferingId(courses[0].offeringId)
+  }, [courses, offeringId])
 
-  const deleteMaterial = (id: number) => {
-    setMaterials(prev => prev.filter(m => m.id !== id))
-    toast.success('Material deleted')
+  const { data: detail, isPending: detailPending } = useQuery({
+    queryKey: lecturerCourseQueryKey(offeringId),
+    queryFn: () => getLecturerCourse(offeringId),
+    enabled: Boolean(offeringId),
+  })
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: lecturerCourseQueryKey(offeringId) })
   }
 
-  return (
-    <LecturerShell pageTitle="Course Management">
-      <div className="animate-fade-up" style={{ padding: '32px 32px 56px', maxWidth: 900, margin: '0 auto' }}>
+  const modules = detail?.modules ?? []
+  const materials = detail?.materials ?? []
+  const announcements = detail?.announcements ?? []
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-7">
+  return (
+    <LecturerShell
+      pageTitle="Course Management"
+      guide="Build the course as modules of pages, files and links, then post announcements, run live classes, and start discussions. Students see published items. A module with a prerequisite stays shut until the earlier one is finished."
+    >
+      <div className="animate-fade-up" style={{ padding: '24px 16px 56px', maxWidth: 900, margin: '0 auto' }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
             <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>Course Management</h1>
-            <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Manage materials and announcements for your courses.</p>
+            <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Modules, materials and announcements for the courses assigned to you.</p>
           </div>
-          <Select value={courseId} onValueChange={setCourseId}>
-            <SelectTrigger className="w-60"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {LECTURER_COURSES.map(c => <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {courses.length > 0 ? (
+            <Select value={offeringId} onValueChange={setOfferingId}>
+              <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder="Choose a course" /></SelectTrigger>
+              <SelectContent>
+                {courses.map((course) => (
+                  <SelectItem key={course.offeringId} value={course.offeringId}>
+                    {course.code} {course.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
 
-        {/* ── Materials section ────────────────────────────────────────────── */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Materials</h2>
-            <Button onClick={() => setUploadOpen(true)} style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}>
-              <Upload style={{ width: 14, height: 14 }} /> Upload material
-            </Button>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-            {filteredMaterials.length === 0 && (
-              <div className="py-12 text-center">
-                <p className="t-body-sm" style={{ color: 'var(--muted-foreground)' }}>No materials uploaded for this course.</p>
+        {isPending ? (
+          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading courses…</p>
+        ) : error ? (
+          <p className="t-body" style={{ color: 'var(--error)' }}>{apiErrorMessage(error, 'Could not load courses.')}</p>
+        ) : courses.length === 0 ? (
+          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No courses assigned this semester.</p>
+        ) : detailPending && !detail ? (
+          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading this course…</p>
+        ) : (
+          <>
+            <section className="mb-8">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Modules</h2>
+                <Button
+                  type="button"
+                  onClick={() => { setEditingModule(null); setModuleOpen(true) }}
+                  style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}
+                >
+                  <Plus style={{ width: 14, height: 14 }} /> Add module
+                </Button>
               </div>
-            )}
-            {filteredMaterials.map((m, i) => {
-              const tb = TYPE_BADGE[m.type] ?? { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
-              return (
-                <div key={m.id} className="flex items-center gap-4 px-5" style={{ paddingTop: 14, paddingBottom: 14, borderBottom: i < filteredMaterials.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <span className="t-label px-2 py-0.5 flex-shrink-0" style={{ backgroundColor: tb.bg, color: tb.color, borderRadius: 'var(--radius-sm)' }}>{m.type}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{m.title}</p>
-                    <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                      {m.uploadDate} · {m.fileSize} · {m.downloads} downloads
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline" size="sm"
-                    className="gap-1 flex-shrink-0"
-                    style={{ fontSize: '0.8125rem', color: 'var(--error)', borderColor: 'var(--error)' }}
-                    onClick={() => deleteMaterial(m.id)}
+              <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                {modules.length === 0 ? (
+                  <p className="t-body-sm px-5 py-10 text-center" style={{ color: 'var(--muted-foreground)' }}>
+                    No modules yet. Add one to sequence pages and files. A course with no modules still works.
+                  </p>
+                ) : modules.map((module, index) => {
+                  const prerequisite = modules.find((row) => row.id === module.prerequisiteModuleId)
+                  return (
+                    <div
+                      key={module.id}
+                      className="flex flex-col sm:flex-row sm:items-center gap-3 px-5"
+                      style={{ paddingTop: 14, paddingBottom: 14, borderBottom: index < modules.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{module.title}</p>
+                          <span
+                            className="t-label px-2 py-0.5"
+                            style={{
+                              backgroundColor: module.isPublished ? 'var(--success-bg)' : 'var(--muted)',
+                              color: module.isPublished ? 'var(--success)' : 'var(--muted-foreground)',
+                              borderRadius: 'var(--radius-sm)',
+                            }}
+                          >
+                            {module.isPublished ? 'Published' : 'Draft'}
+                          </span>
+                        </div>
+                        <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                          {module.materialCount} {module.materialCount === 1 ? 'item' : 'items'}
+                          {prerequisite ? ` · After "${prerequisite.title}"` : ''}
+                          {module.summary ? ` · ${module.summary}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TableIconButton
+                          label="Edit module"
+                          icon={Pencil}
+                          onClick={() => { setEditingModule(module); setModuleOpen(true) }}
+                        />
+                        <DeleteModuleButton module={module} onChanged={refresh} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Materials</h2>
+                <Button
+                  type="button"
+                  onClick={() => { setEditingMaterial(null); setMaterialOpen(true) }}
+                  style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}
+                >
+                  <Upload style={{ width: 14, height: 14 }} /> Add material
+                </Button>
+              </div>
+              <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                {materials.length === 0 ? (
+                  <p className="t-body-sm px-5 py-10 text-center" style={{ color: 'var(--muted-foreground)' }}>
+                    No materials for this course. Add a page, a file or a link.
+                  </p>
+                ) : materials.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5"
+                    style={{ paddingTop: 14, paddingBottom: 14, borderBottom: index < materials.length - 1 ? '1px solid var(--border)' : 'none' }}
                   >
-                    <Trash2 style={{ width: 12, height: 12 }} /> Delete
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ── Announcements section ───────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Announcements</h2>
-            <Button onClick={() => setAnnounceOpen(true)} style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}>
-              <Plus style={{ width: 14, height: 14 }} /> Post announcement
-            </Button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filteredAnnouncements.length === 0 && (
-              <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', padding: 24, textAlign: 'center' }}>
-                <p className="t-body-sm" style={{ color: 'var(--muted-foreground)' }}>No announcements for this course.</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{item.title}</p>
+                        <span className="t-label px-2 py-0.5" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 'var(--radius-sm)' }}>
+                          {materialSourceLabel(item)}
+                        </span>
+                      </div>
+                      <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                        {item.moduleName ?? 'Ungrouped'}
+                        {item.fileName ? ` · ${item.fileName} · ${formatMaterialFileSize(item.fileSizeBytes)}` : ''}
+                        {` · ${item.isPublished ? 'Published' : 'Draft'}`}
+                        {` · ${formatDateShort(item.createdAt)}`}
+                      </p>
+                    </div>
+                    <MaterialRowActions
+                      material={item}
+                      onEdit={() => { setEditingMaterial(item); setMaterialOpen(true) }}
+                      onChanged={refresh}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
-            {filteredAnnouncements.map(a => (
-              <AnnouncementCard key={a.id} announcement={a} />
-            ))}
-          </div>
-        </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Announcements</h2>
+                <Button
+                  type="button"
+                  onClick={() => { setEditingAnnouncement(null); setAnnounceOpen(true) }}
+                  style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}
+                >
+                  <Plus style={{ width: 14, height: 14 }} /> Post announcement
+                </Button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {announcements.length === 0 ? (
+                  <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', padding: 24, textAlign: 'center' }}>
+                    <p className="t-body-sm" style={{ color: 'var(--muted-foreground)' }}>No announcements for this course.</p>
+                  </div>
+                ) : (
+                  <PagedList
+                    items={announcements}
+                    getKey={(row) => row.id}
+                    defaultPageSize={5}
+                    itemLabel="announcements"
+                    renderItem={(row) => (
+                      <AnnouncementCard
+                        announcement={row}
+                        onEdit={() => { setEditingAnnouncement(row); setAnnounceOpen(true) }}
+                        onChanged={refresh}
+                      />
+                    )}
+                  />
+                )}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="t-h3 mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>Live classes</h2>
+              <ClassroomSessionList
+                role="lecturer"
+                sessions={detail?.liveSessions ?? []}
+                offeringId={offeringId}
+                empty="No live classes for this course yet."
+                onChanged={refresh}
+              />
+            </section>
+
+            <section className="mt-8">
+              <CourseDiscussionBoard
+                offeringId={offeringId}
+                threads={detail?.discussions ?? []}
+                role="lecturer"
+                onChanged={refresh}
+              />
+            </section>
+          </>
+        )}
       </div>
 
-      {/* Upload material Sheet */}
-      <Sheet open={uploadOpen} onOpenChange={setUploadOpen}>
+      <Sheet open={moduleOpen} onOpenChange={(open) => { setModuleOpen(open); if (!open) setEditingModule(null) }}>
         <SheetContent side="right" className="p-0 border-l overflow-hidden flex flex-col sheet-md">
-          <UploadMaterialForm courseId={courseId} onClose={() => setUploadOpen(false)} onUploaded={(m) => { setMaterials(prev => [...prev, m]); setUploadOpen(false) }} />
+          {offeringId ? (
+            <ModuleForm
+              offeringId={offeringId}
+              module={editingModule}
+              modules={modules}
+              onClose={() => { setModuleOpen(false); setEditingModule(null) }}
+              onSuccess={async () => {
+                await refresh()
+                setModuleOpen(false)
+                setEditingModule(null)
+              }}
+            />
+          ) : null}
         </SheetContent>
       </Sheet>
 
-      {/* Post announcement Sheet */}
-      <Sheet open={announceOpen} onOpenChange={setAnnounceOpen}>
+      <Sheet open={materialOpen} onOpenChange={(open) => { setMaterialOpen(open); if (!open) setEditingMaterial(null) }}>
         <SheetContent side="right" className="p-0 border-l overflow-hidden flex flex-col sheet-md">
-          <PostAnnouncementForm courseId={courseId} onClose={() => setAnnounceOpen(false)} onPosted={(a) => { setAnnouncements(prev => [a, ...prev]); setAnnounceOpen(false) }} />
+          {offeringId ? (
+            <MaterialForm
+              offeringId={offeringId}
+              material={editingMaterial}
+              modules={modules}
+              onClose={() => { setMaterialOpen(false); setEditingMaterial(null) }}
+              onSuccess={async () => {
+                await refresh()
+                setMaterialOpen(false)
+                setEditingMaterial(null)
+              }}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={announceOpen} onOpenChange={(open) => { setAnnounceOpen(open); if (!open) setEditingAnnouncement(null) }}>
+        <SheetContent side="right" className="p-0 border-l overflow-hidden flex flex-col sheet-md">
+          {offeringId ? (
+            <AnnouncementForm
+              offeringId={offeringId}
+              announcement={editingAnnouncement}
+              onClose={() => { setAnnounceOpen(false); setEditingAnnouncement(null) }}
+              onSuccess={async () => {
+                await refresh()
+                setAnnounceOpen(false)
+                setEditingAnnouncement(null)
+              }}
+            />
+          ) : null}
         </SheetContent>
       </Sheet>
     </LecturerShell>
   )
 }
 
-// ── Announcement card ─────────────────────────────────────────────────────────
+function DeleteModuleButton({
+  module,
+  onChanged,
+}: {
+  module: LecturerCourseModule
+  onChanged: () => Promise<void>
+}) {
+  const mutation = useMutation({
+    mutationFn: () => deleteLecturerModule(module.id),
+    onSuccess: async () => {
+      toast.success(`"${module.title}" removed.`)
+      await onChanged()
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not delete that module.')),
+  })
 
-function AnnouncementCard({ announcement: a }: { announcement: CourseAnnouncement }) {
-  const [hovered, setHovered] = useState(false)
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)', border: '1px solid var(--border)', padding: '18px 20px', transition: 'box-shadow 150ms ease-out' }}
-    >
+    <ConfirmAlertDialog
+      trigger={<TableIconButton label="Delete module" icon={Trash2} danger />}
+      title="Delete this module?"
+      tone="destructive"
+      headlineLabel="Action"
+      headline="Delete module"
+      summary={`"${module.title}" will be removed. Materials inside it stay on the course, ungrouped.`}
+      notices={[
+        { icon: 'lock', label: 'Any later module that named this one as a prerequisite will need a new one set.' },
+        { icon: 'trash', label: 'This cannot be undone.' },
+      ]}
+      confirmLabel="Delete"
+      confirmVariant="destructive"
+      loading={mutation.isPending}
+      onConfirm={() => mutation.mutate()}
+    />
+  )
+}
+
+function ModuleForm({
+  offeringId,
+  module,
+  modules,
+  onClose,
+  onSuccess,
+}: {
+  offeringId: string
+  module: LecturerCourseModule | null
+  modules: LecturerCourseModule[]
+  onClose: () => void
+  onSuccess: () => Promise<void>
+}) {
+  const isEdit = module !== null
+  const [title, setTitle] = useState(module?.title ?? '')
+  const [summary, setSummary] = useState(module?.summary ?? '')
+  const [prerequisiteModuleId, setPrerequisiteModuleId] = useState(module?.prerequisiteModuleId ?? NO_PREREQUISITE)
+  const [publish, setPublish] = useState(module?.isPublished ?? true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setTitle(module?.title ?? '')
+    setSummary(module?.summary ?? '')
+    setPrerequisiteModuleId(module?.prerequisiteModuleId ?? NO_PREREQUISITE)
+    setPublish(module?.isPublished ?? true)
+  }, [module])
+
+  const otherModules = modules.filter((row) => row.id !== module?.id)
+
+  const save = async () => {
+    if (title.trim().length < 2) return
+    setSaving(true)
+    try {
+      const prerequisite = prerequisiteModuleId === NO_PREREQUISITE ? null : prerequisiteModuleId
+      if (isEdit && module) {
+        await updateLecturerModule(module.id, {
+          title: title.trim(),
+          summary: summary.trim() || undefined,
+          prerequisiteModuleId: prerequisite,
+          publish,
+        })
+        toast.success(`Module "${title.trim()}" updated.`)
+      } else {
+        await createLecturerModule({
+          offeringId,
+          title: title.trim(),
+          summary: summary.trim() || undefined,
+          prerequisiteModuleId: prerequisite,
+          publish,
+        })
+        toast.success(`Module "${title.trim()}" saved.`)
+      }
+      await onSuccess()
+    } catch (err) {
+      toast.error(apiErrorMessage(err, isEdit ? 'Could not update that module.' : 'Could not add that module.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
+          {isEdit ? 'Edit module' : 'Add module'}
+        </h3>
+        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+          A prerequisite is optional. If you set one, it takes effect on its own. Students cannot open this module until they finish the earlier one.
+        </p>
+      </div>
+      <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div>
+          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Title</label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Module 1: Foundations" />
+        </div>
+        <div>
+          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Summary (optional)</label>
+          <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What students will cover here…" rows={3} />
+        </div>
+        <div>
+          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Prerequisite (optional)</label>
+          <Select value={prerequisiteModuleId} onValueChange={setPrerequisiteModuleId}>
+            <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PREREQUISITE}>None</SelectItem>
+              {otherModules.map((row) => (
+                <SelectItem key={row.id} value={row.id}>{row.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm" style={{ color: 'var(--foreground)' }}>Publish to students</span>
+          <Switch checked={publish} onCheckedChange={setPublish} />
+        </div>
+      </div>
+      <div style={{ padding: '0 24px 28px', display: 'flex', gap: 10 }}>
+        <ConfirmAlertDialog
+          trigger={
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={title.trim().length < 2 || saving}
+              style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
+            >
+              {saving ? 'Saving…' : isEdit ? 'Save module' : 'Add module'}
+            </Button>
+          }
+          title={isEdit ? 'Save this module?' : 'Add this module?'}
+          tone="success"
+          headlineLabel="Action"
+          headline={isEdit ? 'Update module' : 'Add module'}
+          summary={isEdit
+            ? `Students will see the updated module "${title.trim() || module?.title}".`
+            : `"${title.trim()}" will be added to this course.`}
+          notices={[
+            { icon: 'lock', label: publish ? 'Published modules appear in the student course feed.' : 'A draft stays hidden from students.' },
+          ]}
+          confirmLabel={isEdit ? 'Save module' : 'Add module'}
+          confirmVariant="brand"
+          loading={saving}
+          onConfirm={() => void save()}
+        />
+        <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+      </div>
+    </div>
+  )
+}
+
+function AnnouncementCard({
+  announcement,
+  onEdit,
+  onChanged,
+}: {
+  announcement: LecturerCourseAnnouncement
+  onEdit: () => void
+  onChanged: () => Promise<void>
+}) {
+  const mutation = useMutation({
+    mutationFn: () => deleteLecturerAnnouncement(announcement.id),
+    onSuccess: async () => {
+      toast.success(`"${announcement.title}" deleted.`)
+      await onChanged()
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'Could not delete that announcement.')),
+  })
+
+  return (
+    <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', padding: '18px 20px' }}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{a.title}</p>
-            {a.pinned && (
-              <Pin style={{ width: 13, height: 13, color: 'var(--brand)' }} />
-            )}
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{announcement.title}</p>
+            {announcement.isPinned ? <Pin style={{ width: 13, height: 13, color: 'var(--brand)' }} /> : null}
+            <span
+              className="t-label px-2 py-0.5"
+              style={{
+                backgroundColor: announcement.publishedAt ? 'var(--success-bg)' : 'var(--muted)',
+                color: announcement.publishedAt ? 'var(--success)' : 'var(--muted-foreground)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              {announcement.publishedAt ? 'Posted' : 'Draft'}
+            </span>
           </div>
-          <p className="t-body-sm mb-2" style={{ color: 'var(--muted-foreground)' }}>{a.body}</p>
-          <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>{a.date}</p>
+          <p className="t-body-sm mb-2 whitespace-pre-wrap" style={{ color: 'var(--muted-foreground)' }}>{announcement.body}</p>
+          <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+            {formatDateShort(announcement.publishedAt ?? announcement.createdAt)}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <TableIconButton label="Edit announcement" icon={Pencil} onClick={onEdit} />
+          <ConfirmAlertDialog
+            trigger={<TableIconButton label="Delete announcement" icon={Trash2} danger />}
+            title="Delete this announcement?"
+            tone="destructive"
+            headlineLabel="Action"
+            headline="Delete course announcement"
+            summary={`"${announcement.title}" will be removed from the course feed.`}
+            notices={[{ icon: 'trash', label: 'Students will no longer see this announcement.' }]}
+            confirmLabel="Delete"
+            confirmVariant="destructive"
+            loading={mutation.isPending}
+            onConfirm={() => mutation.mutate()}
+          />
         </div>
       </div>
     </div>
   )
 }
 
-// ── Upload material form ──────────────────────────────────────────────────────
-
-function UploadMaterialForm({
-  courseId, onClose, onUploaded,
+function AnnouncementForm({
+  offeringId,
+  announcement,
+  onClose,
+  onSuccess,
 }: {
-  courseId: string
+  offeringId: string
+  announcement: LecturerCourseAnnouncement | null
   onClose: () => void
-  onUploaded: (m: CourseMaterial) => void
+  onSuccess: () => Promise<void>
 }) {
-  const [title,    setTitle]    = useState('')
-  const [selected, setSelected] = useState(courseId)
-  const [desc,     setDesc]     = useState('')
-  const [type,     setType]     = useState<CourseMaterial['type']>('PDF')
+  const isEdit = announcement !== null
+  const [title, setTitle] = useState(announcement?.title ?? '')
+  const [body, setBody] = useState(announcement?.body ?? '')
+  const [pinned, setPinned] = useState(announcement?.isPinned ?? false)
+  const [publish, setPublish] = useState(announcement ? Boolean(announcement.publishedAt) : true)
+  const [saving, setSaving] = useState(false)
 
-  const handleUpload = () => {
-    if (!title.trim()) return
-    const newMaterial: CourseMaterial = {
-      id: Date.now(), courseId: selected, title, type,
-      uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      fileSize: '—', downloads: 0,
+  useEffect(() => {
+    setTitle(announcement?.title ?? '')
+    setBody(announcement?.body ?? '')
+    setPinned(announcement?.isPinned ?? false)
+    setPublish(announcement ? Boolean(announcement.publishedAt) : true)
+  }, [announcement])
+
+  const save = async () => {
+    if (title.trim().length < 2 || body.trim().length < 2) return
+    setSaving(true)
+    try {
+      if (isEdit && announcement) {
+        await updateLecturerAnnouncement(announcement.id, {
+          title: title.trim(),
+          body: body.trim(),
+          isPinned: pinned,
+          publish,
+        })
+        toast.success(publish ? `Announcement "${title.trim()}" posted.` : `Draft "${title.trim()}" saved.`)
+      } else {
+        await createLecturerAnnouncement({
+          offeringId,
+          title: title.trim(),
+          body: body.trim(),
+          isPinned: pinned,
+          publish,
+        })
+        toast.success(publish ? `Announcement "${title.trim()}" posted.` : `Draft "${title.trim()}" saved.`)
+      }
+      await onSuccess()
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not save that announcement.'))
+    } finally {
+      setSaving(false)
     }
-    toast.success(`"${title}" uploaded`)
-    onUploaded(newMaterial)
   }
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.4 }}>Upload Material</h3>
+      <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
+          {isEdit ? 'Edit announcement' : 'Post announcement'}
+        </h3>
+        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+          Posted announcements go to enrolled students. A draft stays on this screen until you post it.
+        </p>
       </div>
-
-      <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Title</label>
-          <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Week 1 — Lecture Slides" />
-        </div>
-        <div>
-          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Course</label>
-          <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {LECTURER_COURSES.map(c => <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>File type</label>
-          <Select value={type} onValueChange={v => setType(v as CourseMaterial['type'])}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(['PDF', 'PPTX', 'DOCX', 'ZIP'] as const).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Description (optional)</label>
-          <Textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Brief description of this material…" rows={3} />
-        </div>
-        {/* Drop zone */}
-        <div
-          style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)', padding: 32, textAlign: 'center', backgroundColor: 'var(--muted)', cursor: 'pointer' }}
-          onClick={() => toast.info('File picker not connected in prototype')}
-        >
-          <Upload style={{ width: 24, height: 24, color: 'var(--muted-foreground)', margin: '0 auto 8px' }} />
-          <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Click to select a file</p>
-          <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>PDF, PPTX, DOCX, ZIP · Max 50 MB</p>
-        </div>
-      </div>
-
-      <div style={{ padding: '0 24px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
-        <Button onClick={handleUpload} className="flex-1" style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}>Upload</Button>
-        <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-      </div>
-    </div>
-  )
-}
-
-// ── Post announcement form ────────────────────────────────────────────────────
-
-function PostAnnouncementForm({
-  courseId, onClose, onPosted,
-}: {
-  courseId: string
-  onClose: () => void
-  onPosted: (a: CourseAnnouncement) => void
-}) {
-  const [title,    setTitle]    = useState('')
-  const [body,     setBody]     = useState('')
-  const [selected, setSelected] = useState(courseId)
-  const [pinned,   setPinned]   = useState(false)
-
-  const handlePost = () => {
-    if (!title.trim()) return
-    const a: CourseAnnouncement = {
-      id: Date.now(), courseId: selected, title, body, pinned,
-      date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-    }
-    toast.success(`Announcement "${title}" posted`)
-    onPosted(a)
-  }
-
-  return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.4 }}>Post Announcement</h3>
-      </div>
-
-      <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Title</label>
-          <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Announcement title" />
-        </div>
-        <div>
-          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Course</label>
-          <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {LECTURER_COURSES.map(c => <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title" />
         </div>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Message</label>
-          <Textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your announcement…" rows={5} />
+          <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your announcement…" rows={5} />
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setPinned(v => !v)}
-            style={{ width: 40, height: 22, borderRadius: 11, backgroundColor: pinned ? 'var(--brand)' : 'var(--border)', transition: 'background-color 150ms', border: 'none', cursor: 'pointer', position: 'relative' }}
-          >
-            <span style={{ position: 'absolute', top: 2, left: pinned ? 20 : 2, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff', transition: 'left 150ms' }} />
-          </button>
-          <span className="text-sm" style={{ color: 'var(--foreground)' }}>Pin this announcement</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm" style={{ color: 'var(--foreground)' }}>Pin to the top of the feed</span>
+          <Switch checked={pinned} onCheckedChange={setPinned} />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm" style={{ color: 'var(--foreground)' }}>Post now</span>
+          <Switch checked={publish} onCheckedChange={setPublish} />
         </div>
       </div>
-
-      <div style={{ padding: '0 24px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
-        <Button onClick={handlePost} className="flex-1" style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}>Post</Button>
-        <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+      <div style={{ padding: '0 24px 28px', display: 'flex', gap: 10 }}>
+        <ConfirmAlertDialog
+          trigger={
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={title.trim().length < 2 || body.trim().length < 2 || saving}
+              style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
+            >
+              {saving ? 'Saving…' : publish ? 'Post' : 'Save draft'}
+            </Button>
+          }
+          title={publish ? 'Post this announcement?' : 'Save this draft?'}
+          tone="success"
+          headlineLabel="Action"
+          headline={publish ? 'Post announcement' : 'Save draft'}
+          summary={`"${title.trim()}" will ${publish ? 'appear in the student course feed' : 'stay on this screen until you post it'}.`}
+          notices={[{ icon: 'bell', label: publish ? 'Enrolled students are notified when it is posted.' : 'Students cannot see a draft.' }]}
+          confirmLabel={publish ? 'Post' : 'Save draft'}
+          confirmVariant="brand"
+          loading={saving}
+          onConfirm={() => void save()}
+        />
+        <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
       </div>
     </div>
   )

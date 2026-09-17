@@ -23,7 +23,7 @@ export interface StatTileProps {
 export function StatTile({
   icon: Icon,
   iconColor = 'var(--brand)',
-  iconBg = 'rgba(15, 189, 59,0.08)',
+  iconBg = 'rgba(var(--brand-rgb),0.08)',
   label,
   value,
   valueUnit,

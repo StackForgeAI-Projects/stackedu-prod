@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { BursarNotification } from '@stackedu/shared'
 import { Bell, CreditCard, RefreshCw, ChevronRight } from 'lucide-react'
 import { BursarShell } from '@/components/BursarShell'
+import { PagedList } from '@/components/ListPagination'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -90,8 +91,15 @@ function BursarNotificationsPage() {
         {error ? <PortalErrorPanel error={error} onRetry={() => refetch()} /> : null}
 
         {!error ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {filtered.map((n) => {
+          <PagedList
+            items={filtered}
+            getKey={(n) => n.id}
+            defaultPageSize={10}
+            resetKey={tab}
+            itemLabel="notifications"
+            gap={8}
+            empty={!isPending ? <p className="t-body text-center py-12" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p> : null}
+            renderItem={(n) => {
               const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.System
               const Icon = cfg.icon
               return (
@@ -107,11 +115,8 @@ function BursarNotificationsPage() {
                   <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted-foreground)', marginTop: 4 }} />
                 </button>
               )
-            })}
-            {!isPending && filtered.length === 0 ? (
-              <p className="t-body text-center py-12" style={{ color: 'var(--muted-foreground)' }}>No notifications yet.</p>
-            ) : null}
-          </div>
+            }}
+          />
         ) : null}
       </div>
 

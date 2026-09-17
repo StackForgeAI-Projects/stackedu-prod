@@ -45,6 +45,8 @@ export const institutions = pgTable(
     website: text('website'),
     location: text('location'),
     logoFileKey: text('logo_file_key'),
+    /** `#RRGGBB` the whole system is themed from. Null means StackEDU default. */
+    brandColor: text('brand_color'),
     ...timestamps(),
   },
   (t) => [uniqueIndex('institutions_slug_key').on(t.slug)],

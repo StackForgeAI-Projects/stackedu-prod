@@ -8,11 +8,13 @@ import {
   paymentMethodSchema,
   paymentStatusSchema,
   registrationStatusSchema,
-  resourceTypeSchema,
 } from '../enums'
 import { paymentFeeKindSchema } from '../payment-policy'
 import { invoiceLineItemSchema } from '../invoice-line-items'
 import { isoDateSchema, isoDateTimeSchema, uuidSchema } from '../primitives'
+import { libraryCatalogueItemSchema } from './library'
+import { discussionThreadSummarySchema } from './lecturer-portal'
+import { classroomSessionSummarySchema } from './classroom'
 
 export const studentProfileSchema = z.object({
   studentId: uuidSchema,
@@ -90,20 +92,50 @@ export const studentDashboardSchema = z.object({
   deadlines: z.array(studentDeadlineSchema),
 })
 
+export const studentCourseMaterialSchema = z.object({
+  id: uuidSchema,
+  moduleId: uuidSchema.nullable(),
+  title: z.string(),
+  description: z.string().nullable(),
+  moduleName: z.string().nullable(),
+  bodyText: z.string().nullable(),
+  sequence: z.number().int().nonnegative(),
+  externalUrl: z.string().nullable(),
+  fileName: z.string().nullable(),
+  hasFile: z.boolean(),
+  /** Whether this student has already opened it, which drives module progress. */
+  isViewed: z.boolean(),
+})
+
+export const studentCourseModuleSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  summary: z.string().nullable(),
+  sequence: z.number().int().nonnegative(),
+  /** True when an unfinished prerequisite module is holding this one shut. */
+  isLocked: z.boolean(),
+  /** Plain-English reason shown to the student, null when the module is open. */
+  lockedReason: z.string().nullable(),
+  materialCount: z.number().int().nonnegative(),
+  viewedCount: z.number().int().nonnegative(),
+})
+
+export const studentCourseAnnouncementSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  body: z.string(),
+  isPinned: z.boolean(),
+  publishedAt: isoDateTimeSchema.nullable(),
+})
+
 export const studentCourseDetailSchema = studentCourseSummarySchema.extend({
   description: z.string().nullable(),
   semesterName: z.string(),
-  materials: z.array(
-    z.object({
-      id: uuidSchema,
-      title: z.string(),
-      description: z.string().nullable(),
-      moduleName: z.string().nullable(),
-      externalUrl: z.string().nullable(),
-      fileName: z.string().nullable(),
-      hasFile: z.boolean(),
-    }),
-  ),
+  modules: z.array(studentCourseModuleSchema),
+  materials: z.array(studentCourseMaterialSchema),
+  announcements: z.array(studentCourseAnnouncementSchema),
+  discussions: z.array(discussionThreadSummarySchema),
+  liveSessions: z.array(classroomSessionSummarySchema),
   assessments: z.array(
     z.object({
       id: uuidSchema,
@@ -231,15 +263,7 @@ export const studentNotificationSchema = z.object({
   createdAt: isoDateTimeSchema,
 })
 
-export const studentLibraryResourceSchema = z.object({
-  id: uuidSchema,
-  title: z.string(),
-  author: z.string().nullable(),
-  type: resourceTypeSchema,
-  description: z.string().nullable(),
-  subjectTags: z.array(z.string()),
-  publicationYear: z.number().int().nullable(),
-})
+export const studentLibraryResourceSchema = libraryCatalogueItemSchema
 
 export const studentOnboardingSchema = z.object({
   completedSteps: z.array(z.string()),
@@ -263,10 +287,34 @@ export const studentAssessmentSchema = z.object({
   dueAt: isoDateTimeSchema.nullable(),
   acceptsSubmissions: z.boolean(),
   submitted: z.boolean(),
+  questionCount: z.number().int().nonnegative(),
+})
+
+export const studentQuizQuestionSchema = z.object({
+  questionVersionId: uuidSchema,
+  sequence: z.number().int().nonnegative(),
+  type: z.enum(['MultipleChoice', 'TrueFalse', 'ShortAnswer']),
+  stem: z.string(),
+  options: z.array(z.string()).nullable(),
+  marks: z.number(),
+  response: z.string().nullable(),
+})
+
+export const studentAssessmentDetailSchema = studentAssessmentSchema.extend({
+  questions: z.array(studentQuizQuestionSchema),
+  score: z.number().nullable(),
 })
 
 export const submitAssessmentRequestSchema = z.object({
-  textResponse: z.string().trim().min(1).max(20_000),
+  textResponse: z.string().trim().max(20_000).optional(),
+  answers: z.array(
+    z.object({
+      questionVersionId: uuidSchema,
+      response: z.string().trim().min(1).max(2000),
+    }),
+  ).max(60).optional(),
+}).refine((value) => Boolean(value.textResponse?.trim()) || Boolean(value.answers?.length), {
+  message: 'Write an answer or complete the quiz.',
 })
 
 export type StudentProfile = z.infer<typeof studentProfileSchema>
@@ -286,3 +334,5 @@ export type StudentOnboarding = z.infer<typeof studentOnboardingSchema>
 export type SaveOnboardingRequest = z.infer<typeof saveOnboardingRequestSchema>
 export type StudentAssessment = z.infer<typeof studentAssessmentSchema>
 export type SubmitAssessmentRequest = z.infer<typeof submitAssessmentRequestSchema>
+export type StudentAssessmentDetail = z.infer<typeof studentAssessmentDetailSchema>
+export type StudentQuizQuestion = z.infer<typeof studentQuizQuestionSchema>

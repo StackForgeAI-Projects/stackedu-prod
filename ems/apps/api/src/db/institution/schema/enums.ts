@@ -2,8 +2,10 @@ import { pgEnum } from 'drizzle-orm/pg-core'
 import {
   academicStandingSchema,
   aiJobStatusSchema,
-  applicationStatusSchema,
+  liveSessionStatusSchema,
+  recordingStatusSchema,  applicationStatusSchema,
   assessmentTypeSchema,
+  questionTypeSchema,
   attendanceStatusSchema,
   deliveryStatusSchema,
   enrolmentStatusSchema,
@@ -42,6 +44,7 @@ export const semesterStatusEnum = pgEnum('semester_status', semesterStatusSchema
 export const registrationStatusEnum = pgEnum('registration_status', registrationStatusSchema.options)
 export const attendanceStatusEnum = pgEnum('attendance_status', attendanceStatusSchema.options)
 export const assessmentTypeEnum = pgEnum('assessment_type', assessmentTypeSchema.options)
+export const questionTypeEnum = pgEnum('question_type', questionTypeSchema.options)
 export const submissionStatusEnum = pgEnum('submission_status', submissionStatusSchema.options)
 export const resultBatchStatusEnum = pgEnum('result_batch_status', resultBatchStatusSchema.options)
 export const invoiceStatusEnum = pgEnum('invoice_status', invoiceStatusSchema.options)
@@ -56,3 +59,5 @@ export const notificationChannelEnum = pgEnum(
 export const deliveryStatusEnum = pgEnum('delivery_status', deliveryStatusSchema.options)
 export const riskLevelEnum = pgEnum('risk_level', riskLevelSchema.options)
 export const aiJobStatusEnum = pgEnum('ai_job_status', aiJobStatusSchema.options)
+export const liveSessionStatusEnum = pgEnum('live_session_status', liveSessionStatusSchema.options)
+export const recordingStatusEnum = pgEnum('recording_status', recordingStatusSchema.options)

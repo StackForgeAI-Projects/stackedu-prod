@@ -4,13 +4,16 @@ import {
   assessmentTypeSchema,
   attendanceStatusSchema,
   gradeSchema,
+  questionTypeSchema,
   resultBatchStatusSchema,
   riskLevelSchema,
   userRoleSchema,
 } from '../enums'
 import { isoDateSchema, isoDateTimeSchema, uuidSchema } from '../primitives'
 import { COURSE_MATERIAL_MAX_BYTES, COURSE_MATERIAL_MIME_TYPES } from '../course-material'
+import { DOCUMENT_IMPORT_MAX_BYTES, DOCUMENT_IMPORT_MIME_TYPES } from '../document-import'
 import { academicAtRiskStudentSchema, academicNotificationSchema } from './academic-portal'
+import { classroomSessionSummarySchema } from './classroom'
 
 export const lecturerProfileSchema = z.object({
   userId: uuidSchema,
@@ -120,9 +123,12 @@ export const lecturerDashboardSchema = z.object({
 
 export const lecturerCourseMaterialSchema = z.object({
   id: uuidSchema,
+  moduleId: uuidSchema.nullable(),
   title: z.string(),
   description: z.string().nullable(),
   moduleName: z.string().nullable(),
+  bodyText: z.string().nullable(),
+  sequence: z.number().int().nonnegative(),
   externalUrl: z.string().nullable(),
   fileKey: z.string().nullable(),
   fileName: z.string().nullable(),
@@ -133,10 +139,50 @@ export const lecturerCourseMaterialSchema = z.object({
   createdAt: isoDateTimeSchema,
 })
 
+export const lecturerCourseModuleSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  summary: z.string().nullable(),
+  sequence: z.number().int().nonnegative(),
+  prerequisiteModuleId: uuidSchema.nullable(),
+  isPublished: z.boolean(),
+  publishedAt: isoDateTimeSchema.nullable(),
+  createdAt: isoDateTimeSchema,
+  /** How many published materials sit in this module, for the list view. */
+  materialCount: z.number().int().nonnegative(),
+})
+
+export const lecturerCourseAnnouncementSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  body: z.string(),
+  isPinned: z.boolean(),
+  publishedAt: isoDateTimeSchema.nullable(),
+  createdAt: isoDateTimeSchema,
+})
+
+export const discussionThreadSummarySchema = z.object({
+  id: uuidSchema,
+  offeringId: uuidSchema,
+  title: z.string(),
+  prompt: z.string(),
+  isPublished: z.boolean(),
+  publishedAt: isoDateTimeSchema.nullable(),
+  closedAt: isoDateTimeSchema.nullable(),
+  assessmentId: uuidSchema.nullable(),
+  graded: z.boolean(),
+  postCount: z.number().int().nonnegative(),
+  createdAt: isoDateTimeSchema,
+})
+
 export const lecturerCourseDetailSchema = lecturerCourseRowSchema.extend({
   description: z.string().nullable(),
   students: z.array(lecturerCourseStudentSchema),
+  modules: z.array(lecturerCourseModuleSchema),
   materials: z.array(lecturerCourseMaterialSchema),
+  announcements: z.array(lecturerCourseAnnouncementSchema),
+  discussions: z.array(discussionThreadSummarySchema),
+  liveSessions: z.array(classroomSessionSummarySchema),
   assessments: z.array(
     z.object({
       id: uuidSchema,
@@ -232,6 +278,7 @@ export const lecturerAssessmentRowSchema = z.object({
   acceptsSubmissions: z.boolean(),
   submittedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
+  itemCount: z.number().int().nonnegative(),
   status: z.enum(['Draft', 'Active', 'Closed', 'Graded']),
 })
 
@@ -247,11 +294,17 @@ export const createLecturerAssessmentRequestSchema = z.object({
   publish: z.boolean().optional(),
 })
 
+/** A page is written in the portal, so it carries body text instead of a file. */
+const materialBodyTextSchema = z.string().trim().max(20_000)
+
 export const createLecturerMaterialRequestSchema = z.object({
   offeringId: uuidSchema,
+  moduleId: uuidSchema.nullable().optional(),
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(2000).optional(),
   moduleName: z.string().trim().max(100).optional(),
+  bodyText: materialBodyTextSchema.optional(),
+  sequence: z.number().int().min(0).max(999).optional(),
   externalUrl: z.string().trim().max(500).optional(),
   fileKey: z.string().trim().max(500).optional(),
   fileName: z.string().trim().max(200).optional(),
@@ -261,9 +314,12 @@ export const createLecturerMaterialRequestSchema = z.object({
 })
 
 export const updateLecturerMaterialRequestSchema = z.object({
+  moduleId: uuidSchema.nullable().optional(),
   title: z.string().trim().min(2).max(200).optional(),
   description: z.string().trim().max(2000).optional(),
   moduleName: z.string().trim().max(100).optional(),
+  bodyText: materialBodyTextSchema.optional(),
+  sequence: z.number().int().min(0).max(999).optional(),
   externalUrl: z.string().trim().max(500).optional(),
   fileKey: z.string().trim().max(500).optional(),
   fileName: z.string().trim().max(200).optional(),
@@ -271,6 +327,173 @@ export const updateLecturerMaterialRequestSchema = z.object({
   fileSizeBytes: z.number().int().positive().max(COURSE_MATERIAL_MAX_BYTES).optional(),
   clearFile: z.boolean().optional(),
   publish: z.boolean().optional(),
+})
+
+export const createLecturerModuleRequestSchema = z.object({
+  offeringId: uuidSchema,
+  title: z.string().trim().min(2).max(200),
+  summary: z.string().trim().max(2000).optional(),
+  sequence: z.number().int().min(0).max(999).optional(),
+  prerequisiteModuleId: uuidSchema.nullable().optional(),
+  publish: z.boolean().optional(),
+})
+
+export const updateLecturerModuleRequestSchema = z.object({
+  title: z.string().trim().min(2).max(200).optional(),
+  summary: z.string().trim().max(2000).optional(),
+  sequence: z.number().int().min(0).max(999).optional(),
+  prerequisiteModuleId: uuidSchema.nullable().optional(),
+  publish: z.boolean().optional(),
+})
+
+export const createLecturerAnnouncementRequestSchema = z.object({
+  offeringId: uuidSchema,
+  title: z.string().trim().min(2).max(200),
+  body: z.string().trim().min(2).max(5000),
+  isPinned: z.boolean().optional(),
+  publish: z.boolean().optional(),
+})
+
+export const updateLecturerAnnouncementRequestSchema = z.object({
+  title: z.string().trim().min(2).max(200).optional(),
+  body: z.string().trim().min(2).max(5000).optional(),
+  isPinned: z.boolean().optional(),
+  publish: z.boolean().optional(),
+})
+
+export const discussionPostSchema = z.object({
+  id: uuidSchema,
+  threadId: uuidSchema,
+  parentPostId: uuidSchema.nullable(),
+  authorId: uuidSchema,
+  authorName: z.string(),
+  authorRole: z.string(),
+  body: z.string(),
+  createdAt: isoDateTimeSchema,
+})
+
+export const discussionThreadDetailSchema = discussionThreadSummarySchema.extend({
+  posts: z.array(discussionPostSchema),
+})
+
+export const createLecturerDiscussionRequestSchema = z.object({
+  offeringId: uuidSchema,
+  title: z.string().trim().min(2).max(200),
+  prompt: z.string().trim().min(2).max(5000),
+  publish: z.boolean().optional(),
+  graded: z.boolean().optional(),
+  weight: z.number().min(0).max(100).optional(),
+})
+
+export const updateLecturerDiscussionRequestSchema = z.object({
+  title: z.string().trim().min(2).max(200).optional(),
+  prompt: z.string().trim().min(2).max(5000).optional(),
+  publish: z.boolean().optional(),
+  close: z.boolean().optional(),
+})
+
+export const createDiscussionPostRequestSchema = z.object({
+  body: z.string().trim().min(2).max(5000),
+  parentPostId: uuidSchema.nullable().optional(),
+})
+
+export const describeLecturerMaterialRequestSchema = z.object({
+  title: z.string().trim().max(200).optional(),
+  externalUrl: z.string().trim().max(500).optional(),
+  fileKey: z.string().trim().max(500).optional(),
+  fileName: z.string().trim().max(200).optional(),
+  mimeType: z.string().trim().max(120).optional(),
+}).refine(
+  (value) => Boolean(value.externalUrl?.trim() || value.fileKey?.trim() || value.fileName?.trim()),
+  { message: 'Add a file or a link first.' },
+)
+
+export const lecturerQuestionSchema = z.object({
+  id: uuidSchema,
+  courseId: uuidSchema.nullable(),
+  courseCode: z.string().nullable(),
+  topic: z.string(),
+  type: questionTypeSchema,
+  version: z.number().int().positive(),
+  stem: z.string(),
+  options: z.array(z.string()).nullable(),
+  correctAnswer: z.string(),
+  marks: z.number(),
+  answeredCount: z.number().int().nonnegative(),
+  createdAt: isoDateTimeSchema,
+})
+
+export const createLecturerQuestionRequestSchema = z.object({
+  courseId: uuidSchema.nullable().optional(),
+  topic: z.string().trim().min(1).max(100),
+  type: questionTypeSchema,
+  stem: z.string().trim().min(4).max(2000),
+  options: z.array(z.string().trim().min(1).max(400)).max(8).optional(),
+  correctAnswer: z.string().trim().min(1).max(400),
+  marks: z.number().positive().max(100),
+})
+
+export const updateLecturerQuestionRequestSchema = z.object({
+  courseId: uuidSchema.nullable().optional(),
+  topic: z.string().trim().min(1).max(100).optional(),
+  stem: z.string().trim().min(4).max(2000).optional(),
+  options: z.array(z.string().trim().min(1).max(400)).max(8).optional(),
+  correctAnswer: z.string().trim().min(1).max(400).optional(),
+  marks: z.number().positive().max(100).optional(),
+})
+
+export const lecturerAssessmentItemSchema = z.object({
+  id: uuidSchema,
+  sequence: z.number().int().nonnegative(),
+  questionId: uuidSchema.nullable(),
+  questionVersionId: uuidSchema.nullable(),
+  stem: z.string().nullable(),
+  type: questionTypeSchema.nullable(),
+  marks: z.number().nullable(),
+  drawTopic: z.string().nullable(),
+  drawCourseId: uuidSchema.nullable(),
+  drawCount: z.number().int().positive().nullable(),
+})
+
+export const saveLecturerAssessmentItemsRequestSchema = z.object({
+  items: z.array(
+    z.object({
+      questionId: uuidSchema.optional(),
+      drawTopic: z.string().trim().min(1).max(100).optional(),
+      drawCourseId: uuidSchema.nullable().optional(),
+      drawCount: z.number().int().positive().max(40).optional(),
+    }).refine((item) => Boolean(item.questionId) || Boolean(item.drawTopic && item.drawCount), {
+      message: 'Each item must be a question or a random draw from a topic.',
+    }),
+  ).max(60),
+})
+
+export const generateLecturerQuestionsRequestSchema = z.object({
+  offeringId: uuidSchema,
+  topic: z.string().trim().min(1).max(100),
+  types: z.array(questionTypeSchema).min(1).max(3).optional(),
+  count: z.number().int().min(1).max(8).optional(),
+  useCourseMaterials: z.boolean().optional(),
+  fileKey: z.string().trim().max(500).optional(),
+  fileName: z.string().trim().max(200).optional(),
+  mimeType: z.string().trim().max(120).optional(),
+  externalUrl: z.string().trim().url().max(2000).optional(),
+  createAssessment: z.object({
+    title: z.string().trim().min(2).max(200),
+    type: assessmentTypeSchema,
+    dueAt: isoDateSchema.optional(),
+    weight: z.number().min(0).max(100).optional(),
+    totalMarks: z.number().positive().max(1000).optional(),
+  }).optional(),
+  assessmentId: uuidSchema.optional(),
+})
+
+export const reserveLecturerQuestionImportRequestSchema = z.object({
+  fileName: z.string().trim().min(1).max(200),
+  mimeType: z.string().trim().min(3).max(120).refine((value) => DOCUMENT_IMPORT_MIME_TYPES.has(value), {
+    message: 'Upload a PDF, Word, Excel, CSV, or text file.',
+  }),
+  fileSizeBytes: z.number().int().positive().max(DOCUMENT_IMPORT_MAX_BYTES),
 })
 
 export const reserveLecturerMaterialUploadRequestSchema = z.object({
@@ -282,24 +505,38 @@ export const reserveLecturerMaterialUploadRequestSchema = z.object({
   fileSizeBytes: z.number().int().positive().max(COURSE_MATERIAL_MAX_BYTES),
 })
 
+export const lecturerAssessmentComponentSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  maxScore: z.number(),
+  sequence: z.number().int().nonnegative(),
+})
+
 export const lecturerSubmissionRowSchema = z.object({
   studentId: uuidSchema,
   studentNumber: z.string(),
   studentName: z.string(),
   status: z.enum(['Submitted', 'Late', 'Not submitted', 'Graded']),
   submittedAt: isoDateTimeSchema.nullable(),
+  isLate: z.boolean(),
+  textResponse: z.string().nullable(),
   score: z.number().nullable(),
+  componentScores: z.record(z.string(), z.number()).nullable(),
   feedback: z.string().nullable(),
 })
 
 export const lecturerAssessmentDetailSchema = lecturerAssessmentRowSchema.extend({
+  components: z.array(lecturerAssessmentComponentSchema),
   submissions: z.array(lecturerSubmissionRowSchema),
 })
 
 export const saveLecturerGradeRequestSchema = z.object({
   studentId: uuidSchema,
-  score: z.number().min(0),
+  score: z.number().min(0).optional(),
+  componentScores: z.record(z.string(), z.number().min(0)).optional(),
   feedback: z.string().trim().max(2000).optional(),
+}).refine((value) => value.score != null || Boolean(value.componentScores), {
+  message: 'Enter a mark or the component scores.',
 })
 
 export const resolveLecturerAtRiskRequestSchema = z.object({
@@ -340,6 +577,22 @@ export const updateLecturerTimetableSlotRequestSchema = z.object({
 })
 
 export type LecturerProfile = z.infer<typeof lecturerProfileSchema>
+export type LecturerCourseModule = z.infer<typeof lecturerCourseModuleSchema>
+export type LecturerCourseAnnouncement = z.infer<typeof lecturerCourseAnnouncementSchema>
+export type CreateLecturerModuleRequest = z.infer<typeof createLecturerModuleRequestSchema>
+export type UpdateLecturerModuleRequest = z.infer<typeof updateLecturerModuleRequestSchema>
+export type CreateLecturerAnnouncementRequest = z.infer<
+  typeof createLecturerAnnouncementRequestSchema
+>
+export type UpdateLecturerAnnouncementRequest = z.infer<
+  typeof updateLecturerAnnouncementRequestSchema
+>
+export type DiscussionPost = z.infer<typeof discussionPostSchema>
+export type DiscussionThreadSummary = z.infer<typeof discussionThreadSummarySchema>
+export type DiscussionThreadDetail = z.infer<typeof discussionThreadDetailSchema>
+export type CreateLecturerDiscussionRequest = z.infer<typeof createLecturerDiscussionRequestSchema>
+export type UpdateLecturerDiscussionRequest = z.infer<typeof updateLecturerDiscussionRequestSchema>
+export type CreateDiscussionPostRequest = z.infer<typeof createDiscussionPostRequestSchema>
 export type LecturerDashboard = z.infer<typeof lecturerDashboardSchema>
 export type LecturerCourseRow = z.infer<typeof lecturerCourseRowSchema>
 export type LecturerCourseDetail = z.infer<typeof lecturerCourseDetailSchema>
@@ -363,3 +616,11 @@ export type LecturerRoomOption = z.infer<typeof lecturerRoomOptionSchema>
 export type LecturerTimetableSlot = z.infer<typeof lecturerTimetableSlotSchema>
 export type SaveLecturerTimetableSlotRequest = z.infer<typeof saveLecturerTimetableSlotRequestSchema>
 export type UpdateLecturerTimetableSlotRequest = z.infer<typeof updateLecturerTimetableSlotRequestSchema>
+export type DescribeLecturerMaterialRequest = z.infer<typeof describeLecturerMaterialRequestSchema>
+export type LecturerQuestion = z.infer<typeof lecturerQuestionSchema>
+export type CreateLecturerQuestionRequest = z.infer<typeof createLecturerQuestionRequestSchema>
+export type UpdateLecturerQuestionRequest = z.infer<typeof updateLecturerQuestionRequestSchema>
+export type LecturerAssessmentItem = z.infer<typeof lecturerAssessmentItemSchema>
+export type SaveLecturerAssessmentItemsRequest = z.infer<typeof saveLecturerAssessmentItemsRequestSchema>
+export type GenerateLecturerQuestionsRequest = z.infer<typeof generateLecturerQuestionsRequestSchema>
+export type ReserveLecturerQuestionImportRequest = z.infer<typeof reserveLecturerQuestionImportRequestSchema>

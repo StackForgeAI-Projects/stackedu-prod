@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { IctShell } from '@/components/IctShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,10 +18,50 @@ import {
 import { institutionBrandingQueryKey } from '@/hooks/useInstitutionBranding'
 import { accountProfileQueryKey } from '@/lib/api/account'
 import { apiErrorMessage } from '@/lib/api/client'
+import {
+  applyBrandColor,
+  DEFAULT_BRAND_COLOR,
+  isUsableBrandColor,
+  rememberBrandColor,
+} from '@/lib/brand-theme'
+import { extractLogoPalette } from '@/lib/logo-palette'
 
 export const Route = createFileRoute('/_auth/ict/settings')({
   component: SystemSettingsPage,
 })
+
+/** Kept in step with what the API accepts, so nothing fails only after upload. */
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+
+function isSameColour(a: string | null, b: string): boolean {
+  return (a ?? '').toUpperCase() === b.toUpperCase()
+}
+
+function ColourSwatch({
+  colour,
+  selected,
+  onSelect,
+}: {
+  colour: string
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`Use ${colour}`}
+      aria-pressed={selected}
+      className="h-10 w-10 rounded-lg transition-transform hover:scale-105"
+      style={{
+        backgroundColor: colour,
+        border: selected ? '2px solid var(--foreground)' : '1px solid var(--border)',
+        boxShadow: selected ? 'var(--shadow-md)' : 'none',
+        cursor: 'pointer',
+      }}
+    />
+  )
+}
 
 function SystemSettingsPage() {
   const queryClient = useQueryClient()
@@ -39,9 +80,11 @@ function SystemSettingsPage() {
     applicationFullOnly: true,
     tuitionFullOnly: false,
     levyFullOnly: false,
+    brandColor: null as string | null,
   })
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPalette, setLogoPalette] = useState<string[]>([])
 
   useEffect(() => {
     if (data) {
@@ -58,10 +101,31 @@ function SystemSettingsPage() {
         applicationFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'ApplicationFee')?.mode === 'FullOnly',
         tuitionFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'TuitionFee')?.mode === 'FullOnly',
         levyFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'Levy')?.mode === 'FullOnly',
+        brandColor: data.brandColor,
       })
       setLogoPreview(data.logoUrl)
     }
   }, [data])
+
+  // Offer the colours of the logo that is already saved, so the palette is
+  // there without having to pick the same file again.
+  const savedLogoUrl = data?.logoUrl ?? null
+  useEffect(() => {
+    if (!savedLogoUrl) return
+    let cancelled = false
+    void extractLogoPalette(savedLogoUrl)
+      .then((palette) => { if (!cancelled) setLogoPalette((current) => (current.length ? current : palette)) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [savedLogoUrl])
+
+  // Show the chosen colour on the live screen while it is being picked, and
+  // put the saved one back if the page is left without saving.
+  const savedBrandColor = data?.brandColor ?? null
+  useEffect(() => {
+    applyBrandColor(form.brandColor)
+    return () => applyBrandColor(savedBrandColor)
+  }, [form.brandColor, savedBrandColor])
 
   const invalidateBranding = async () => {
     await queryClient.invalidateQueries({ queryKey: ictSettingsQueryKey })
@@ -81,6 +145,7 @@ function SystemSettingsPage() {
         locale: form.locale,
         website: form.website.trim() || null,
         location: form.location.trim() || null,
+        brandColor: form.brandColor,
         attendancePolicy: {
           allowEditAfterSubmit: form.allowEditAfterSubmit,
           editWindowMinutes: form.editWindowMinutes,
@@ -98,27 +163,39 @@ function SystemSettingsPage() {
     onSuccess: async (settings) => {
       setLogoFile(null)
       setLogoPreview(settings.logoUrl)
+      applyBrandColor(settings.brandColor)
+      rememberBrandColor(settings.brandColor)
       toast.success('Institution settings saved.')
       await invalidateBranding()
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not save settings.')),
   })
 
-  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!LOGO_TYPES.includes(file.type)) {
       toast.error('Choose a PNG, JPEG, WebP or SVG image.')
       return
     }
+
     setLogoFile(file)
-    setLogoPreview(URL.createObjectURL(file))
+    setLogoPreview((previous) => {
+      if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
+      return URL.createObjectURL(file)
+    })
+
+    const palette = await extractLogoPalette(file).catch(() => [])
+    setLogoPalette(palette)
+    if (palette.length) {
+      toast.success(`Found ${palette.length} ${palette.length === 1 ? 'colour' : 'colours'} in this logo.`)
+    }
   }
 
   return (
     <IctShell
       pageTitle="Settings"
-      guide="Change the institution name, contact email, website, location, logo, timezone and language. Faculties, programmes and semester activation are Academic Admin screens, not settings."
+      guide="Change the institution name, contact email, website, location, logo, system colour, timezone and language. Faculties, programmes and semester activation are Academic Admin screens, not settings."
     >
       <div className="animate-fade-up mx-auto w-full max-w-[760px]" style={{ padding: '32px 0 48px' }}>
         <h1 className="t-h1 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Institution settings</h1>
@@ -130,7 +207,7 @@ function SystemSettingsPage() {
           <form
             className="flex flex-col gap-4 p-5"
             style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}
-            onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}
+            onSubmit={(event) => { event.preventDefault() }}
           >
             <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>The institution short code cannot be changed here.</p>
 
@@ -183,14 +260,15 @@ function SystemSettingsPage() {
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
                   <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-                    Used on apply, sign-in and verification screens. PNG, JPEG, WebP or SVG up to 2 MB.
+                    Used on the sign-in, apply and portal screens, and on email notifications. PNG, JPEG, WebP or
+                    SVG up to 2 MB. The colours in the logo are read automatically and offered below.
                   </p>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
                     className="hidden"
-                    onChange={handleLogoChange}
+                    onChange={(event) => { void handleLogoChange(event) }}
                   />
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                     {logoPreview ? 'Replace logo' : 'Upload logo'}
@@ -198,6 +276,80 @@ function SystemSettingsPage() {
                 </div>
               </div>
             </div>
+
+            <div
+              className="rounded-xl p-4 flex flex-col gap-4"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)' }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
+                  System colour
+                </p>
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Buttons, links and highlights across every portal use this colour, including email
+                  notifications. The screen updates as you choose so you can see it before saving.
+                </p>
+              </div>
+
+              {logoPalette.length ? (
+                <div>
+                  <Label>Colours from your logo</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {logoPalette.map((colour) => (
+                      <ColourSwatch
+                        key={colour}
+                        colour={colour}
+                        selected={isSameColour(form.brandColor, colour)}
+                        onSelect={() => setForm({ ...form, brandColor: colour })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <Label htmlFor="brand-color">Colour code</Label>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      id="brand-color-picker"
+                      type="color"
+                      aria-label="Pick a system colour"
+                      className="h-10 w-12 flex-shrink-0 cursor-pointer rounded-lg"
+                      style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)', padding: 2 }}
+                      value={form.brandColor ?? DEFAULT_BRAND_COLOR}
+                      onChange={(e) => setForm({ ...form, brandColor: e.target.value.toUpperCase() })}
+                    />
+                    <Input
+                      id="brand-color"
+                      value={form.brandColor ?? ''}
+                      placeholder={`${DEFAULT_BRAND_COLOR} (default)`}
+                      onChange={(e) => {
+                        const value = e.target.value.trim().toUpperCase()
+                        setForm({ ...form, brandColor: value === '' ? null : value })
+                      }}
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:w-auto"
+                  disabled={form.brandColor === null}
+                  onClick={() => setForm({ ...form, brandColor: null })}
+                >
+                  Use default colour
+                </Button>
+              </div>
+
+              {form.brandColor && !isUsableBrandColor(form.brandColor) ? (
+                <p className="t-caption" style={{ color: 'var(--error)' }}>
+                  Enter a colour code like #0FBD3B. Very light or very dark colours are not allowed, because text
+                  sitting on them would be hard to read.
+                </p>
+              ) : null}
+            </div>
+
             <div>
               <Label htmlFor="tz">Timezone</Label>
               <Input id="tz" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
@@ -310,9 +462,28 @@ function SystemSettingsPage() {
               </div>
             </div>
 
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Save settings'}
-            </Button>
+            <ConfirmAlertDialog
+              trigger={
+                <Button
+                  type="button"
+                  disabled={mutation.isPending || (form.brandColor !== null && !isUsableBrandColor(form.brandColor))}
+                >
+                  {mutation.isPending ? 'Saving…' : 'Save settings'}
+                </Button>
+              }
+              title="Save these settings?"
+              tone="success"
+              headlineLabel="Action"
+              headline="Update institution settings"
+              summary="Name, branding, attendance and payments for this institution will be updated."
+              notices={[
+                { icon: 'email', label: 'The logo and system colour also appear on email notifications.' },
+              ]}
+              confirmLabel="Save"
+              confirmVariant="brand"
+              loading={mutation.isPending}
+              onConfirm={() => mutation.mutate()}
+            />
           </form>
         )}
       </div>

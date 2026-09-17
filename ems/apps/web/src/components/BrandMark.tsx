@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useInstitutionBranding } from '@/hooks/useInstitutionBranding'
 import { cn } from '@/lib/utils'
 
 interface BrandMarkProps {
@@ -10,7 +11,10 @@ interface BrandMarkProps {
   to?: string
   /** Square size of the logo tile in pixels. */
   size?: number
-  /** Institution logo from ICT settings. Falls back to the StackEDU mark. */
+  /**
+   * Overrides the logo from ICT settings. Left unset, the mark resolves the
+   * institution's own logo itself, so every surface stays in step with it.
+   */
   institutionLogoUrl?: string | null
   wordmarkColor?: string
   wordmarkClassName?: string
@@ -31,6 +35,9 @@ export function BrandMark({
   ariaLabel = 'StackEDU home',
   className,
 }: BrandMarkProps) {
+  const { logoUrl, institutionName } = useInstitutionBranding()
+  const logoSrc = institutionLogoUrl ?? logoUrl
+
   const content = (
     <>
       <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
@@ -44,12 +51,12 @@ export function BrandMark({
           S
         </div>
         <img
-          src={institutionLogoUrl ?? '/stackedu-logo.png'}
-          alt="StackEDU"
+          src={logoSrc ?? '/stackedu-logo.png'}
+          alt={logoSrc ? institutionName : 'StackEDU'}
           className="absolute inset-0"
           style={{ width: size, height: size, objectFit: 'contain' }}
           onError={(e) => {
-            if (institutionLogoUrl) {
+            if (logoSrc) {
               e.currentTarget.src = '/stackedu-logo.png'
               return
             }

@@ -4,7 +4,7 @@
 
 import {
   LayoutDashboard, FileText, Users, BookOpen, GraduationCap,
-  CalendarDays, Clock, UserCheck, BarChart2, FileBarChart, AlertTriangle, Bell,
+  CalendarDays, Clock, UserCheck, BarChart2, FileBarChart, AlertTriangle, Library, Bell,
 } from 'lucide-react'
 
 // ── Identity ──────────────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ export const ACADEMIC_NAV = [
   { label: 'Results',       to: '/academic/results',       icon: BarChart2       },
   { label: 'Reports',       to: '/academic/reports',       icon: FileBarChart    },
   { label: 'At-Risk',       to: '/academic/at-risk',       icon: AlertTriangle   },
+  { label: 'E-Library',     to: '/academic/library',       icon: Library         },
   { label: 'Notifications', to: '/academic/notifications', icon: Bell            },
 ]
 
@@ -1128,11 +1129,11 @@ export function riskColors(level: RiskLevel) {
 export function calEventColors(type: CalEventType) {
   switch (type) {
     case 'Semester':      return { bg: 'var(--info-bg)',              color: 'var(--info)'            }
-    case 'Registration':  return { bg: 'rgba(15, 189, 59,0.10)',        color: '#16A34A'                }
+    case 'Registration':  return { bg: 'rgba(var(--brand-rgb),0.10)',        color: '#16A34A'                }
     case 'Exam':          return { bg: 'var(--error-bg)',             color: 'var(--error)'           }
     case 'Holiday':       return { bg: 'var(--muted)',                color: 'var(--muted-foreground)'}
     case 'Deadline':      return { bg: 'var(--warning-bg)',           color: 'var(--warning)'         }
-    case 'Results':       return { bg: 'rgba(15, 189, 59,0.10)',        color: '#16A34A'                }
+    case 'Results':       return { bg: 'rgba(var(--brand-rgb),0.10)',        color: '#16A34A'                }
   }
 }
 

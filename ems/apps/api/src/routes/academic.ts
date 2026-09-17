@@ -44,6 +44,8 @@ import {
   updateAcademicCourse,
   updateAcademicProgramme,
 } from '../services/academic'
+import { getAcademicStudentEngagement } from '../services/course-analytics'
+import { registerLibraryReaderRoutes } from './library-reader'
 
 type Variables = RequestVariables & Partial<AuthVariables>
 
@@ -78,6 +80,13 @@ academicRoutes.get('/academic/students', ...academicOnly, async (c) => {
 academicRoutes.get('/academic/students/:id', ...academicOnly, async (c) => {
   const user = c.get('user')!
   return c.json({ student: await getAcademicStudent(user.institution.id, c.req.param('id')) })
+})
+
+academicRoutes.get('/academic/students/:id/engagement', ...academicOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    engagement: await getAcademicStudentEngagement(user.institution.id, c.req.param('id')),
+  })
 })
 
 academicRoutes.post('/academic/students/:id/status', ...academicOnly, async (c) => {
@@ -254,6 +263,8 @@ academicRoutes.post('/academic/notifications/:id/read', ...academicOnly, async (
     ),
   })
 })
+
+registerLibraryReaderRoutes(academicRoutes, '/academic', academicOnly)
 
 academicRoutes.get('/academic/reports', ...academicOnly, async (c) => {
   const user = c.get('user')!

@@ -13,9 +13,7 @@ function LibrarianSettingsPage() {
         breadcrumb="Librarian"
         notificationPrefs={[
           { key: 'requests', label: 'New resource requests', email: true, sms: false, inapp: true },
-          { key: 'overdue', label: 'Overdue loans', email: true, sms: true, inapp: true },
-          { key: 'uploads', label: 'New course pack uploads', email: true, sms: false, inapp: true },
-          { key: 'system', label: 'System announcements', email: true, sms: false, inapp: false },
+          { key: 'system', label: 'System announcements', email: true, sms: false, inapp: true },
         ]}
       />
     </LibrarianShell>

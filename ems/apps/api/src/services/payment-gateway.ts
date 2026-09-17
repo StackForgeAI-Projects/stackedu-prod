@@ -1,6 +1,7 @@
 import type { PaymentMethod } from '@stackedu/shared'
 import { env } from '../config/env'
 import { badRequest } from '../lib/errors'
+import { resolveCredential } from '../lib/integration-credentials'
 import { isIntegrationEnabled } from '../lib/integrations'
 
 export interface PaymentGatewayResult {
@@ -27,32 +28,25 @@ export async function initiatePaymentGateway(
     return { completeImmediately: true, gatewayReference: `sandbox-${reference}` }
   }
 
-  if (method === 'MoMo') {
+  if (method === 'MoMo' || method === 'Airtel') {
     if (!(await isIntegrationEnabled(institutionId, 'PawaPay'))) {
       throw badRequest('Mobile money payments are turned off. Ask ICT to enable PawaPay.')
     }
-    if (!settings.PAWAPAY_API_TOKEN) {
-      throw badRequest('PawaPay credentials are not configured on the server yet.')
+    if (!(await resolveCredential(institutionId, 'PawaPay', 'apiToken'))) {
+      throw badRequest('PawaPay credentials are not configured yet. Ask ICT to add the API token under Integrations.')
     }
-    return { completeImmediately: false, gatewayReference: `pawapay-${reference}` }
-  }
-
-  if (method === 'Airtel') {
-    if (!(await isIntegrationEnabled(institutionId, 'PawaPay'))) {
-      throw badRequest('Mobile money payments are turned off. Ask ICT to enable PawaPay.')
+    return {
+      completeImmediately: false,
+      gatewayReference: method === 'Airtel' ? `pawapay-airtel-${reference}` : `pawapay-${reference}`,
     }
-    if (!settings.PAWAPAY_API_TOKEN) {
-      throw badRequest('PawaPay credentials are not configured on the server yet.')
-    }
-    return { completeImmediately: false, gatewayReference: `pawapay-airtel-${reference}` }
   }
 
   if (method === 'Card') {
     if (!(await isIntegrationEnabled(institutionId, 'Flutterwave'))) {
       throw badRequest('Card payments are turned off. Ask ICT to enable Flutterwave.')
     }
-    if (!settings.FLUTTERWAVE_SECRET_KEY) {
-      throw badRequest('Flutterwave credentials are not configured on the server yet.')
+    if (!(await resolveCredential(institutionId, 'Flutterwave', 'secretKey'))) {
+      throw badRequest('Flutterwave credentials are not configured yet. Ask ICT to add the secret key under Integrations.')
     }
     return { completeImmediately: false, gatewayReference: `flutterwave-${reference}` }
   }
@@ -60,7 +54,9 @@ export async function initiatePaymentGateway(
   return { completeImmediately: false, gatewayReference: null }
 }
 
-export function smsProviderConfigured(): boolean {
-  const settings = env()
-  return Boolean(settings.TWILIO_ACCOUNT_SID && settings.TWILIO_AUTH_TOKEN && settings.TWILIO_FROM_NUMBER)
+export async function smsProviderConfigured(institutionId?: string): Promise<boolean> {
+  const sid = await resolveCredential(institutionId, 'Twilio', 'accountSid')
+  const token = await resolveCredential(institutionId, 'Twilio', 'authToken')
+  const from = await resolveCredential(institutionId, 'Twilio', 'fromNumber')
+  return Boolean(sid && token && from)
 }

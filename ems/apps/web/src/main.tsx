@@ -6,10 +6,12 @@ import { router } from './router'
 import { queryClient } from './lib/query-client'
 import { installStaleChunkRecovery } from './lib/chunk-reload'
 import { ensureFreshClientBuild } from './lib/client-build'
+import { initBrandColor } from './lib/brand-theme'
 import { initTheme } from './lib/theme'
 import './styles.css'
 
 initTheme()
+initBrandColor()
 ensureFreshClientBuild()
 installStaleChunkRecovery()
 

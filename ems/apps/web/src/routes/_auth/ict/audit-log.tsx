@@ -21,7 +21,7 @@ function AuditLogPage() {
   return (
     <IctShell
       pageTitle="Audit log"
-      guide="Every significant ICT action is appended here. Entries cannot be edited or deleted, including by you."
+      guide="Every significant user action across the institution is appended here, including sign-ins and sign-outs. Entries cannot be edited or deleted, including by you."
     >
       <div className="animate-fade-up" style={{ padding: '24px 16px 56px' }}>
         <h1 className="t-h1 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Audit log</h1>
@@ -35,9 +35,13 @@ function AuditLogPage() {
             rowKey={(row) => row.id}
             searchPlaceholder="Search action, actor or target…"
             searchFilter={(row, query) =>
-              `${row.summary} ${row.actorEmail ?? ''} ${displayRole(row.actorRole)}`.toLowerCase().includes(query)
+              `${row.summary} ${row.actionLabel} ${row.actorEmail ?? ''} ${displayRole(row.actorRole)}`
+                .toLowerCase()
+                .includes(query)
             }
-            filters={[{ id: 'action', label: 'actions', getValue: (row) => row.summary }]}
+            // Grouping keys off the stable label: the summary names the record
+            // that was touched, so filtering on it would list one option per row.
+            filters={[{ id: 'action', label: 'actions', getValue: (row) => row.actionLabel }]}
             empty="No audit entries yet."
             columns={[
               {

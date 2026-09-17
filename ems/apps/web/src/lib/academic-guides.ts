@@ -30,6 +30,8 @@ export const ACADEMIC_PAGE_GUIDES: Record<string, string> = {
     'Generate enrollment, results, attendance, and programme summaries from live aggregates.',
   'At-Risk':
     'Students flagged by attendance, grades, or missing work. Advisor assignment is not wired yet.',
+  'E-Library':
+    'Published catalogue from the librarian. Search, download a signed copy, or request a title the library does not hold.',
   Notifications:
     'Registrar notices about applications, results, and calendar events. Mark items read as you review them.',
   'My Profile':

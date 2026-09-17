@@ -34,7 +34,7 @@ function parseDurationYears(duration: string): number {
 
 function deptBadgeColors(dept: string) {
   if (dept.includes('Computer') || dept.includes('Computing')) return { bg: 'var(--info-bg)', color: 'var(--info)' }
-  if (dept.includes('Math') || dept.includes('Science')) return { bg: 'rgba(15, 189, 59,0.10)', color: '#16A34A' }
+  if (dept.includes('Math') || dept.includes('Science')) return { bg: 'rgba(var(--brand-rgb),0.10)', color: '#16A34A' }
   if (dept.includes('Engineer') || dept.includes('Mechanical')) return { bg: 'rgba(124,58,237,0.10)', color: '#7C3AED' }
   return { bg: 'var(--muted)', color: 'var(--muted-foreground)' }
 }

@@ -1,4 +1,4 @@
-import type { LoginRequest, LoginResponse, SessionResponse, SessionUser } from '@stackedu/shared'
+import type { LoginRequest, LoginResponse, LogoutReason, SessionResponse, SessionUser } from '@stackedu/shared'
 import { api, ApiClientError } from './client'
 
 export const sessionQueryKey = ['auth', 'session'] as const
@@ -21,8 +21,9 @@ export async function verifyTwoFactor(code: string): Promise<SessionUser> {
   return user
 }
 
-export async function logout(): Promise<void> {
-  await api.post<void>('/auth/logout')
+/** The reason is recorded in the audit log, so idle sign-outs read differently. */
+export async function logout(reason: LogoutReason = 'manual'): Promise<void> {
+  await api.post<void>('/auth/logout', { reason })
 }
 
 export async function getSession(): Promise<SessionUser | null> {

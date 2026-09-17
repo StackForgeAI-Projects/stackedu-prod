@@ -11,7 +11,9 @@ import {
   updateRolePermissionsRequestSchema,
   userRoleSchema,
 } from '@stackedu/shared'
+import { INSTITUTION_LOGO_UPLOAD_PATH } from '../lib/branding'
 import { validationFailed, badRequest } from '../lib/errors'
+import { LOGO_MAX_BYTES } from '../lib/storage'
 import { requireAuth, requireRole, type AuthVariables } from '../middleware/auth'
 import type { RequestVariables } from '../middleware/request-context'
 import {
@@ -182,9 +184,9 @@ ictRoutes.patch('/ict/settings', ...ictOnly, async (c) => {
 })
 
 ictRoutes.post(
-  '/ict/settings/logo',
+  INSTITUTION_LOGO_UPLOAD_PATH,
   ...ictOnly,
-  bodyLimit({ maxSize: 2 * 1024 * 1024 }),
+  bodyLimit({ maxSize: LOGO_MAX_BYTES }),
   async (c) => {
     const mimeType = c.req.header('content-type')?.split(';')[0]?.trim() ?? ''
     const bytes = Buffer.from(await c.req.arrayBuffer())
@@ -214,7 +216,7 @@ ictRoutes.patch('/ict/integrations/:id', ...ictOnly, async (c) => {
       user.institution.id,
       actor(c),
       c.req.param('id'),
-      parsed.data.isEnabled,
+      parsed.data,
     ),
   })
 })

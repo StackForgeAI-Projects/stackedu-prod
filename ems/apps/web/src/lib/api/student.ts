@@ -1,5 +1,11 @@
 import type {
+  ClassroomJoin,
+  ClassroomSessionDetail,
+  ClassroomSessionSummary,
+  CreateDiscussionPostRequest,
+  DiscussionThreadDetail,
   StudentAssessment,
+  StudentAssessmentDetail,
   StudentCourseDetail,
   StudentDashboard,
   StudentFees,
@@ -11,9 +17,12 @@ import type {
   StudentRegistrationState,
   StudentResults,
   StudentTranscript,
+  StudyAssistantRequest,
+  StudyAssistantResponse,
   PaymentMethod,
 } from '@stackedu/shared'
 import { api } from './client'
+import { getReaderLibrary } from './library'
 
 export const studentProfileQueryKey = ['student', 'me'] as const
 export const studentDashboardQueryKey = ['student', 'dashboard'] as const
@@ -27,6 +36,7 @@ export const studentNotificationsQueryKey = ['student', 'notifications'] as cons
 export const studentLibraryQueryKey = ['student', 'library'] as const
 export const studentOnboardingQueryKey = ['student', 'onboarding'] as const
 export const studentAssessmentsQueryKey = ['student', 'assessments'] as const
+export const studentAssessmentQueryKey = (id: string) => ['student', 'assessment', id] as const
 
 export async function getStudentProfile(): Promise<StudentProfile> {
   const { profile } = await api.get<{ profile: StudentProfile }>('/student/me')
@@ -52,6 +62,26 @@ export async function getStudentCourse(offeringId: string): Promise<StudentCours
   return course
 }
 
+export const studentDiscussionQueryKey = (id: string) => ['student', 'discussion', id] as const
+
+export async function getStudentDiscussion(threadId: string): Promise<DiscussionThreadDetail> {
+  const { discussion } = await api.get<{ discussion: DiscussionThreadDetail }>(
+    `/student/discussions/${threadId}`,
+  )
+  return discussion
+}
+
+export async function createStudentDiscussionPost(
+  threadId: string,
+  input: CreateDiscussionPostRequest,
+): Promise<DiscussionThreadDetail> {
+  const { discussion } = await api.post<{ discussion: DiscussionThreadDetail }>(
+    `/student/discussions/${threadId}/posts`,
+    input,
+  )
+  return discussion
+}
+
 export async function getStudentMaterialDownloadUrl(materialId: string): Promise<{
   url: string
   expiresAt: string
@@ -61,6 +91,10 @@ export async function getStudentMaterialDownloadUrl(materialId: string): Promise
     download: { url: string; expiresAt: string; fileName: string | null }
   }>(`/student/materials/${materialId}/download`)
   return download
+}
+
+export async function recordStudentMaterialView(materialId: string): Promise<void> {
+  await api.post(`/student/materials/${materialId}/view`)
 }
 
 export async function getStudentRegistration(): Promise<StudentRegistrationState> {
@@ -124,9 +158,8 @@ export async function markStudentNotificationRead(id: string) {
   return notifications
 }
 
-export async function getStudentLibrary(): Promise<StudentLibraryResource[]> {
-  const { resources } = await api.get<{ resources: StudentLibraryResource[] }>('/student/library')
-  return resources
+export async function getStudentLibrary(query?: string): Promise<StudentLibraryResource[]> {
+  return getReaderLibrary('student', query)
 }
 
 export async function getStudentOnboarding(): Promise<StudentOnboarding> {
@@ -153,10 +186,66 @@ export async function getStudentAssessments(): Promise<StudentAssessment[]> {
   return assessments
 }
 
-export async function submitStudentAssessment(id: string, textResponse: string) {
+export async function getStudentAssessment(id: string): Promise<StudentAssessmentDetail> {
+  const { assessment } = await api.get<{ assessment: StudentAssessmentDetail }>(
+    `/student/assessments/${id}`,
+  )
+  return assessment
+}
+
+export async function submitStudentAssessment(
+  id: string,
+  input: {
+    textResponse?: string
+    answers?: Array<{ questionVersionId: string; response: string }>
+  },
+) {
   const { assessments } = await api.post<{ assessments: StudentAssessment[] }>(
     `/student/assessments/${id}/submit`,
-    { textResponse },
+    input,
   )
   return assessments
+}
+
+export const studentClassroomQueryKey = ['student', 'classroom'] as const
+export const studentClassroomSessionQueryKey = (id: string) => ['student', 'classroom-session', id] as const
+
+export async function listStudentClassroomSessions(): Promise<ClassroomSessionSummary[]> {
+  const { sessions } = await api.get<{ sessions: ClassroomSessionSummary[] }>('/student/classroom')
+  return sessions
+}
+
+export async function getStudentClassroomSession(id: string): Promise<ClassroomSessionDetail> {
+  const { session } = await api.get<{ session: ClassroomSessionDetail }>(`/student/classroom/${id}`)
+  return session
+}
+
+export async function joinStudentClassroomSession(id: string): Promise<ClassroomJoin> {
+  const { join } = await api.post<{ join: ClassroomJoin }>(`/student/classroom/${id}/join`)
+  return join
+}
+
+export async function getStudentClassroomWhiteboard(id: string): Promise<unknown> {
+  const { scene } = await api.get<{ scene: unknown }>(`/student/classroom/${id}/whiteboard`)
+  return scene
+}
+
+export async function saveStudentClassroomWhiteboard(id: string, scene: unknown): Promise<void> {
+  await api.put(`/student/classroom/${id}/whiteboard`, { scene })
+}
+
+export async function getStudentRecordingDownloadUrl(id: string): Promise<{
+  url: string
+  expiresAt: string
+  fileName: string
+}> {
+  const { download } = await api.get<{ download: { url: string; expiresAt: string; fileName: string } }>(
+    `/student/recordings/${id}/download`,
+  )
+  return download
+}
+
+export async function askStudentStudyAssistant(input: StudyAssistantRequest): Promise<StudyAssistantResponse> {
+  const { answer } = await api.post<{ answer: StudyAssistantResponse }>('/student/study-assistant', input)
+  return answer
 }
