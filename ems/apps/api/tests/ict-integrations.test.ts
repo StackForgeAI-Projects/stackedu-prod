@@ -173,6 +173,34 @@ describe('ICT integrations credentials', () => {
     expect(JSON.stringify(missing)).not.toContain(DUMMY_LIVEKIT_SECRET)
   })
 
+  it('returns a failed LiveKit check instead of 500 when the vendor SDK throws', async () => {
+    const listed = await listIctIntegrations(institutionId)
+    const livekit = listed.find((row) => row.provider === 'LiveKit')
+    if (!livekit) throw new Error('LiveKit was not listed.')
+
+    await updateIctIntegration(institutionId, actor, livekit.id, { isEnabled: true })
+    setIntegrationVendorProbe(async () => {
+      const error = new Error('unauthorized') as Error & { status: number }
+      error.status = 401
+      throw error
+    })
+
+    const response = await app.request(`/ict/integrations/${livekit.id}/check`, {
+      method: 'POST',
+      headers: { Cookie: sessionCookie },
+    })
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      integration: { checkOk?: boolean; lastStatus: string | null }
+    }
+    expect(body.integration.checkOk).toBe(false)
+    expect(body.integration.lastStatus).toMatch(/rejected/i)
+    expect(JSON.stringify(body)).not.toContain(DUMMY_LIVEKIT_SECRET)
+    expect(JSON.stringify(body)).not.toContain(DUMMY_SAVED_SECRET)
+
+    setIntegrationVendorProbe(async () => ({ ok: false, message: 'The API rejected this key' }))
+  })
+
   it('calls the vendor check and does not treat a dummy key as connected', async () => {
     const listed = await listIctIntegrations(institutionId)
     const livekit = listed.find((row) => row.provider === 'LiveKit')

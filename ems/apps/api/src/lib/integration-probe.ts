@@ -50,8 +50,20 @@ export async function probeIntegration(
 }
 
 async function pingVendor(institutionId: string, provider: string): Promise<ProbeResult> {
-  if (vendorProbe) return vendorProbe({ provider, institutionId })
-  return defaultVendorPing(institutionId, provider)
+  try {
+    if (vendorProbe) return await vendorProbe({ provider, institutionId })
+    return await defaultVendorPing(institutionId, provider)
+  } catch (error) {
+    const status = httpStatusFromUnknown(error)
+    if (status > 0) {
+      return fromHttp(
+        status,
+        `${provider} accepted these credentials.`,
+        `${provider} rejected these credentials.`,
+      )
+    }
+    return { ok: false, message: networkMessage(provider, error) }
+  }
 }
 
 async function missingCredentialMessage(institutionId: string, provider: string): Promise<string | null> {
@@ -89,19 +101,15 @@ async function missingCredentialMessage(institutionId: string, provider: string)
 }
 
 async function defaultVendorPing(institutionId: string, provider: string): Promise<ProbeResult> {
-  try {
-    if (provider === 'Resend') return pingResend(institutionId)
-    if (provider === 'Twilio') return pingTwilio(institutionId)
-    if (provider === 'PawaPay' || provider === 'MTNMoMo' || provider === 'AirtelMoney') {
-      return pingPawaPay(institutionId, provider)
-    }
-    if (provider === 'Flutterwave') return pingFlutterwave(institutionId)
-    if (provider === 'LiveKit') return pingLiveKit(institutionId)
-    if (provider === 'AI') return pingAi(institutionId)
-    return { ok: false, message: 'That service has no connection check yet.' }
-  } catch (error) {
-    return { ok: false, message: networkMessage(provider, error) }
+  if (provider === 'Resend') return pingResend(institutionId)
+  if (provider === 'Twilio') return pingTwilio(institutionId)
+  if (provider === 'PawaPay' || provider === 'MTNMoMo' || provider === 'AirtelMoney') {
+    return pingPawaPay(institutionId, provider)
   }
+  if (provider === 'Flutterwave') return pingFlutterwave(institutionId)
+  if (provider === 'LiveKit') return pingLiveKit(institutionId)
+  if (provider === 'AI') return pingAi(institutionId)
+  return { ok: false, message: 'That service has no connection check yet.' }
 }
 
 async function pingResend(institutionId: string): Promise<ProbeResult> {
@@ -149,7 +157,9 @@ async function pingLiveKit(institutionId: string): Promise<ProbeResult> {
   const url = (await resolveCredential(institutionId, 'LiveKit', 'url'))!
   const apiKey = (await resolveCredential(institutionId, 'LiveKit', 'apiKey'))!
   const apiSecret = (await resolveCredential(institutionId, 'LiveKit', 'apiSecret'))!
-  const rooms = new RoomServiceClient(url, apiKey, apiSecret)
+  const rooms = new RoomServiceClient(url, apiKey, apiSecret, {
+    requestTimeout: PROBE_TIMEOUT_MS / 1000,
+  })
   await rooms.listRooms()
   return { ok: true, message: 'LiveKit accepted this URL and API key pair.' }
 }
@@ -200,6 +210,12 @@ function fromHttp(status: number, connected: string, rejected: string): ProbeRes
   if (status === 401 || status === 403) return { ok: false, message: rejected }
   if (status >= 200 && status < 300) return { ok: true, message: connected }
   return { ok: false, message: `The API returned HTTP ${status}. The key may be wrong, or the service is down.` }
+}
+
+function httpStatusFromUnknown(error: unknown): number {
+  if (!error || typeof error !== 'object' || !('status' in error)) return 0
+  const status = Number(error.status)
+  return Number.isFinite(status) ? status : 0
 }
 
 function networkMessage(provider: string, error: unknown): string {
