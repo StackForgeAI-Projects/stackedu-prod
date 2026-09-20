@@ -1,11 +1,27 @@
 # Bursar guide
 
-<div style="background:#05131D;color:#FFFFFF;padding:16px 20px;border-radius:12px;margin:16px 0;border-left:6px solid #0FBD3B;">
-<strong style="color:#0FBD3B;">Who this is for</strong><br/>
-You look after fees and payments. Sign in with your bursar email. The app takes you to the bursar dashboard.
-</div>
+This guide walks you through fees and payments in StackEDU: the ledger, fee structure, student accounts, receipts, messages, reports, and reconciliation.
 
-<span style="background:#DCFCE7;color:#16A34A;padding:3px 10px;border-radius:999px;font-weight:700;">Works</span> Use the steps below on live fee records.
+**Who this is for:** You look after fees and payments.
+
+**How to start:** Open the StackEDU app URL your institution sent you. Sign in with your bursar email. The app takes you to the bursar dashboard. Use the steps below on live fee records.
+
+> [!NOTE]
+> Dates on screen use **DD-MM-YYYY**. When you create, update, or delete something, the app asks you to confirm before it saves.
+
+## Contents
+
+1. [Sign in](#sign-in)
+2. [Dashboard](#dashboard)
+3. [Payment Ledger](#payment-ledger)
+4. [Fee Structure](#fee-structure)
+5. [Student Accounts](#student-accounts)
+6. [Receipts](#receipts)
+7. [Fee Messages](#fee-messages)
+8. [Reports](#reports)
+9. [Reconciliation](#reconciliation)
+
+---
 
 ## Sign in
 
@@ -14,6 +30,8 @@ You look after fees and payments. Sign in with your bursar email. The app takes 
 3. Click **Sign in**.
 
 The sidebar shows: Dashboard, Payment Ledger, Fee Structure, Student Accounts, Receipts, Fee Messages, Reports, Reconciliation.
+
+---
 
 ## Dashboard
 
@@ -30,11 +48,15 @@ Tiles show live finance:
 
 Quick actions: **Issue receipt**, **Generate report**, **Reconcile payments**.
 
+---
+
 ## Payment Ledger
 
 Open **Payment Ledger**. Filter by date range, payment method, and status, then search.
 
 Totals follow the filters you set. Open a row when a payment exists.
+
+---
 
 ## Fee Structure
 
@@ -44,20 +66,24 @@ You see tuition, other fees, and a grand total. Search and programme / fee-type 
 
 You can **Add fee item** or **Apply to semester**. Applying fees changes what students see on **Fees**.
 
+---
+
 ## Student Accounts
 
 Open **Student Accounts**. Search by name or ID. Filter by programme and payment status.
 
 Click **View account** to see total fees, amount paid, outstanding balance, and payment history.
 
-<div style="background:#FEE2E2;color:#05131D;padding:14px 18px;border-radius:12px;margin:16px 0;border-left:6px solid #DC2626;">
-<strong style="color:#DC2626;">Watch</strong><br/>
-<strong>Apply fee hold</strong> blocks a student. Do not use it unless you mean to.
-</div>
+> [!WARNING]
+> **Apply fee hold** blocks a student. Do not use it unless you mean to.
+
+---
 
 ## Receipts
 
 Open **Receipts**. Search by name, ID, or receipt number. Filter by date.
+
+---
 
 ## Fee Messages
 
@@ -69,12 +95,20 @@ Open **Fee Messages**. Choose who should get the message (Everyone, Departments,
 
 Students get it under Notifications and Fees. The compose form then clears.
 
+---
+
 ## Reports
 
 Open **Reports**. Choose Daily, Monthly, Semester, or Annual, pick a date and programme (or All Programmes), then **Generate report**.
 
 You see total collected, outstanding, collection rate, and transaction count. The generated date uses weekday plus **DD-MM-YYYY**.
 
+---
+
 ## Reconciliation
 
 Open **Reconciliation**. Work through gateway items that are pending or mismatched. If the list is clear, there is nothing to match. Use **Sync gateway** when you are matching real payments.
+
+---
+
+[All role guides](./README.md)

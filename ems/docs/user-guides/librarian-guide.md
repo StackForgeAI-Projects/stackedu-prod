@@ -1,11 +1,25 @@
 # Librarian guide
 
-<div style="background:#05131D;color:#FFFFFF;padding:16px 20px;border-radius:12px;margin:16px 0;border-left:6px solid #0FBD3B;">
-<strong style="color:#0FBD3B;">Who this is for</strong><br/>
-You run the e-library. Sign in with your librarian email. The app takes you to the librarian dashboard.
-</div>
+This guide walks you through the e-library in StackEDU: the catalogue, collections, requests, and analytics.
 
-<span style="background:#DCFCE7;color:#16A34A;padding:3px 10px;border-radius:999px;font-weight:700;">Works</span> Use the steps below on the live catalogue.
+**Who this is for:** You run the e-library.
+
+**How to start:** Open the StackEDU app URL your institution sent you. Sign in with your librarian email. The app takes you to the librarian dashboard. Use the steps below on the live catalogue.
+
+> [!NOTE]
+> Dates on screen use **DD-MM-YYYY**. When you create, update, or delete something, the app asks you to confirm before it saves.
+
+## Contents
+
+1. [Sign in](#sign-in)
+2. [Dashboard](#dashboard)
+3. [Resource Catalogue](#resource-catalogue)
+4. [Collections](#collections)
+5. [Resource Requests](#resource-requests)
+6. [Analytics](#analytics)
+7. [Notifications](#notifications)
+
+---
 
 ## Sign in
 
@@ -15,6 +29,8 @@ You run the e-library. Sign in with your librarian email. The app takes you to t
 
 The sidebar shows: Dashboard, Resource Catalogue, Collections, Resource Requests, Analytics, Notifications.
 
+---
+
 ## Dashboard
 
 You see a greeting and today’s date as **DD-MM-YYYY**.
@@ -23,16 +39,18 @@ Tiles: **Total resources**, **Pending requests**, **Downloads today**, **Publish
 
 **Recent catalogue** lists published titles. **Pending requests** shows titles students and staff asked for.
 
+---
+
 ## Resource Catalogue
 
 Open **Resource Catalogue**. Search by title or author. Filter by type (for example E-book or Course pack) and status.
 
 You can **Add resource** to upload a new file, then publish it so students can download a signed copy.
 
-<div style="background:#FEE2E2;color:#05131D;padding:14px 18px;border-radius:12px;margin:16px 0;border-left:6px solid #DC2626;">
-<strong style="color:#DC2626;">Watch</strong><br/>
-<strong>Unpublish</strong> hides a title from students. Only do that if you mean to take it off the shelf.
-</div>
+> [!WARNING]
+> **Unpublish** hides a title from students. Only do that if you mean to take it off the shelf.
+
+---
 
 ## Collections
 
@@ -43,6 +61,8 @@ Open **Collections**. Group catalogue items into reading lists.
 3. Click **Create**, then confirm.
 
 Open the collection later to add a catalogue title. Deleting a collection does not delete the books.
+
+---
 
 ## Resource Requests
 
@@ -56,10 +76,18 @@ To fulfil a request:
 
 The requester is notified. You can also **Decline** with a reason.
 
+---
+
 ## Analytics
 
 Open **Analytics**. You see resources, downloads, views, and pending requests. **Most downloaded** lists titles. If nobody has downloaded yet, usage can say **No usage yet**.
 
+---
+
 ## Notifications
 
 Open **Notifications**. New library requests appear here with dates as **DD-MM-YYYY**. The bell may show unread until you open them.
+
+---
+
+[All role guides](./README.md)
