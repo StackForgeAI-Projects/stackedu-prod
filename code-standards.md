@@ -149,3 +149,48 @@
   be committed.
 - Push to GitHub only the product code that should go live. Local planning
   docs, design exports, and dummy datasets stay local.
+- Role user guides are read on GitHub Pages, not in the GitHub file
+  browser. Keep `ems/docs/user-guides/` the source of truth and keep that
+  site responsive.
+
+## Local role testing and tester guides
+
+These rules apply every time a role-facing feature is built or changed.
+Tester guides live in `ems/docs/user-guides/`. Write one file per role
+(`applicant-guide.md`, `student-guide.md`, `lecturer-guide.md`,
+`academic-admin-guide.md`, `bursar-guide.md`, `librarian-guide.md`,
+`ict-guide.md`). Keep the wording in simple English so a first-time tester
+can follow it.
+
+Readers use the GitHub Pages site, not the GitHub file tree. The markdown
+in `ems/docs/user-guides/` is the only source of guide content. The site
+shell (`index.html`, `styles.css`, `app.js`) in that same folder must stay
+fully responsive (phone, tablet, and computer) and use the design-system
+colours below. Do not copy guide text into extra HTML pages. Pushing those
+files to `main` publishes
+https://stackforgeai-projects.github.io/stackedu-prod/ through
+`.github/workflows/user-guides-pages.yml`. Update the matching `.md` file
+whenever a role flow changes so the hosted guide stays current.
+
+- Start the local servers first (marketing site, EMS API, EMS web). Sign in
+  as that role with the local dummy accounts. Do not pause for confirmation
+  on local test logins.
+- Walk the screens and actions that role can use. Use dummy data. Confirm
+  every create, update, and delete in `ConfirmAlertDialog` before the
+  request is sent.
+- Add a step to the matching role guide only after you have tested it and
+  it worked. Do not document a screen you have not opened. Do not document
+  a flow that failed.
+- If something breaks, is unclear, or does not talk to the API correctly,
+  fix the product code, re-test the same step, and only then update the
+  guide.
+- Keep the guides appealing and easy to scan. Use the design-system colours
+  (`--brand` `#0FBD3B`, `--brand-ink` `#05131D`, `--success` `#16A34A`,
+  `--error` `#DC2626`, `--info` `#2563EB`, and their background tokens) for
+  callouts such as what works, what to watch, and who this role is.
+- Do not invent extra test files or extra product work. API tests that a
+  fix needs must stay relevant and finish quickly. All of those tests must
+  pass.
+- Dates stay DD-MM-YYYY. Icon-only controls use `IconActionButton` with a
+  tooltip. Keep the codebase DRY. Do not implement work you were not asked
+  to do.

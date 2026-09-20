@@ -35,4 +35,4 @@ Sign in with the email (or student number) your institution gave you. Do not sha
 5. If a step is not in a guide, do not assume it works.
 
 > [!NOTE]
-> On GitHub, **Tip** boxes are extra help, **Warning** boxes are easy to miss or they change live data, and **Important** boxes mark something you must not skip.
+> **Tip** boxes are extra help. **Watch** boxes are easy to miss, or they change live data.
