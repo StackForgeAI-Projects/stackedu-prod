@@ -1,0 +1,52 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Form inputs — States</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px 24px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--foreground); }
+  .input { height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+    font-family: var(--font-sans); font-size: 14px; color: var(--foreground); width: 100%; outline: none; }
+  .input::placeholder { color: var(--muted-foreground); }
+  .input.empty {}
+  .input.focus { border-color: var(--brand); box-shadow: var(--shadow-focus); }
+  .input.error { border-color: var(--error); }
+  .input.disabled { background: var(--muted); color: var(--muted-foreground); cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--muted-foreground); }
+  .err  { font-size: 12px; color: var(--error); }
+  .lbl  { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="field">
+      <span class="lbl">empty</span>
+      <span class="field-label">Email</span>
+      <input class="input empty" placeholder="you@university.ac.rw">
+    </div>
+    <div class="field">
+      <span class="lbl">filled · focused</span>
+      <span class="field-label">Email</span>
+      <input class="input focus" value="jean.mugisha@ur.ac.rw">
+    </div>
+    <div class="field">
+      <span class="lbl">error</span>
+      <span class="field-label">Mobile number</span>
+      <input class="input error" value="0712345678">
+      <span class="err">Enter a valid Rwandan mobile number — must start with 078, 079, 072 or 073.</span>
+    </div>
+    <div class="field">
+      <span class="lbl">disabled</span>
+      <span class="field-label">Student ID</span>
+      <input class="input disabled" value="STU‑2024‑0481" disabled>
+      <span class="hint">Locked — set at admission.</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

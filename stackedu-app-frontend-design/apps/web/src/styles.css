@@ -1,0 +1,374 @@
+/* ==========================================================================
+   StackEDU — Global Styles
+   Single source of truth for design tokens in the frontend.
+   All values sourced from design_system/colors_and_type.css.
+
+   Load order:
+   1. @font-face (Clash Grotesk from /fonts/ static assets)
+   2. Google Fonts (Inter + JetBrains Mono)
+   3. @import "tailwindcss" (Tailwind v4 base)
+   4. @theme { … } (design token definitions → Tailwind utilities)
+   5. Base overrides (html/body, semantic type classes, focus ring)
+   ========================================================================== */
+
+/* ── 1. Clash Grotesk — served from /public/fonts/ ──────────────────────── */
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('/fonts/ClashGrotesk-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('/fonts/ClashGrotesk-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('/fonts/ClashGrotesk-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('/fonts/ClashGrotesk-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── 2. Inter + JetBrains Mono from Google Fonts ────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+/* ── 3. Tailwind v4 ──────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* ── 4. Design Tokens — @theme block ────────────────────────────────────── */
+/*
+   Naming conventions for Tailwind v4 utility generation:
+   --color-*     → bg-*, text-*, border-*, ring-*, fill-*, stroke-*
+   --font-*      → font-*
+   --text-*      → text-* (font-size utilities)
+   --radius-*    → rounded-*
+   --shadow-*    → shadow-*
+   --spacing-*   → p-*, m-*, gap-*, w-*, h-* (overrides the scale at that step)
+*/
+@theme {
+  /* ── Colors — Brand ──────────────────────────────────────────────────── */
+  --color-brand:              #20F44E;
+  --color-brand-ink:          #05131D;
+
+  /* ── Colors — Surface & Ink ─────────────────────────────────────────── */
+  --color-ink:                #05131D;
+  --color-background:         #F8FAFC;
+  --color-card:               #FFFFFF;
+  --color-muted:              #F1F5F9;
+  --color-muted-foreground:   #64748B;
+  --color-border:             #E2E8F0;
+  --color-foreground:         #05131D;
+
+  /* ── Colors — Inverse (Ink surfaces — sidebar, dark cards) ─────────── */
+  --color-ink-foreground:     #F8FAFC;
+  --color-ink-muted:          #94A3B8;
+  --color-ink-border:         #1F2A35;
+  --color-ink-surface:        #0F1E2B;
+
+  /* ── Colors — Semantic ──────────────────────────────────────────────── */
+  --color-success:            #16A34A;
+  --color-success-bg:         #DCFCE7;
+  --color-warning:            #CA8A04;
+  --color-warning-bg:         #FEF9C3;
+  --color-error:              #DC2626;
+  --color-error-bg:           #FEE2E2;
+  --color-info:               #2563EB;
+  --color-info-bg:            #DBEAFE;
+
+  /* ── Font Families ──────────────────────────────────────────────────── */
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Clash Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── Type Scale — font sizes ────────────────────────────────────────── */
+  --text-display: 3rem;       /* 48px */
+  --text-h1:      2rem;       /* 32px */
+  --text-h2:      1.5rem;     /* 24px */
+  --text-h3:      1.125rem;   /* 18px */
+  --text-body-lg: 1rem;       /* 16px */
+  --text-body:    0.875rem;   /* 14px */
+  --text-body-sm: 0.8125rem;  /* 13px */
+  --text-caption: 0.75rem;    /* 12px */
+  --text-label:   0.6875rem;  /* 11px */
+  --text-mono:    0.8125rem;  /* 13px */
+
+  /* ── Spacing — 4px base grid ────────────────────────────────────────── */
+  /* These override Tailwind's default scale at these named steps.         */
+  --spacing-1:   0.25rem;    /*  4px */
+  --spacing-2:   0.5rem;     /*  8px */
+  --spacing-3:   0.75rem;    /* 12px */
+  --spacing-4:   1rem;       /* 16px */
+  --spacing-6:   1.5rem;     /* 24px */
+  --spacing-8:   2rem;       /* 32px */
+  --spacing-12:  3rem;       /* 48px */
+  --spacing-16:  4rem;       /* 64px */
+
+  /* ── Border Radius ──────────────────────────────────────────────────── */
+  --radius-sm:   0.625rem;   /* 10px — badges, chips */
+  --radius-md:   0.75rem;    /* 12px — inputs, buttons */
+  --radius-lg:   0.875rem;   /* 14px — large inputs, small cards */
+  --radius-xl:   1.125rem;   /* 18px — cards */
+  --radius-2xl:  1.375rem;   /* 22px — hero cards, modals */
+  --radius-3xl:  1.625rem;   /* 26px — marketing surfaces */
+
+  /* ── Shadows — Ink-tinted (rgba(5,19,29,…)) ────────────────────────── */
+  --shadow-xs:
+    0 1px 1px rgba(5, 19, 29, 0.04);
+  --shadow-sm:
+    0 1px 2px rgba(5, 19, 29, 0.05),
+    0 1px 1px rgba(5, 19, 29, 0.04);
+  --shadow-md:
+    0 4px 8px -2px rgba(5, 19, 29, 0.06),
+    0 2px 4px -2px rgba(5, 19, 29, 0.05);
+  --shadow-lg:
+    0 12px 24px -8px rgba(5, 19, 29, 0.12),
+    0 4px 8px -4px rgba(5, 19, 29, 0.06);
+  --shadow-xl:
+    0 24px 48px -16px rgba(5, 19, 29, 0.18),
+    0 8px 16px -8px rgba(5, 19, 29, 0.10);
+
+  /* ── shadcn/ui token aliases ─────────────────────────────────────────
+     shadcn components reference these Tailwind color names. We map each
+     one to its design-system equivalent so all primitives render with
+     the correct StackEDU palette without modifying the generated files.
+     ──────────────────────────────────────────────────────────────────── */
+  --color-primary:              #20F44E;   /* brand — CTA buttons, active states     */
+  --color-primary-foreground:   #05131D;   /* brand-ink — text on brand green        */
+  --color-secondary:            #F1F5F9;   /* muted — secondary button surfaces      */
+  --color-secondary-foreground: #05131D;   /* foreground — text on secondary         */
+  --color-destructive:          #DC2626;   /* error — destructive actions            */
+  --color-destructive-foreground: #F8FAFC; /* light text on error red                */
+  --color-accent:               #F1F5F9;   /* muted — ghost/hover surfaces           */
+  --color-accent-foreground:    #05131D;   /* foreground — text on accent            */
+  --color-ring:                 #20F44E;   /* brand — focus ring colour              */
+  --color-input:                #E2E8F0;   /* border — input border colour           */
+  --color-popover:              #FFFFFF;   /* card — popover/dropdown background     */
+  --color-popover-foreground:   #05131D;   /* foreground — popover text              */
+  --color-sidebar:              #05131D;   /* ink — sidebar background               */
+  --color-sidebar-foreground:   #F8FAFC;   /* ink-foreground — sidebar text          */
+}
+
+/* ── 5. Base overrides ───────────────────────────────────────────────────── */
+
+/* Raw CSS variables — used in arbitrary Tailwind values and component CSS.
+   These mirror the @theme tokens above; they coexist because @theme variables
+   are prefixed for Tailwind (e.g. --color-brand) while some component CSS
+   uses the unprefixed design-system names (e.g. var(--brand)). */
+:root {
+  --brand:             #20F44E;
+  --brand-ink:         #05131D;
+  --ink:               #05131D;
+  --background:        #F8FAFC;
+  --card:              #FFFFFF;
+  --muted:             #F1F5F9;
+  --muted-foreground:  #64748B;
+  --border:            #E2E8F0;
+  --foreground:        #05131D;
+  --ink-foreground:    #F8FAFC;
+  --ink-muted:         #94A3B8;
+  --ink-border:        #1F2A35;
+  --ink-surface:       #0F1E2B;
+  --success:           #16A34A;
+  --success-bg:        #DCFCE7;
+  --warning:           #CA8A04;
+  --warning-bg:        #FEF9C3;
+  --error:             #DC2626;
+  --error-bg:          #FEE2E2;
+  --info:              #2563EB;
+  --info-bg:           #DBEAFE;
+
+  /* Focus ring — brand green at 35% opacity */
+  --shadow-focus: 0 0 0 3px rgba(32, 244, 78, 0.35);
+
+  /* Motion */
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:     120ms;
+  --dur-base:     180ms;
+  --dur-slow:     280ms;
+
+  /* Layout constants */
+  --sidebar-width:          248px;
+  --sidebar-width-collapsed: 72px;
+  --header-height:           64px;
+  --content-max-width:       1400px;
+}
+
+/* Base typography & rendering */
+html,
+body {
+  font-family: var(--font-sans);
+  font-size: 14px; /* --fs-body */
+  line-height: 1.5;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus ring — applied to every interactive element */
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* Disabled state */
+:disabled,
+[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Pretty text wrap on paragraphs and headings */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: pretty;
+}
+
+/* ── Entrance animation ──────────────────────────────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Staggered dashboard tiles — apply delay via style prop or nth-child  */
+.animate-fade-up-1 { animation: fade-up 300ms 60ms  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-up-2 { animation: fade-up 300ms 120ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-up-3 { animation: fade-up 300ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-up-4 { animation: fade-up 300ms 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Banner fade-down (welcome banner on onboarding) ─────────────────────── */
+@keyframes banner-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up-4 { animation: fade-up 300ms 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Semantic type utility classes ───────────────────────────────────────── */
+/* Mirror the .t-* classes from design_system/colors_and_type.css.
+   Use these directly on elements when Tailwind utilities would be verbose. */
+
+.t-display {
+  font-family: var(--font-display);
+  font-size: 3rem;        /* 48px */
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.t-h1 {
+  font-family: var(--font-display);
+  font-size: 2rem;        /* 32px */
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.t-h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;      /* 24px */
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.t-h3 {
+  font-family: var(--font-display);
+  font-size: 1.125rem;    /* 18px */
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.t-body-lg {
+  font-size: 1rem;        /* 16px */
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.t-body {
+  font-size: 0.875rem;    /* 14px */
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.t-body-sm {
+  font-size: 0.8125rem;   /* 13px */
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.t-caption {
+  font-size: 0.75rem;     /* 12px */
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.t-label {
+  font-size: 0.6875rem;   /* 11px */
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;   /* 13px */
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── Demo role-switcher grid — responsive breakpoints ───────────────────── */
+@media (max-width: 768px) {
+  .demo-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  .demo-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

@@ -1,0 +1,43 @@
+<!-- @dsCard group="Colors" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colors — Neutrals</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-3);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F8FAFC; border-bottom:1px solid var(--border);"></div>
+      <div class="swatch-meta"><span class="swatch-name">background</span><span class="swatch-hex">#F8FAFC</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#FFFFFF; border-bottom:1px solid var(--border);"></div>
+      <div class="swatch-meta"><span class="swatch-name">card</span><span class="swatch-hex">#FFFFFF</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F1F5F9;"></div>
+      <div class="swatch-meta"><span class="swatch-name">muted</span><span class="swatch-hex">#F1F5F9</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#E2E8F0;"></div>
+      <div class="swatch-meta"><span class="swatch-name">border</span><span class="swatch-hex">#E2E8F0</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#64748B;"></div>
+      <div class="swatch-meta"><span class="swatch-name">muted-foreground</span><span class="swatch-hex">#64748B</span></div>
+    </div>
+  </div>
+  <div class="note">Light app surfaces. Cards sit flat on the background with a 1px border; muted is for input fills, tags and skeletons.</div>
+</div>
+</body>
+</html>

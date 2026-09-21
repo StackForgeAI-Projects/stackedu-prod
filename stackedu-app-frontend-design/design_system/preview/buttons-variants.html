@@ -1,0 +1,37 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Buttons — Variants</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
+  .tok { display: flex; flex-direction: column; gap: 8px; }
+  .lbl { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+  .btn { height: 40px; padding: 0 16px; border-radius: 12px; border: 1px solid transparent;
+    font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+  .primary { background: var(--brand); color: var(--brand-ink); }
+  .ink { background: var(--ink); color: var(--ink-foreground); }
+  .secondary { background: var(--card); color: var(--foreground); border-color: var(--border); }
+  .ghost { background: transparent; color: var(--foreground); }
+  .ghost:hover { background: var(--muted); }
+  .destructive { background: var(--error); color: white; }
+  .link { background: transparent; color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; padding: 0; height: auto; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="tok"><span class="lbl">primary</span><button class="btn primary">Pay fees</button></div>
+    <div class="tok"><span class="lbl">ink</span><button class="btn ink">Publish results</button></div>
+    <div class="tok"><span class="lbl">secondary</span><button class="btn secondary">Cancel</button></div>
+    <div class="tok"><span class="lbl">ghost</span><button class="btn ghost">View transcript</button></div>
+    <div class="tok"><span class="lbl">destructive</span><button class="btn destructive">Suspend student</button></div>
+    <div class="tok"><span class="lbl">link</span><button class="btn link">Forgot password?</button></div>
+  </div>
+  <div class="note">One primary CTA per surface. Ink is the "important but not promotional" variant — used for staff actions like Publish, Save, Submit. Secondary is the everyday cancel/back partner.</div>
+</div>
+</body>
+</html>

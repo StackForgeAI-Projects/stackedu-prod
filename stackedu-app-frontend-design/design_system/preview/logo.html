@@ -1,0 +1,35 @@
+<!-- @dsCard group="Brand" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logo mark</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--background); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tile { border-radius: 18px; padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .tile.light { background: var(--card); border: 1px solid var(--border); }
+  .tile.dark  { background: var(--ink); }
+  .tile img { width: 96px; height: 96px; object-fit: contain; }
+  .lbl { font: 600 11px/1 var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; }
+  .light .lbl { color: var(--muted-foreground); }
+  .dark .lbl  { color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="tile light">
+      <img src="../assets/logo-mark-on-light.png" alt="StackForgeAI mark on light">
+      <span class="lbl">On light · #FFFFFF</span>
+    </div>
+    <div class="tile dark">
+      <img src="../assets/logo-mark-on-dark.png" alt="StackForgeAI mark on dark">
+      <span class="lbl">On dark · #05131D</span>
+    </div>
+  </div>
+  <div class="note">The SF mark in Ink with the brand‑green accent slab. Used for splash, sidebar collapsed state, favicon. Source artwork at 700×700 in <code>assets/</code>.</div>
+</div>
+</body>
+</html>

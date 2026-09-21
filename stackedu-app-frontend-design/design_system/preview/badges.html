@@ -1,0 +1,53 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Badges — Status variants</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .row-badges { display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 10px;
+    font-family: var(--font-sans); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .b-success { background: #DCFCE7; color: #15803D; }
+  .b-warning { background: #FEF9C3; color: #854D0E; }
+  .b-error   { background: #FEE2E2; color: #B91C1C; }
+  .b-info    { background: #DBEAFE; color: #1D4ED8; }
+  .b-neutral { background: var(--muted); color: var(--foreground); }
+  .b-ink     { background: var(--ink); color: var(--ink-foreground); }
+  .b-brand   { background: var(--brand); color: var(--brand-ink); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="col">
+    <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted-foreground);">payments</span>
+    <div class="row-badges">
+      <span class="badge b-success"><span class="dot" style="background:#16A34A;"></span>Paid</span>
+      <span class="badge b-warning"><span class="dot" style="background:#CA8A04;"></span>Pending</span>
+      <span class="badge b-error"><span class="dot" style="background:#DC2626;"></span>Unpaid</span>
+      <span class="badge b-info"><span class="dot" style="background:#2563EB;"></span>Reconciling</span>
+    </div>
+  </div>
+  <div class="col">
+    <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted-foreground);">enrolment</span>
+    <div class="row-badges">
+      <span class="badge b-success">Enrolled</span>
+      <span class="badge b-warning">Pending review</span>
+      <span class="badge b-neutral">Graduated</span>
+      <span class="badge b-error">Suspended</span>
+      <span class="badge b-info">On leave</span>
+    </div>
+  </div>
+  <div class="col">
+    <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted-foreground);">emphasis</span>
+    <div class="row-badges">
+      <span class="badge b-ink">ICT Manager</span>
+      <span class="badge b-brand">New</span>
+      <span class="badge b-neutral">Semester 2</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

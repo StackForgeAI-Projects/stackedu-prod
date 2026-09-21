@@ -1,0 +1,22 @@
+{
+  "name": "@stackedu/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stackedu/shared": "workspace:*",
+    "drizzle-orm": "^0.44",
+    "hono": "^4",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4",
+    "drizzle-kit": "^0.30",
+    "typescript": "^5.8",
+    "wrangler": "^4"
+  }
+}

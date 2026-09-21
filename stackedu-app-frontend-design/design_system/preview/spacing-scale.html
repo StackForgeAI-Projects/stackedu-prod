@@ -1,0 +1,31 @@
+<!-- @dsCard group="Spacing" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spacing scale</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 16px; align-items: end; }
+  .tok { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .bar { background: var(--ink); border-radius: 2px; width: 100%; max-width: 64px; }
+  .name { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+  .px { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="tok"><div class="bar" style="height:4px;"></div><div class="px">4</div><div class="name">space-1</div></div>
+    <div class="tok"><div class="bar" style="height:8px;"></div><div class="px">8</div><div class="name">space-2</div></div>
+    <div class="tok"><div class="bar" style="height:12px;"></div><div class="px">12</div><div class="name">space-3</div></div>
+    <div class="tok"><div class="bar" style="height:16px;"></div><div class="px">16</div><div class="name">space-4</div></div>
+    <div class="tok"><div class="bar" style="height:24px;"></div><div class="px">24</div><div class="name">space-6</div></div>
+    <div class="tok"><div class="bar" style="height:32px;"></div><div class="px">32</div><div class="name">space-8</div></div>
+    <div class="tok"><div class="bar" style="height:48px;"></div><div class="px">48</div><div class="name">space-12</div></div>
+    <div class="tok"><div class="bar" style="height:64px;"></div><div class="px">64</div><div class="name">space-16</div></div>
+  </div>
+  <div class="note">4px base grid. Card padding 24, page padding 32, section break 48, field row gap 16.</div>
+</div>
+</body>
+</html>

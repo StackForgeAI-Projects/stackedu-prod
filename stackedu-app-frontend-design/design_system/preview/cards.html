@@ -1,0 +1,108 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cards — Patterns</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--background); }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .pcard { background: var(--card); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+  .pcard .body { padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .pcard .h { font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.005em; color: var(--foreground); }
+  .pcard .p { font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); line-height: 1.5; }
+  .img { height: 88px; background: linear-gradient(135deg, var(--ink) 0%, #14233A 100%); display: flex; align-items: center; justify-content: center; }
+  .img-mark { width: 56px; height: 56px; border-radius: 14px; background: var(--brand); display: flex; align-items: center; justify-content: center; color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 24px; }
+  .actions { padding: 0 16px 14px; display: flex; gap: 8px; }
+  .btn { height: 32px; padding: 0 12px; border-radius: 10px; font: 600 13px/1 var(--font-sans); display: inline-flex; align-items: center; cursor: pointer; }
+  .b-prim { background: var(--brand); color: var(--brand-ink); border: 1px solid transparent; }
+  .b-sec { background: var(--card); color: var(--foreground); border: 1px solid var(--border); }
+  .lbl { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); padding: 12px 16px 0; }
+
+  /* Dark KPI / revenue card */
+  .kpi {
+    background: var(--ink);
+    color: var(--ink-foreground);
+    border-radius: 22px;
+    padding: 22px;
+    display: flex; flex-direction: column; gap: 18px;
+    min-height: 180px;
+    justify-content: space-between;
+    position: relative;
+  }
+  .kpi-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .kpi-label { font-family: var(--font-sans); font-size: 15px; font-weight: 500; color: var(--ink-muted); }
+  .kpi-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(32, 244, 78, 0.14);
+    color: var(--brand);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .kpi-value {
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink-foreground);
+  }
+  .kpi-foot {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--brand);
+  }
+  .kpi-foot .mono { font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+
+    <div class="pcard">
+      <div class="lbl">basic</div>
+      <div class="body">
+        <div class="h">Course registration</div>
+        <div class="p">Semester 2 registration is open until 30 June 2026. Select up to 24 credits.</div>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="img"><div class="img-mark">SF</div></div>
+      <div class="body">
+        <div class="h">SE401 · Software Architecture</div>
+        <div class="p">Dr. Mukamana · Year 4 · 4 credits · Mon &amp; Thu, 10:00–12:00</div>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="lbl">with actions</div>
+      <div class="body">
+        <div class="h">Fee statement ready</div>
+        <div class="p">RWF 380,000 outstanding for Semester 2. Due 30 Jun 2026.</div>
+      </div>
+      <div class="actions">
+        <button class="btn b-prim">Pay fees</button>
+        <button class="btn b-sec">View statement</button>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-head">
+        <span class="kpi-label">Total revenue</span>
+        <span class="kpi-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/>
+            <polyline points="16 7 22 7 22 13"/>
+          </svg>
+        </span>
+      </div>
+      <div class="kpi-value">RWF 1.2M</div>
+      <div class="kpi-foot">Settled to MoMo · <span class="mono">*182#</span></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
