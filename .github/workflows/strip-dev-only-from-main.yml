@@ -1,8 +1,7 @@
 name: Strip development-only paths from main
 
-# Safety net if a GitHub merge ever lands docs/context/design on main.
-# Prefer `.github/workflows/merge-development.yml` so these paths never
-# enter the main tree.
+# Does not push to main. Opens a pull request so production still
+# requires review. Temporary branch: auto/strip-dev-only.
 
 on:
   push:
@@ -10,6 +9,11 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
+
+concurrency:
+  group: strip-dev-only-from-main
+  cancel-in-progress: false
 
 jobs:
   strip:
@@ -18,7 +22,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Remove development-only paths
+      - name: Open a pull request if main has development-only paths
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           paths=(
@@ -30,18 +36,38 @@ jobs:
             stackedu-app-frontend-design
             code-standards.md
           )
-          changed=0
+          found=0
           for p in "${paths[@]}"; do
             if [ -e "$p" ]; then
-              git rm -rf --ignore-unmatch "$p"
-              changed=1
+              found=1
+              break
             fi
           done
-          if [ "$changed" -eq 0 ]; then
+          if [ "$found" -eq 0 ]; then
             echo "Main tree is clean."
             exit 0
           fi
+
+          existing="$(gh pr list --base main --head auto/strip-dev-only --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Cleanup PR #$existing is already open."
+            exit 0
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B auto/strip-dev-only
+          for p in "${paths[@]}"; do
+            git rm -rf --ignore-unmatch "$p" || true
+          done
           git commit -m "chore: remove development-only docs, context, and design from main."
-          git push origin HEAD:main
+          git push --force origin auto/strip-dev-only
+          gh pr create --base main --head auto/strip-dev-only \
+            --title "Remove development-only docs, context, and design from main" \
+            --body "$(cat <<'EOF'
+          These folders belong on `development` only. This PR removes them from `main` after a production merge.
+
+          Review and merge this PR so they do not stay on the live branch.
+          EOF
+          )"
+          gh pr merge --auto --merge || true
