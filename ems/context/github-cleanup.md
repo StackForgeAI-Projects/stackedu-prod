@@ -5,11 +5,11 @@ This is a live product. `main` is production. Nothing goes onto `main` except th
 ## The two branches
 
 - `development` — where you work. Docs, context, and the design system live here.
-- `main` — the live site. Code gets here only after a pull request and a review.
+- `main` — the live site. Code gets here only after a pull request.
 
 ## What “PR required” means
 
-You cannot push straight to `main` from your laptop. You open a pull request from `development` to `main`, CodeRabbit reviews it, then it can be merged.
+You cannot push straight to `main` from your laptop. You open a pull request from `development` to `main`. CodeRabbit reviews it. Then you merge it.
 
 A “bypass” would be a secret exception: a person or robot allowed to ignore that rule and write to production anyway. We are not giving anyone that exception. A live product should not have a backdoor.
 
@@ -23,8 +23,8 @@ So the cleanup robot does not push to `main`. If a merge accidentally copies doc
 
 1. Work and push on `development`.
 2. Open a pull request: `development` → `main`.
-3. Wait for CodeRabbit to review and approve.
-4. Merge with a **merge commit** (not squash, not rebase). Do not delete `development`.
+3. Wait for CodeRabbit’s review check to finish (green).
+4. Merge with a **merge commit** (not squash, not rebase). Do not delete `development`. You do not need Enable auto-merge.
 5. If docs/context/design landed on `main`, merge the small cleanup PR the robot opens.
 
 Track new files under the development-only paths with `git add -f`.
@@ -32,9 +32,8 @@ Track new files under the development-only paths with `git add -f`.
 ## Production settings (locked)
 
 - Pull request required before anything reaches `main`
-- One approving review required (CodeRabbit)
-- New commits dismiss old approvals
-- Review comments do not block merge (CodeRabbit nits can stay open)
+- No required human/CodeRabbit Approve (you cannot approve your own PR)
+- Review comments do not block merge
 - Force-push to `main` blocked
 - Deleting `main` blocked
 - Only merge commits (squash and rebase are off, so `development` is not rewritten or deleted)
