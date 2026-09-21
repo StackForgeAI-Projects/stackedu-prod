@@ -1,36 +1,52 @@
 # GitHub flow — stackedu-prod
 
-Keep exactly two branches:
+This is a live product. `main` is production. Nothing goes onto `main` except through a pull request.
 
-- `development` — working branch. Local work is pushed here. Context, docs, and the design system live only on this branch.
-- `main` — production. Code reaches `main` only through a pull request that CodeRabbit has reviewed.
+## The two branches
 
-## Flow
+- `development` — where you work. Docs, context, and the design system live here.
+- `main` — the live site. Code gets here only after a pull request and a review.
 
-1. Work locally on `development`.
-2. Push from this environment to `origin/development`.
-3. Open a pull request: `development` → `main`.
-4. CodeRabbit reviews the PR (it ignores docs/context/design paths).
-5. After CodeRabbit approval, merge the PR.
-6. A GitHub Action then strips docs/context/design from `main` if they came along with the merge. Prefer the **Merge development into main** Action (Actions tab → Run workflow) so those paths never land on `main`.
-7. Do not push local work straight to `main`.
+## What “PR required” means
 
-Track new files under the development-only paths with `git add -f` (they are listed in `.gitignore` so they cannot land on `main` by accident).
+You cannot push straight to `main` from your laptop. You open a pull request from `development` to `main`, CodeRabbit reviews it, then it can be merged.
 
-## Branch cleanup
+A “bypass” would be a secret exception: a person or robot allowed to ignore that rule and write to production anyway. We are not giving anyone that exception. A live product should not have a backdoor.
 
-The extra remote branches were Dependabot npm/yarn bump PRs, not feature branches. Those PRs are closed and the branches deleted. Dependabot security auto-updates are off. If Dependabot version updates recreate branches, turn them off in GitHub → Settings → Code security.
+## Why a GitHub Action must not write to `main`
+
+GitHub Actions is a robot in the cloud. Your organisation does not let that robot skip branch rules. That is the right call for production: the robot must not be able to change the live branch on its own.
+
+So the cleanup robot does not push to `main`. If a merge accidentally copies docs/context/design onto `main`, the robot opens a pull request to take them off. That cleanup PR still needs a review, the same as any other production change.
+
+## Daily flow
+
+1. Work and push on `development`.
+2. Open a pull request: `development` → `main`.
+3. Wait for CodeRabbit to review and approve.
+4. Merge with a **merge commit** (not squash, not rebase). Do not delete `development`.
+5. If docs/context/design landed on `main`, merge the small cleanup PR the robot opens.
+
+Track new files under the development-only paths with `git add -f`.
+
+## Production settings (locked)
+
+- Pull request required before anything reaches `main`
+- One approving review required (CodeRabbit)
+- New commits dismiss old approvals
+- Force-push to `main` blocked
+- Deleting `main` blocked
+- Only merge commits (squash and rebase are off, so `development` is not rewritten or deleted)
+- Auto-delete of the head branch is off (so merging does not delete `development`)
 
 ## What stays off `main`
 
-These paths exist on `development` only. They must not appear in `main`:
-
-- `docs/` (planning / local docs)
-- `ems/docs/` (EMS docs and user-guide sources; GitHub Pages deploys these from `development`)
-- `ems/context/` (internal context, including this file)
-- `ems/design_system/` (UI kit reference)
+- `docs/`
+- `ems/docs/` (user guides still publish from `development` via GitHub Pages)
+- `ems/context/`
+- `ems/design_system/`
 - `ems/EMS-master-context.md`
-- `stackedu-app-frontend-design/` (design-system reference)
-- `code-standards.md` (moved to `ems/context/code-standards.md`)
+- `stackedu-app-frontend-design/`
+- `code-standards.md` (now `ems/context/code-standards.md`)
 
-`.gitignore` lists those paths on both branches. On `development` they are still tracked with `git add -f`. `.vercelignore` lists the same paths so a brief merge onto `main` cannot ship them to production.
+`.gitignore` lists those paths. On `development` they are still tracked with `git add -f`. `.vercelignore` lists them so they cannot ship to the live website even if they briefly appear on `main`.
