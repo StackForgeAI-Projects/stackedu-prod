@@ -46,6 +46,16 @@ next-env.d.ts
 /stackedu-design/
 /stackforgenext-main/
 
+# Development-only paths. Tracked on `development` with `git add -f`.
+# Never present on `main` (production).
+/docs/
+/ems/docs/
+/ems/context/
+/ems/design_system/
+/ems/EMS-master-context.md
+/stackedu-app-frontend-design/
+/code-standards.md
+
 # EMS monorepo — secrets and local artifacts (also covered by ems/.gitignore)
 /ems/.env
 /ems/.env.local
@@ -66,5 +76,3 @@ Thumbs.db
 # Office lock files
 ~\$*
 
-# Local planning docs — keep off the main repo
-/docs/

@@ -1,0 +1,47 @@
+name: Strip development-only paths from main
+
+# Safety net if a GitHub merge ever lands docs/context/design on main.
+# Prefer `.github/workflows/merge-development.yml` so these paths never
+# enter the main tree.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  strip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Remove development-only paths
+        run: |
+          set -euo pipefail
+          paths=(
+            docs
+            ems/docs
+            ems/context
+            ems/design_system
+            ems/EMS-master-context.md
+            stackedu-app-frontend-design
+            code-standards.md
+          )
+          changed=0
+          for p in "${paths[@]}"; do
+            if [ -e "$p" ]; then
+              git rm -rf --ignore-unmatch "$p"
+              changed=1
+            fi
+          done
+          if [ "$changed" -eq 0 ]; then
+            echo "Main tree is clean."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove development-only docs, context, and design from main."
+          git push origin HEAD:main

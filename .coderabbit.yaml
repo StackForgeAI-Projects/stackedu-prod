@@ -1,0 +1,11 @@
+# CodeRabbit — ignore development-only paths so production PRs stay focused.
+language: en-US
+reviews:
+  path_filters:
+    - "!docs/**"
+    - "!ems/docs/**"
+    - "!ems/context/**"
+    - "!ems/design_system/**"
+    - "!ems/EMS-master-context.md"
+    - "!stackedu-app-frontend-design/**"
+    - "!code-standards.md"

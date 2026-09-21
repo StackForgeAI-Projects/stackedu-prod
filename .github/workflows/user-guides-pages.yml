@@ -2,7 +2,7 @@ name: Deploy user guides
 
 on:
   push:
-    branches: [main]
+    branches: [development]
     paths:
       - ems/docs/user-guides/**
       - .github/workflows/user-guides-pages.yml
