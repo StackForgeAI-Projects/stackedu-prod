@@ -1,7 +1,7 @@
-docs
-ems/docs
-ems/context
-ems/design_system
-ems/EMS-master-context.md
-stackedu-app-frontend-design
-code-standards.md
+/docs/
+/ems/docs/
+/ems/context/
+/ems/design_system/
+/ems/EMS-master-context.md
+/stackedu-app-frontend-design/
+/code-standards.md

@@ -34,6 +34,7 @@ Track new files under the development-only paths with `git add -f`.
 - Pull request required before anything reaches `main`
 - One approving review required (CodeRabbit)
 - New commits dismiss old approvals
+- Review comments do not block merge (CodeRabbit nits can stay open)
 - Force-push to `main` blocked
 - Deleting `main` blocked
 - Only merge commits (squash and rebase are off, so `development` is not rewritten or deleted)
