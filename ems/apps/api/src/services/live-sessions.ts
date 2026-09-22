@@ -307,15 +307,14 @@ export async function startLecturerClassroomSession(
       targetType: 'live_session',
       targetId: sessionId,
     })
-    const detail = await toDetail(institutionId, db, sessionId)
     if (await lecturerAutoRecordEnabled(db, actor.id)) {
       try {
         return await startLecturerRecording(institutionId, actor, sessionId)
       } catch {
-        return detail
+        return toDetail(institutionId, db, sessionId)
       }
     }
-    return detail
+    return toDetail(institutionId, db, sessionId)
   }
   return toDetail(institutionId, db, sessionId)
 }

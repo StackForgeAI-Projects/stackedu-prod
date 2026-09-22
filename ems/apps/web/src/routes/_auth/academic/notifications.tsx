@@ -111,9 +111,8 @@ function AcademicNotificationsPage() {
   const markAllRead = async () => {
     const unread = notifs.filter((n) => !n.read)
     applyAllNotificationsReadLocally(queryClient)
-    try {
-      await Promise.all(unread.map((n) => markAcademicNotificationRead(n.id)))
-    } catch {
+    const results = await Promise.allSettled(unread.map((n) => markAcademicNotificationRead(n.id)))
+    if (results.some((result) => result.status === 'rejected')) {
       await invalidateNotificationReadCaches(queryClient)
     }
   }

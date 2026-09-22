@@ -52,9 +52,6 @@ function LecturerNotificationsPage() {
     onMutate: (id) => {
       applyNotificationReadLocally(queryClient, id)
     },
-    onSuccess: (notifications) => {
-      queryClient.setQueryData(lecturerNotificationsQueryKey, notifications)
-    },
     onError: () => {
       void invalidateNotificationReadCaches(queryClient)
     },

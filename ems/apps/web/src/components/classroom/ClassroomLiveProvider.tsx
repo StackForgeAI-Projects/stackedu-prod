@@ -44,6 +44,10 @@ const noopSync: WhiteboardSync = {
   subscribe: () => () => undefined,
 }
 
+export function whiteboardChannelIsLive(sync: WhiteboardSync): boolean {
+  return sync !== noopSync
+}
+
 const WhiteboardSyncContext = createContext<WhiteboardSync>(noopSync)
 
 export function useClassroomWhiteboardSync(): WhiteboardSync {
@@ -110,29 +114,47 @@ export function ClassroomLiveProvider({ children }: { children: ReactNode }) {
     setStageEl(null)
   }, [])
 
-  useQuery({
+  const liveSession = useQuery({
     queryKey: ['classroom-live-session', role, sessionId],
-    queryFn: async () => {
+    queryFn: () => {
       if (!role || !sessionId) return null
-      const next = role === 'lecturer'
-        ? await getLecturerClassroomSession(sessionId)
-        : await getStudentClassroomSession(sessionId)
-      setSession(next)
-      setJoin((current) => (current ? { ...current, session: next } : current))
-      if (next.status !== 'Live') setJoin(null)
-      return next
+      return role === 'lecturer'
+        ? getLecturerClassroomSession(sessionId)
+        : getStudentClassroomSession(sessionId)
     },
     enabled: Boolean(role && sessionId && join),
     refetchInterval: 8000,
   })
 
-  const media = join?.media && session?.status === 'Live' ? join.media : null
-  const recording = Boolean(session?.recordings.some((row) => row.status === 'Pending'))
+  const polled = liveSession.data
+  const shownSession = polled && polled.id === sessionId ? polled : session
+  const shownJoin = useMemo(() => {
+    if (!join || shownSession?.status !== 'Live') return null
+    return { ...join, session: shownSession }
+  }, [join, shownSession])
+
+  useEffect(() => {
+    if (!polled || !sessionId || polled.id !== sessionId) return
+    if (polled.status === 'Live') return
+    setJoin(null)
+  }, [polled, sessionId])
+
+  const media = shownJoin?.media ?? null
+  const recording = Boolean(shownSession?.recordings.some((row) => row.status === 'Pending'))
   const [boardSync, setBoardSync] = useState<WhiteboardSync>(noopSync)
 
   const value = useMemo<ClassroomLiveContextValue>(
-    () => ({ role, sessionId, join, session, connect, updateSession, disconnect, setStageEl }),
-    [role, sessionId, join, session, connect, updateSession, disconnect],
+    () => ({
+      role,
+      sessionId,
+      join: shownJoin,
+      session: shownSession,
+      connect,
+      updateSession,
+      disconnect,
+      setStageEl,
+    }),
+    [role, sessionId, shownJoin, shownSession, connect, updateSession, disconnect],
   )
 
   return (
@@ -152,7 +174,7 @@ export function ClassroomLiveProvider({ children }: { children: ReactNode }) {
             <ClassroomMediaChrome
               role={role}
               sessionId={sessionId}
-              session={session}
+              session={shownSession}
               recording={recording}
               stageEl={stageEl}
               onEnded={disconnect}

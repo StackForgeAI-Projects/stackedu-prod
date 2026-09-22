@@ -29,9 +29,6 @@ function NotificationsPage() {
     onMutate: (id) => {
       applyNotificationReadLocally(queryClient, id)
     },
-    onSuccess: (notifications) => {
-      queryClient.setQueryData(studentNotificationsQueryKey, notifications)
-    },
     onError: () => {
       void invalidateNotificationReadCaches(queryClient)
     },

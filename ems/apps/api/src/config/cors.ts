@@ -24,7 +24,7 @@ export function corsOrigin(env: Env) {
  * preview URLs and localhost so a preview build can talk to a preview API.
  */
 export function expandOriginsForEnvironment(env: Env): Env {
-  if (env.NODE_ENV === 'production') return env
+  if (env.NODE_ENV !== 'development') return env
 
   const extras = [
     'http://localhost:3000',

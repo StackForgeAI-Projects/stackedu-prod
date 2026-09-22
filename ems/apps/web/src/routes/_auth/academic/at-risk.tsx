@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { AcademicAtRiskStudent } from '@stackedu/shared'
 import { AcademicShell } from '@/components/AcademicShell'
@@ -126,19 +127,19 @@ function RiskCard({ student: s }: { student: AcademicAtRiskStudent }) {
   const rc = riskColors(s.riskLevel === 'Critical' ? 'High' : s.riskLevel as Parameters<typeof riskColors>[0])
   return (
     <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', padding: 20 }}>
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center justify-center rounded-full flex-shrink-0 text-sm font-bold" style={{ width: 44, height: 44, backgroundColor: 'var(--muted)' }}>{s.initials}</div>
-        <div className="flex-shrink-0" style={{ minWidth: 160 }}>
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="flex items-center justify-center rounded-full shrink-0 text-sm font-bold" style={{ width: 44, height: 44, backgroundColor: 'var(--muted)' }}>{s.initials}</div>
+        <div className="min-w-0 flex-1 basis-35">
           <Link to="/academic/student" search={{ id: s.studentNumber }} className="text-sm font-semibold" style={{ color: 'var(--foreground)', textDecoration: 'none' }}>{s.name}</Link>
           <p className="t-mono text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{s.studentNumber}</p>
           <p className="t-caption mt-0.5">{s.programme} · Year {s.year}</p>
         </div>
-        <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+        <div className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
           {s.riskFactors.map((f, i) => (
-            <span key={i} className="t-label px-2 py-0.5" style={{ backgroundColor: f.severity === 'error' ? 'var(--error-bg)' : 'var(--warning-bg)', color: f.severity === 'error' ? 'var(--error)' : 'var(--warning)', borderRadius: 'var(--radius-sm)' }}>{f.label}</span>
+            <span key={i} className="t-label px-2 py-0.5 max-w-full whitespace-normal" style={{ backgroundColor: f.severity === 'error' ? 'var(--error-bg)' : 'var(--warning-bg)', color: f.severity === 'error' ? 'var(--error)' : 'var(--warning)', borderRadius: 'var(--radius-sm)' }}>{f.label}</span>
           ))}
         </div>
-        <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
+        <div className="flex flex-col items-start sm:items-end gap-2.5">
           <span className="t-label px-2.5 py-1" style={{ backgroundColor: rc.bg, color: rc.color, borderRadius: 'var(--radius-sm)' }}>{s.riskLevel} Risk</span>
         </div>
       </div>

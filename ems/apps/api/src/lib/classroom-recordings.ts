@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lte } from 'drizzle-orm'
 import {
   DEFAULT_RECORDING_RETENTION,
   RECORDING_RETENTION_SETTING_KEY,
@@ -20,6 +20,7 @@ export async function processClassroomRecordings(db: InstitutionDb, now = new Da
     DEFAULT_RECORDING_RETENTION,
   )
   const nowIso = now.toISOString()
+  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
 
   const due = await db
     .select({
@@ -41,6 +42,7 @@ export async function processClassroomRecordings(db: InstitutionDb, now = new Da
         eq(sessionRecordings.status, 'Ready'),
         isNull(sessionRecordings.purgedAt),
         isNotNull(sessionRecordings.expiresAt),
+        lte(sessionRecordings.expiresAt, horizon),
       ),
     )
 

@@ -170,14 +170,14 @@ describe('role notifications', () => {
   it('notifies enrolled students when a lecturer publishes course material or assignment', async () => {
     const ctx = await seedCourseWithEnrollment()
 
-    const module = await createLecturerModule(ctx.institutionId, ctx.actor, {
+    const courseModule = await createLecturerModule(ctx.institutionId, ctx.actor, {
       offeringId: ctx.offeringId,
       title: 'Week 1',
       publish: true,
     })
     await createLecturerMaterial(ctx.institutionId, ctx.actor, {
       offeringId: ctx.offeringId,
-      moduleId: module.id,
+      moduleId: courseModule.id,
       title: 'Week 1 notes',
       publish: true,
     })

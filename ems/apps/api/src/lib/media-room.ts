@@ -146,12 +146,7 @@ function createLiveKitAdapter(creds: { url: string; apiKey: string; apiSecret: s
           const sid = track.sid
           if (!sid || track.muted) continue
           const source = String(track.source ?? '')
-          const type = String(track.type ?? '')
-          const isMic =
-            source.includes('MICROPHONE') ||
-            source === '2' ||
-            type.includes('AUDIO') ||
-            type === '1'
+          const isMic = source.includes('MICROPHONE') || source === '2'
           if (!isMic) continue
           await rooms.mutePublishedTrack(roomName, participant.identity, sid, true)
           muted += 1

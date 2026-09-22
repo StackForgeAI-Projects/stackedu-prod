@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { LecturerShell } from '@/components/LecturerShell'
 import { ClassroomSessionList } from '@/components/classroom/ClassroomSessionList'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/_auth/lecturer/classroom')({
 })
 
 function LecturerClassroomPage() {
+  const [recordConfirmOpen, setRecordConfirmOpen] = useState(false)
   const queryClient = useQueryClient()
   const { data: courses = [] } = useQuery({
     queryKey: lecturerCoursesQueryKey,
@@ -59,13 +61,18 @@ function LecturerClassroomPage() {
             <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Automatically record live classes</p>
             <FormInfoBox lines={formInfo.autoRecordClassroom} />
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>{autoRecord ? 'On' : 'Off'}</span>
+            <Switch
+              aria-label="Automatically record live classes"
+              checked={autoRecord}
+              disabled={autoRecordMutation.isPending}
+              onCheckedChange={() => setRecordConfirmOpen(true)}
+            />
+          </div>
           <ConfirmAlertDialog
-            trigger={
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="t-caption" style={{ color: 'var(--muted-foreground)' }}>{autoRecord ? 'On' : 'Off'}</span>
-                <Switch checked={autoRecord} disabled={autoRecordMutation.isPending} onCheckedChange={() => undefined} />
-              </div>
-            }
+            open={recordConfirmOpen}
+            onOpenChange={setRecordConfirmOpen}
             title={autoRecord ? 'Turn off automatic recording?' : 'Turn on automatic recording?'}
             tone="info"
             headlineLabel="Action"

@@ -49,9 +49,13 @@ async function runClassroomRecordings() {
     const platform = getPlatformDb()
     const rows = await platform.select({ id: institutions.id }).from(institutions)
     for (const row of rows) {
-      const db = await getInstitutionDb(row.id)
-      const changed = await processClassroomRecordings(db)
-      if (changed > 0) logger.info('Classroom recordings processed', { institutionId: row.id, changed })
+      try {
+        const db = await getInstitutionDb(row.id)
+        const changed = await processClassroomRecordings(db)
+        if (changed > 0) logger.info('Classroom recordings processed', { institutionId: row.id, changed })
+      } catch (error) {
+        logger.error('Classroom recording job failed for institution', { institutionId: row.id, error })
+      }
     }
   } catch (error) {
     logger.error('Classroom recording job failed', { error })

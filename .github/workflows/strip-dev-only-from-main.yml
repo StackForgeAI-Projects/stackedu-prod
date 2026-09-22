@@ -48,15 +48,9 @@ jobs:
             exit 0
           fi
 
-          enable_auto_merge() {
-            local number="$1"
-            gh pr merge "$number" --auto --merge
-          }
-
           existing="$(gh pr list --base main --head auto/strip-dev-only --state open --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
-            echo "Cleanup PR #$existing is already open. Retrying auto-merge."
-            enable_auto_merge "$existing"
+            echo "Cleanup PR #$existing is already open. It waits for a person to press Merge."
             exit 0
           fi
 
@@ -68,12 +62,11 @@ jobs:
           done
           git commit -m "chore: remove development-only docs, context, and design from main."
           git push --force origin auto/strip-dev-only
-          pr_url="$(gh pr create --base main --head auto/strip-dev-only \
+          gh pr create --base main --head auto/strip-dev-only \
             --title "Remove development-only docs, context, and design from main" \
             --body "$(cat <<'EOF'
           These folders belong on `development` only. This PR removes them from `main` after a production merge.
 
-          Review and merge this PR so they do not stay on the live branch.
+          Review this PR, then press Merge. It does not merge by itself.
           EOF
-          )")"
-          enable_auto_merge "$pr_url"
+          )"

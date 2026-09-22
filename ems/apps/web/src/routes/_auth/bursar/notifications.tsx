@@ -47,9 +47,6 @@ function BursarNotificationsPage() {
     onMutate: (id) => {
       applyNotificationReadLocally(queryClient, id)
     },
-    onSuccess: (notifications) => {
-      queryClient.setQueryData(bursarNotificationsQueryKey, notifications)
-    },
     onError: () => {
       void invalidateNotificationReadCaches(queryClient)
     },

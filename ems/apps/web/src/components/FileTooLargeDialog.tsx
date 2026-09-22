@@ -32,23 +32,41 @@ export function FileTooLargeDialog({
   onAccept: (file: File) => void
   onClose: () => void
 }) {
-  const [phase, setPhase] = useState<Phase>('ready')
+  if (!file) return null
+  return (
+    <FileTooLargeDialogBody
+      key={`${file.name}:${file.size}:${file.lastModified}`}
+      file={file}
+      onAccept={onAccept}
+      onClose={onClose}
+    />
+  )
+}
+
+function FileTooLargeDialogBody({
+  file,
+  onAccept,
+  onClose,
+}: {
+  file: File
+  onAccept: (file: File) => void
+  onClose: () => void
+}) {
+  const extreme = isExtremelyLargeUpload(file.size)
+  const canCompress = !extreme && isCompressibleImage(file)
+  const [phase, setPhase] = useState<Phase>(canCompress ? 'compressing' : 'ready')
   const [resultSize, setResultSize] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const onAcceptRef = useRef(onAccept)
-  onAcceptRef.current = onAccept
-
-  const extreme = Boolean(file && isExtremelyLargeUpload(file.size))
-  const canCompress = Boolean(file && !extreme && isCompressibleImage(file))
 
   useEffect(() => {
-    setPhase('ready')
-    setResultSize(null)
-    setError(null)
-    if (!file || extreme || !isCompressibleImage(file)) return
+    onAcceptRef.current = onAccept
+  }, [onAccept])
+
+  useEffect(() => {
+    if (!canCompress) return
 
     let cancelled = false
-    setPhase('compressing')
     void reduceUploadFile(file)
       .then((reduced) => {
         if (cancelled) return
@@ -69,9 +87,7 @@ export function FileTooLargeDialog({
     return () => {
       cancelled = true
     }
-  }, [file, extreme])
-
-  if (!file) return null
+  }, [file, canCompress])
 
   const original = formatUploadBytes(file.size)
   const title = extreme

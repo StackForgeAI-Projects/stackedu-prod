@@ -50,8 +50,7 @@ export function NotificationMenu({ unreadCount = 0, notificationsHref }: Notific
     const applied = applyNotificationReadLocally(queryClient, id)
     if (!applied) return
     try {
-      const updated = await markAccountNotificationRead(id)
-      queryClient.setQueryData(accountNotificationsQueryKey, updated)
+      await markAccountNotificationRead(id)
     } catch {
       await invalidateNotificationReadCaches(queryClient)
     }

@@ -3,7 +3,11 @@ import '@excalidraw/excalidraw/index.css'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { useEffect, useRef, useState } from 'react'
 import type { ClassroomJoin } from '@stackedu/shared'
-import { useClassroomWhiteboardSync, type WhiteboardScene } from '@/components/classroom/ClassroomLiveProvider'
+import {
+  useClassroomWhiteboardSync,
+  whiteboardChannelIsLive,
+  type WhiteboardScene,
+} from '@/components/classroom/ClassroomLiveProvider'
 
 type Scene = WhiteboardScene
 
@@ -68,15 +72,21 @@ export function ClassroomWhiteboard({
     return sync.subscribe((scene) => applyRemote(scene))
   }, [sync])
 
+  const liveTransport = whiteboardChannelIsLive(sync) || collab != null
+
   useEffect(() => {
-    if (!isLive) return
+    if (!isLive || liveTransport) return
     const tick = window.setInterval(() => {
       void loadScene(sessionId)
-        .then((scene) => applyRemote((scene as Scene) ?? {}))
+        .then((scene) => {
+          const loaded = scene as Scene | null
+          if (!loaded || stampOf(loaded) === 0) return
+          applyRemote(loaded)
+        })
         .catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(tick)
-  }, [isLive, sessionId, loadScene])
+  }, [isLive, liveTransport, sessionId, loadScene])
 
   useEffect(() => {
     if (!collab) return
