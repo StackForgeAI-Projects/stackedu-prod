@@ -296,3 +296,73 @@ export async function notifyLecturerOfResultReview(
     actionUrl: '/lecturer/results',
   })
 }
+
+function timetablePlace(room: string | null): string {
+  return room ? ` in ${room}` : ''
+}
+
+export async function notifyLecturerToConfirmTimetable(
+  db: InstitutionDb,
+  input: {
+    lecturerId: string
+    courseCode: string
+    courseName: string
+    when: string
+    room: string | null
+  },
+): Promise<void> {
+  const code = formatCourseCode(input.courseCode)
+  await notifyUsers(db, [{
+    userId: input.lecturerId,
+    title: `Confirm your class: ${code}`,
+    body: `${input.courseName} is set for ${input.when}${timetablePlace(input.room)}. Confirm you are free, or ask for a different time.`,
+    category: 'Timetable',
+    actionUrl: '/lecturer/timetable',
+  }])
+}
+
+export async function notifyStudentsTimetableLive(
+  db: InstitutionDb,
+  offeringId: string,
+  input: { courseCode: string; courseName: string; when: string; room: string | null },
+): Promise<void> {
+  const studentIds = await enrolledStudentUserIds(db, offeringId)
+  if (studentIds.length === 0) return
+  const code = formatCourseCode(input.courseCode)
+  await notifyUserIds(db, studentIds, {
+    title: `Class on your timetable: ${code}`,
+    body: `${input.courseName} is on ${input.when}${timetablePlace(input.room)}.`,
+    category: 'Timetable',
+    actionUrl: '/student/timetable',
+  })
+}
+
+export async function notifyAcademicAdminsOfTimetableChange(
+  db: InstitutionDb,
+  input: { courseCode: string; lecturerName: string; when: string; reason: string },
+): Promise<void> {
+  const code = formatCourseCode(input.courseCode)
+  await notifyUserIds(db, await activeUserIdsByRole(db, 'AcademicAdmin'), {
+    title: `Timetable change requested: ${code}`,
+    body: `${input.lecturerName} asked to change ${input.when}. Reason: ${input.reason}`,
+    category: 'Timetable',
+    actionUrl: '/academic/timetable',
+  })
+}
+
+export async function notifyAcademicAdminsOfApplicationDocument(
+  db: InstitutionDb,
+  input: {
+    applicationId: string
+    applicantName: string
+    documentLabel: string
+    fileName: string
+  },
+): Promise<void> {
+  await notifyUserIds(db, await activeUserIdsByRole(db, 'AcademicAdmin'), {
+    title: `Document uploaded: ${input.applicantName}`,
+    body: `${input.applicantName} uploaded ${input.documentLabel} (${input.fileName}).`,
+    category: 'Applications',
+    actionUrl: `/academic/application?id=${input.applicationId}`,
+  })
+}

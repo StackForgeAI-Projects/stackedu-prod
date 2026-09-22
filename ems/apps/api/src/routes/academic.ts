@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import {
   askLecturerTimetableSlotRequestSchema,
+  createAcademicTimetableSlotRequestSchema,
+  updateAcademicTimetableSlotRequestSchema,
   createAcademicCalendarEventRequestSchema,
   createAcademicCourseRequestSchema,
   createAcademicProgrammeRequestSchema,
@@ -39,6 +41,10 @@ import {
   listAcademicSemesters,
   listAcademicStudents,
   listAcademicTimetableSlots,
+  listAcademicRooms,
+  createAcademicTimetableSlot,
+  updateAcademicTimetableSlot,
+  deleteAcademicTimetableSlot,
   askLecturerToFreeTimetableSlot,
   markAcademicNotificationRead,
   rejectAcademicResultBatch,
@@ -200,6 +206,37 @@ academicRoutes.delete('/academic/calendar/:id', ...academicOnly, async (c) => {
 academicRoutes.get('/academic/timetable', ...academicOnly, async (c) => {
   const user = c.get('user')!
   return c.json({ slots: await listAcademicTimetableSlots(user.institution.id) })
+})
+
+academicRoutes.get('/academic/rooms', ...academicOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({ rooms: await listAcademicRooms(user.institution.id) })
+})
+
+academicRoutes.post('/academic/timetable', ...academicOnly, async (c) => {
+  const parsed = createAcademicTimetableSlotRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    slot: await createAcademicTimetableSlot(c.get('user')!.institution.id, actor(c), parsed.data),
+  }, 201)
+})
+
+academicRoutes.patch('/academic/timetable/:slotId', ...academicOnly, async (c) => {
+  const parsed = updateAcademicTimetableSlotRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    slot: await updateAcademicTimetableSlot(
+      c.get('user')!.institution.id,
+      actor(c),
+      c.req.param('slotId'),
+      parsed.data,
+    ),
+  })
+})
+
+academicRoutes.delete('/academic/timetable/:slotId', ...academicOnly, async (c) => {
+  await deleteAcademicTimetableSlot(c.get('user')!.institution.id, actor(c), c.req.param('slotId'))
+  return c.json({ ok: true })
 })
 
 academicRoutes.post('/academic/timetable/:slotId/ask-lecturer', ...academicOnly, async (c) => {

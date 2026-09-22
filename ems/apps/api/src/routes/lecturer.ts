@@ -24,8 +24,7 @@ import {
   saveLecturerAttendanceRequestSchema,
   saveLecturerGradeRequestSchema,
   saveLecturerResultsRequestSchema,
-  saveLecturerTimetableSlotRequestSchema,
-  updateLecturerTimetableSlotRequestSchema,
+  requestTimetableChangeRequestSchema,
 } from '@stackedu/shared'
 import { validationFailed } from '../lib/errors'
 import { requireAuth, requireRole, type AuthVariables } from '../middleware/auth'
@@ -42,8 +41,8 @@ import {
   updateLecturerAnnouncement,
   updateLecturerModule,
   getLecturerMaterialDownloadUrl,
-  createLecturerTimetableSlot,
-  deleteLecturerTimetableSlot,
+  confirmLecturerTimetableSlot,
+  requestLecturerTimetableChange,
   getLecturerAssessment,
   getLecturerAttendanceSession,
   getLecturerCourse,
@@ -64,7 +63,6 @@ import {
   saveLecturerGrade,
   saveLecturerResults,
   deleteLecturerAttendanceSession,
-  updateLecturerTimetableSlot,
   submitLecturerResults,
   updateLecturerMaterial,
   reserveLecturerMaterialUpload,
@@ -524,33 +522,25 @@ lecturerRoutes.get('/lecturer/rooms', ...lecturerOnly, async (c) => {
   return c.json({ rooms: await listLecturerRooms(user.institution.id, user.id) })
 })
 
-lecturerRoutes.post('/lecturer/timetable', ...lecturerOnly, async (c) => {
-  const parsed = saveLecturerTimetableSlotRequestSchema.safeParse(await c.req.json().catch(() => ({})))
-  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+lecturerRoutes.post('/lecturer/timetable/:slotId/confirm', ...lecturerOnly, async (c) => {
   return c.json({
-    slot: await createLecturerTimetableSlot(c.get('user')!.institution.id, actor(c), parsed.data),
-  })
-})
-
-lecturerRoutes.patch('/lecturer/timetable/:slotId', ...lecturerOnly, async (c) => {
-  const parsed = updateLecturerTimetableSlotRequestSchema.safeParse(await c.req.json().catch(() => ({})))
-  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
-  return c.json({
-    slot: await updateLecturerTimetableSlot(
+    slot: await confirmLecturerTimetableSlot(
       c.get('user')!.institution.id,
       actor(c),
       c.req.param('slotId'),
-      parsed.data,
     ),
   })
 })
 
-lecturerRoutes.delete('/lecturer/timetable/:slotId', ...lecturerOnly, async (c) => {
+lecturerRoutes.post('/lecturer/timetable/:slotId/request-change', ...lecturerOnly, async (c) => {
+  const parsed = requestTimetableChangeRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
   return c.json({
-    slots: await deleteLecturerTimetableSlot(
+    slot: await requestLecturerTimetableChange(
       c.get('user')!.institution.id,
       actor(c),
       c.req.param('slotId'),
+      parsed.data,
     ),
   })
 })

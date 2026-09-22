@@ -178,12 +178,17 @@ export const academicTimetableSlotSchema = z.object({
   endTime: z.string(),
   courseCode: z.string(),
   courseName: z.string(),
+  courseId: uuidSchema,
+  offeringId: uuidSchema,
   lecturer: z.string().nullable(),
   lecturerId: uuidSchema.nullable(),
   room: z.string().nullable(),
+  roomId: uuidSchema.nullable(),
   type: z.string(),
   dept: z.string(),
   color: z.string(),
+  availabilityStatus: z.enum(['Pending', 'Confirmed', 'ChangeRequested']),
+  changeReason: z.string().nullable(),
 })
 
 export const academicLecturerCourseSchema = z.object({
@@ -401,6 +406,34 @@ export const askLecturerTimetableSlotRequestSchema = z.object({
   message: z.string().trim().min(1, 'Write a short message for the lecturer.').max(1000),
 })
 
+const timetableSessionTypeSchema = z.enum(['Lecture', 'Tutorial', 'Lab', 'Practical'])
+
+export const createAcademicTimetableSlotRequestSchema = z
+  .object({
+    courseId: uuidSchema.optional(),
+    offeringId: uuidSchema.optional(),
+    lecturerId: uuidSchema,
+    dayOfWeek: z.number().int().min(1).max(7),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/),
+    sessionType: timetableSessionTypeSchema.default('Lecture'),
+    roomId: uuidSchema.nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.courseId && !data.offeringId) {
+      ctx.addIssue({ code: 'custom', message: 'Choose a course.', path: ['courseId'] })
+    }
+  })
+
+export const updateAcademicTimetableSlotRequestSchema = z.object({
+  lecturerId: uuidSchema.optional(),
+  dayOfWeek: z.number().int().min(1).max(7).optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  sessionType: timetableSessionTypeSchema.optional(),
+  roomId: uuidSchema.nullable().optional(),
+})
+
 export const changeAcademicStudentStatusRequestSchema = z.object({
   action: z.enum(['suspend', 'transfer', 'graduate', 'withdraw']),
   reason: z.string().trim().min(4, 'Please enter a reason (at least 4 characters).').max(500),
@@ -463,4 +496,6 @@ export type UpdateAcademicCourseRequest = z.infer<typeof updateAcademicCourseReq
 export type CreateAcademicCalendarEventRequest = z.infer<typeof createAcademicCalendarEventRequestSchema>
 export type UpdateAcademicCalendarEventRequest = z.infer<typeof updateAcademicCalendarEventRequestSchema>
 export type AskLecturerTimetableSlotRequest = z.infer<typeof askLecturerTimetableSlotRequestSchema>
+export type CreateAcademicTimetableSlotRequest = z.infer<typeof createAcademicTimetableSlotRequestSchema>
+export type UpdateAcademicTimetableSlotRequest = z.infer<typeof updateAcademicTimetableSlotRequestSchema>
 export type AcademicDepartmentOption = z.infer<typeof academicDepartmentOptionSchema>

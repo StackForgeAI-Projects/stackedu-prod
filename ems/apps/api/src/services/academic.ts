@@ -20,15 +20,17 @@ import type {
   CreateAcademicCalendarEventRequest,
   CreateAcademicCourseRequest,
   CreateAcademicProgrammeRequest,
+  CreateAcademicTimetableSlotRequest,
   ChangeAcademicStudentStatusRequest,
   BulkCreateAcademicCoursesRequest,
   RejectResultBatchRequest,
   UpdateAcademicCalendarEventRequest,
   UpdateAcademicCourseRequest,
   UpdateAcademicProgrammeRequest,
+  UpdateAcademicTimetableSlotRequest,
   UserRole,
 } from '@stackedu/shared'
-import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, RELEASED_RESULT_BATCH_STATUSES, timetableWeekdayLabel } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, RELEASED_RESULT_BATCH_STATUSES, timetableAvailabilityStatus, timetableWeekdayLabel } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
 import { applications } from '../db/institution/schema/admissions'
@@ -67,9 +69,11 @@ import {
   notifyAcademicCalendarChange,
   notifyCourseCatalogueChange,
   notifyLecturerOfResultReview,
+  notifyLecturerToConfirmTimetable,
   notifyUsers,
 } from './role-notifications'
 import { writeAudit } from '../lib/audit'
+import { assertTimetableSlotFree } from '../lib/timetable-conflicts'
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 
@@ -504,11 +508,42 @@ export async function getAcademicStudent(
   }
 }
 
+type CourseOfferingPick = {
+  offeringId: string
+  lecturerId: string | null
+  lecturerName: string | null
+  enrolled: number
+  semesterName: string | null
+  semesterId: string
+  openForRegistration: boolean
+  assignedAt: string | null
+}
+
+function pickCourseOffering(
+  rows: CourseOfferingPick[],
+  currentSemesterId: string | null,
+): CourseOfferingPick | null {
+  if (rows.length === 0) return null
+  const withLecturer = rows.filter((row) => row.lecturerId)
+  const currentWithLecturer = currentSemesterId
+    ? withLecturer.find((row) => row.semesterId === currentSemesterId)
+    : undefined
+  if (currentWithLecturer) return currentWithLecturer
+  if (withLecturer.length > 0) {
+    return [...withLecturer].sort((a, b) => (b.assignedAt ?? '').localeCompare(a.assignedAt ?? ''))[0] ?? null
+  }
+  if (currentSemesterId) {
+    const current = rows.find((row) => row.semesterId === currentSemesterId)
+    if (current) return current
+  }
+  return rows[0] ?? null
+}
+
 export async function listAcademicCourses(institutionId: string): Promise<AcademicCourseRow[]> {
   const db = await getInstitutionDb(institutionId)
   const semester = await currentSemester(institutionId)
 
-  const rows = await db
+  const courseRows = await db
     .select({
       id: courses.id,
       code: courses.code,
@@ -518,21 +553,24 @@ export async function listAcademicCourses(institutionId: string): Promise<Academ
       yearOfStudy: courses.yearOfStudy,
       isActive: courses.isActive,
       description: courses.description,
+    })
+    .from(courses)
+    .innerJoin(departments, eq(departments.id, courses.departmentId))
+    .orderBy(courses.code)
+
+  const offeringRows = await db
+    .select({
+      courseId: courseOfferings.courseId,
+      offeringId: courseOfferings.id,
       lecturerId: lecturerAssignments.lecturerId,
       lecturerName: users.fullName,
       enrolled: courseOfferings.enrolledCount,
       semesterName: semesters.name,
       semesterId: courseOfferings.semesterId,
       openForRegistration: courseOfferings.isOpenForRegistration,
+      assignedAt: lecturerAssignments.createdAt,
     })
-    .from(courses)
-    .innerJoin(departments, eq(departments.id, courses.departmentId))
-    .leftJoin(
-      courseOfferings,
-      semester
-        ? and(eq(courseOfferings.courseId, courses.id), eq(courseOfferings.semesterId, semester.id))
-        : eq(courseOfferings.courseId, courses.id),
-    )
+    .from(courseOfferings)
     .leftJoin(semesters, eq(semesters.id, courseOfferings.semesterId))
     .leftJoin(
       lecturerAssignments,
@@ -542,7 +580,41 @@ export async function listAcademicCourses(institutionId: string): Promise<Academ
       ),
     )
     .leftJoin(users, eq(users.id, lecturerAssignments.lecturerId))
-    .orderBy(courses.code)
+
+  const offeringsByCourse = new Map<string, CourseOfferingPick[]>()
+  for (const row of offeringRows) {
+    const pick: CourseOfferingPick = {
+      offeringId: row.offeringId,
+      lecturerId: row.lecturerId,
+      lecturerName: row.lecturerName,
+      enrolled: row.enrolled,
+      semesterName: row.semesterName,
+      semesterId: row.semesterId,
+      openForRegistration: row.openForRegistration,
+      assignedAt: row.assignedAt,
+    }
+    const list = offeringsByCourse.get(row.courseId) ?? []
+    const existing = list.findIndex((item) => item.offeringId === pick.offeringId)
+    if (existing >= 0) {
+      if (!list[existing]?.lecturerId && pick.lecturerId) list[existing] = pick
+    } else {
+      list.push(pick)
+    }
+    offeringsByCourse.set(row.courseId, list)
+  }
+
+  const rows = courseRows.map((course) => {
+    const offering = pickCourseOffering(offeringsByCourse.get(course.id) ?? [], semester?.id ?? null)
+    return {
+      ...course,
+      lecturerId: offering?.lecturerId ?? null,
+      lecturerName: offering?.lecturerName ?? null,
+      enrolled: offering?.enrolled ?? 0,
+      semesterName: offering?.semesterName ?? null,
+      semesterId: offering?.semesterId ?? null,
+      openForRegistration: offering?.openForRegistration ?? true,
+    }
+  })
 
   const prereqRows = await db
     .select({
@@ -736,13 +808,18 @@ export async function listAcademicTimetableSlots(
       day: timetableSlots.dayOfWeek,
       startTime: timetableSlots.startTime,
       endTime: timetableSlots.endTime,
+      courseId: courses.id,
+      offeringId: timetableSlots.courseOfferingId,
       courseCode: courses.code,
       courseName: courses.name,
       lecturer: users.fullName,
       lecturerId: lecturerAssignments.lecturerId,
       room: rooms.name,
+      roomId: timetableSlots.roomId,
       type: timetableSlots.sessionType,
       dept: departments.code,
+      availabilityStatus: timetableSlots.availabilityStatus,
+      changeReason: timetableSlots.changeReason,
     })
     .from(timetableSlots)
     .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
@@ -766,14 +843,19 @@ export async function listAcademicTimetableSlots(
     hour: parseHour(row.startTime),
     startTime: formatClock(row.startTime),
     endTime: formatClock(row.endTime),
+    courseId: row.courseId,
+    offeringId: row.offeringId,
     courseCode: formatCourseCode(row.courseCode),
     courseName: row.courseName,
     lecturer: row.lecturer,
     lecturerId: row.lecturerId,
     room: row.room,
+    roomId: row.roomId,
     type: row.type,
     dept: deptPrefix(row.courseCode),
     color: courseColor(row.courseCode),
+    availabilityStatus: timetableAvailabilityStatus(row.availabilityStatus),
+    changeReason: row.changeReason,
   }))
 }
 
@@ -838,6 +920,254 @@ export async function askLecturerToFreeTimetableSlot(
   })
 
   return { lecturerName: slot.lecturerName ?? 'the lecturer' }
+}
+
+function assertSlotTimes(startTime: string, endTime: string): void {
+  if (startTime >= endTime) throw badRequest('End time must be after start time.')
+}
+
+async function timetableSlotOrThrow(institutionId: string, slotId: string): Promise<AcademicTimetableSlot> {
+  const slot = (await listAcademicTimetableSlots(institutionId)).find((row) => row.id === slotId)
+  if (!slot) throw notFound('That class')
+  return slot
+}
+
+async function offeringForTimetable(
+  db: Awaited<ReturnType<typeof getInstitutionDb>>,
+  input: { courseId?: string; offeringId?: string },
+  semesterId: string,
+): Promise<{ offeringId: string; courseId: string }> {
+  if (input.offeringId) {
+    const [offering] = await db
+      .select({
+        id: courseOfferings.id,
+        courseId: courseOfferings.courseId,
+        semesterId: courseOfferings.semesterId,
+      })
+      .from(courseOfferings)
+      .where(eq(courseOfferings.id, input.offeringId))
+      .limit(1)
+    if (!offering || offering.semesterId !== semesterId) {
+      throw badRequest('Choose a course on the current semester.')
+    }
+    return { offeringId: offering.id, courseId: offering.courseId }
+  }
+  if (!input.courseId) throw badRequest('Choose a course.')
+  const [course] = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(eq(courses.id, input.courseId))
+    .limit(1)
+  if (!course) throw notFound('That course')
+  return {
+    offeringId: await ensureOffering(db, input.courseId, semesterId),
+    courseId: input.courseId,
+  }
+}
+
+export async function listAcademicRooms(institutionId: string) {
+  const db = await getInstitutionDb(institutionId)
+  return db
+    .select({
+      id: rooms.id,
+      code: rooms.code,
+      name: rooms.name,
+      building: rooms.building,
+    })
+    .from(rooms)
+    .where(eq(rooms.isActive, true))
+    .orderBy(rooms.name)
+}
+
+export async function createAcademicTimetableSlot(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  input: CreateAcademicTimetableSlotRequest,
+): Promise<AcademicTimetableSlot> {
+  const db = await getInstitutionDb(institutionId)
+  const semester = await currentSemester(institutionId)
+  if (!semester) throw badRequest('Add a current semester on the calendar before you build the timetable.')
+  assertSlotTimes(input.startTime, input.endTime)
+
+  const offering = await offeringForTimetable(db, input, semester.id)
+  await assignLeadLecturer(db, offering.courseId, input.lecturerId, actor.id, semester.id)
+
+  if (input.roomId) {
+    const [room] = await db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(and(eq(rooms.id, input.roomId), eq(rooms.isActive, true)))
+      .limit(1)
+    if (!room) throw badRequest('Choose a location.')
+  }
+
+  await assertTimetableSlotFree(db, {
+    offeringId: offering.offeringId,
+    dayOfWeek: input.dayOfWeek,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    roomId: input.roomId ?? null,
+  })
+
+  const [created] = await db
+    .insert(timetableSlots)
+    .values({
+      courseOfferingId: offering.offeringId,
+      roomId: input.roomId ?? null,
+      dayOfWeek: input.dayOfWeek,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      sessionType: input.sessionType,
+      availabilityStatus: 'Pending',
+      changeReason: null,
+      confirmedAt: null,
+    })
+    .returning({ id: timetableSlots.id })
+
+  const slot = await timetableSlotOrThrow(institutionId, created!.id)
+  await notifyLecturerToConfirmTimetable(db, {
+    lecturerId: input.lecturerId,
+    courseCode: slot.courseCode,
+    courseName: slot.courseName,
+    when: `${timetableWeekdayLabel(slot.day)} ${slot.startTime}–${slot.endTime}`,
+    room: slot.room,
+  })
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'timetable.slot.create',
+    targetType: 'timetable_slot',
+    targetId: slot.id,
+    metadata: { lecturerId: input.lecturerId, availabilityStatus: 'Pending' },
+  })
+
+  return slot
+}
+
+export async function updateAcademicTimetableSlot(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  slotId: string,
+  input: UpdateAcademicTimetableSlotRequest,
+): Promise<AcademicTimetableSlot> {
+  const db = await getInstitutionDb(institutionId)
+  const semester = await currentSemester(institutionId)
+  if (!semester) throw badRequest('Add a current semester on the calendar before you build the timetable.')
+
+  const [existing] = await db
+    .select({
+      id: timetableSlots.id,
+      offeringId: timetableSlots.courseOfferingId,
+      courseId: courseOfferings.courseId,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      startTime: timetableSlots.startTime,
+      endTime: timetableSlots.endTime,
+      roomId: timetableSlots.roomId,
+      sessionType: timetableSlots.sessionType,
+      lecturerId: lecturerAssignments.lecturerId,
+    })
+    .from(timetableSlots)
+    .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
+    .leftJoin(
+      lecturerAssignments,
+      and(
+        eq(lecturerAssignments.courseOfferingId, courseOfferings.id),
+        eq(lecturerAssignments.isLead, true),
+      ),
+    )
+    .where(and(eq(timetableSlots.id, slotId), eq(courseOfferings.semesterId, semester.id)))
+    .limit(1)
+  if (!existing) throw notFound('That class')
+
+  const startTime = input.startTime ?? formatClock(existing.startTime)
+  const endTime = input.endTime ?? formatClock(existing.endTime)
+  assertSlotTimes(startTime, endTime)
+  const lecturerId = input.lecturerId ?? existing.lecturerId
+  if (!lecturerId) throw badRequest('Choose a lecturer.')
+
+  if (input.roomId) {
+    const [room] = await db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(and(eq(rooms.id, input.roomId), eq(rooms.isActive, true)))
+      .limit(1)
+    if (!room) throw badRequest('Choose a location.')
+  }
+
+  await assignLeadLecturer(db, existing.courseId, lecturerId, actor.id, semester.id)
+  await assertTimetableSlotFree(db, {
+    offeringId: existing.offeringId,
+    dayOfWeek: input.dayOfWeek ?? existing.dayOfWeek,
+    startTime,
+    endTime,
+    roomId: input.roomId !== undefined ? input.roomId : existing.roomId,
+    exceptSlotId: slotId,
+  })
+
+  await db
+    .update(timetableSlots)
+    .set({
+      dayOfWeek: input.dayOfWeek ?? existing.dayOfWeek,
+      startTime,
+      endTime,
+      sessionType: input.sessionType ?? existing.sessionType,
+      roomId: input.roomId !== undefined ? input.roomId : existing.roomId,
+      availabilityStatus: 'Pending',
+      changeReason: null,
+      confirmedAt: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(timetableSlots.id, slotId))
+
+  const slot = await timetableSlotOrThrow(institutionId, slotId)
+  await notifyLecturerToConfirmTimetable(db, {
+    lecturerId,
+    courseCode: slot.courseCode,
+    courseName: slot.courseName,
+    when: `${timetableWeekdayLabel(slot.day)} ${slot.startTime}–${slot.endTime}`,
+    room: slot.room,
+  })
+
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'timetable.slot.update',
+    targetType: 'timetable_slot',
+    targetId: slotId,
+    metadata: { lecturerId, availabilityStatus: 'Pending' },
+  })
+
+  return slot
+}
+
+export async function deleteAcademicTimetableSlot(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  slotId: string,
+): Promise<void> {
+  const db = await getInstitutionDb(institutionId)
+  const [existing] = await db
+    .select({ id: timetableSlots.id })
+    .from(timetableSlots)
+    .where(eq(timetableSlots.id, slotId))
+    .limit(1)
+  if (!existing) throw notFound('That class')
+
+  await db.delete(timetableSlots).where(eq(timetableSlots.id, slotId))
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'timetable.slot.delete',
+    targetType: 'timetable_slot',
+    targetId: slotId,
+  })
 }
 
 export async function listAcademicLecturers(institutionId: string): Promise<AcademicLecturerRow[]> {

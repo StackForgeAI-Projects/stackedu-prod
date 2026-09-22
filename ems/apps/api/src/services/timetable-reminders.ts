@@ -86,6 +86,7 @@ async function enrolledSlot(db: InstitutionDb, studentId: string, slotId: string
       room: rooms.name,
       dayOfWeek: timetableSlots.dayOfWeek,
       status: courseRegistrations.status,
+      availabilityStatus: timetableSlots.availabilityStatus,
     })
     .from(timetableSlots)
     .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
@@ -102,6 +103,9 @@ async function enrolledSlot(db: InstitutionDb, studentId: string, slotId: string
     .limit(1)
 
   if (!row) throw notFound('That class')
+  if (row.availabilityStatus !== 'Confirmed') {
+    throw badRequest('That class is not on the timetable until the lecturer confirms it.')
+  }
   if (row.status !== 'Approved') throw forbidden('Register for that course before setting a reminder.')
   return {
     slotId: row.slotId,

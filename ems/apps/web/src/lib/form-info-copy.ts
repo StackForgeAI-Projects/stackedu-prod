@@ -64,12 +64,12 @@ export const formInfo = {
     `Confirming adds them to the bank. A file must be ${MAX_UPLOAD_LABEL} or less. If a cloud model is slow or missing a key, the in-built generator is used instead.`,
   ],
   addTimetableSlot: [
-    'A timetable slot is a weekly class time for one of your courses.',
-    'Confirming puts it on the live week. Students and Academic Admin see it at once. A taken room or lecturer cannot be booked twice.',
+    'A class is a weekly time for one course, one lecturer, and one location.',
+    'Confirming saves it and asks that lecturer to confirm they are free. Students see it only after the lecturer confirms. A taken room or lecturer cannot be booked twice.',
   ],
   editTimetableSlot: [
-    'A timetable slot is a weekly class time for this course.',
-    'Saving updates the day, time, or room on the live week that students and Academic Admin see.',
+    'Saving changes the day, time, lecturer, or location.',
+    'The class waits for the lecturer again. Students see the new time only after they confirm.',
   ],
   scheduleLiveClass: [
     'A live class is a scheduled session for this course.',

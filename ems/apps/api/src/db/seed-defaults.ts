@@ -49,7 +49,7 @@ export const DEFAULT_PERMISSIONS: PermissionDefinition[] = [
   // Academic structure
   { key: 'courses.read', module: 'Academic', description: 'View the course catalogue', roles: ['AcademicAdmin', 'Lecturer', 'Student', 'Librarian'] },
   { key: 'courses.write', module: 'Academic', description: 'Create and edit courses and programmes', roles: ['AcademicAdmin'] },
-  { key: 'timetable.write', module: 'Academic', description: 'Lecturers set class times and rooms. A room or lecturer cannot be booked twice at the same time. Academic Admin reviews the live week.', roles: ['AcademicAdmin', 'Lecturer'] },
+  { key: 'timetable.write', module: 'Academic', description: 'Academic Admin sets class times, rooms, and lecturers. The lecturer confirms availability before students see the class. A room or lecturer cannot be booked twice.', roles: ['AcademicAdmin', 'Lecturer'] },
   { key: 'calendar.write', module: 'Academic', description: 'Edit the academic calendar', roles: ['AcademicAdmin'] },
 
   // Teaching

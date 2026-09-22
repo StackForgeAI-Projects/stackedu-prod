@@ -6,15 +6,15 @@ The timetable is the **weekly room and clock time**. It is not course registrati
 
 ## Who does what
 
-- **Academic Admin** assigns a lecturer to a course, then **reviews** the live week. They do not add slots on this page. Click a class to see when, where, and who teaches it. If a hall is needed for something else, they send a message to the lecturer who booked it.
-- **Lecturer** adds, changes, or removes class times for courses they are assigned to. Confirm before save. If that room is already booked in that time, the save is **refused** — the room is not available. The lecturer who holds a room gets a notification when Academic Admin asks them to free it.
-- **Student** sees only **Approved** classes this semester. They can set a StackEDU reminder (email + in-app). They cannot edit the grid.
-- **ICT Manager** sets the institution **timezone**, turns **Resend** on if reminder emails should send, and can grant `timetable.write` on **Access levels** (a room or lecturer still cannot be booked twice). ICT does not build the week grid.
+- **Academic Admin** builds the week. They choose the course, lecturer, day, time from–to, and location, then confirm and save. They can edit or remove a class. A change request from the lecturer shows on the class, with the reason.
+- **Lecturer** does not add the class. They get a notice and either **Confirm availability** or **Request a change** with a reason. Students do not see the class until the lecturer confirms.
+- **Student** sees only **Approved** classes this semester that the lecturer has confirmed. They can set a StackEDU reminder (email + in-app). They cannot edit the grid.
+- **ICT Manager** sets the institution **timezone**, turns **Resend** on if reminder emails should send, and can grant `timetable.write` on **Access levels**. ICT does not build the week grid.
 - **Bursar**, **Librarian**, and **Applicant** are not on this path.
 
-Classes appear on student and Academic Admin screens as soon as the lecturer saves. There is no extra Publish button.
+There is no extra Publish button. The lecturer’s confirmation is what makes the class live for students. Editing a class sends it back to the lecturer to confirm again.
 
-A room with no name (TBA) is not treated as a hall clash. A lecturer teaching two overlapping classes is always a clash, even in different rooms. Back-to-back classes (one ends at 10:00, the next starts at 10:00) are allowed.
+A room or lecturer cannot be booked twice in the same time. Back-to-back classes (one ends at 10:00, the next starts at 10:00) are allowed.
 
 ---
 
@@ -27,25 +27,24 @@ A room with no name (TBA) is not treated as a hall clash. A lecturer teaching tw
 
 ---
 
-## 2. Lecturer sets the week
+## 2. Academic Admin sets the class
 
-1. Sign in as a lecturer. Open **Timetable**.
-2. **Add slot**. Choose course, day, start, end, type, and optional room.
-3. Confirm. If that room is already booked in that time, the save is refused: the room is not available, and the message names the day, time and course that holds it.
-4. Edit or remove a slot the same way (confirm). Removing a slot does not drop the student from the course.
+1. Sign in as Academic Admin. Open **Timetable**.
+2. **Add class**. Choose course, lecturer, day, time from and to, session type, and location.
+3. Confirm. If that room or lecturer is already booked in that time, the save is refused.
+4. The lecturer is notified at once. The class stays off the student timetable until they confirm.
+5. Open a class to edit or remove it. Confirm first. An edit asks the lecturer to confirm again.
 
-The slot then shows on the lecturer dashboard, Academic Admin **Timetable**, and (for registered students) the student **Timetable**.
+Desktop shows a Monday–Friday grid. A phone shows a list for each day.
 
 ---
 
-## 3. Academic Admin reviews
+## 3. Lecturer confirms or asks for a change
 
-1. Open **Timetable**.
-2. Read the green **On this page** note: this is the live week. Lecturers pick day, time and room. You only review. You cannot edit a slot here.
-3. Desktop: week grid. Phone: day lists.
-4. Click a class to see code, time, room, type, and lecturer.
-5. If you need that hall (urgent use, or another class), write a short message and confirm. The lecturer gets a notification (and a phone popup if their browser allowed it).
-6. If a room or lecturer is already double-booked from older data, a red list names it. New saves cannot add another clash.
+1. Sign in as the lecturer. Open **Timetable**, or the notice.
+2. Open the class. **Confirm availability** if the time works. Registered students are notified and the class appears on their timetable.
+3. Or **Request a change**, write a short reason, and confirm. Academic Admin sees the reason. Students still do not see the class.
+4. Confirming the same class again does not send a second student notice.
 
 ---
 
@@ -67,12 +66,13 @@ See `Timetable-Reminders-Implementation.md` for the mail file format.
 
 | What you see | What to do |
 | --- | --- |
-| Empty Academic Admin grid | Lecturer has not added slots yet. |
-| Empty student grid | Student is not **Approved** for those courses, or no slots exist. |
-| Red clash on Academic Admin | Lecturer must move a class. Open the class and message them if you need the hall now. New saves cannot add another overlap. |
+| Empty Academic Admin grid | No classes have been added yet. Use **Add class**. |
+| Empty student grid | The student is not **Approved** for the course, or the lecturer has not confirmed the time. |
+| Class says “Waiting for lecturer” | The lecturer has not confirmed. Students cannot see it yet. |
+| Class says “Change requested” | Open it and read the lecturer’s reason, then edit the time or location. |
+| Red clash | Two classes share a room or a lecturer. Edit one of them. New saves cannot add another overlap. |
 | “Room is not available” on save | That hall is already booked in that time. Pick another room or time. |
-| Lecturer did not see a room request | Check Notifications. On a phone, allow browser notifications, keep the tab open (even minimised). |
+| Lecturer did not see the new class | Check Notifications. The open app also refreshes notices without a reload. |
 | Reminder saved but no email | ICT: turn Resend on and save the API key. |
-| Lecturer cannot add a slot | They need a course assignment this semester (`timetable.write`). |
 
 ICT, Bursar, and Librarian have no Timetable menu. Live video stays on **Classroom**.

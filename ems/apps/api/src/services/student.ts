@@ -321,6 +321,7 @@ export async function getStudentDashboard(
             eq(courseRegistrations.studentId, profile.studentId),
             eq(courseRegistrations.status, 'Approved'),
             eq(courseOfferings.semesterId, semester.id),
+            eq(timetableSlots.availabilityStatus, 'Confirmed'),
           ),
         )
     : []

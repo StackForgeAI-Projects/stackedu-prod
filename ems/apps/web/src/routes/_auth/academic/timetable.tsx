@@ -1,20 +1,41 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { AcademicTimetableSlot } from '@stackedu/shared'
-import { TIMETABLE_GRID_DAYS, findTimetableClashes, timetableWeekdayLabel } from '@stackedu/shared'
+import {
+  TIMETABLE_GRID_DAYS,
+  findTimetableClashes,
+  timetableAvailabilityLabel,
+  timetableWeekdayLabel,
+} from '@stackedu/shared'
 import { AcademicShell } from '@/components/AcademicShell'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
 import { TimetableClashBanner } from '@/components/timetable/TimetableClashBanner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { formInfo } from '@/lib/form-info-copy'
+import {
+  academicCoursesQueryKey,
+  academicLecturersQueryKey,
+  academicRoomsQueryKey,
   academicTimetableQueryKey,
-  askLecturerToFreeTimetableSlot,
+  createAcademicTimetableSlot,
+  deleteAcademicTimetableSlot,
+  listAcademicCourses,
+  listAcademicLecturers,
+  listAcademicRooms,
   listAcademicTimetableSlots,
+  updateAcademicTimetableSlot,
 } from '@/lib/api/academic'
+import { lecturerDashboardQueryKey, lecturerTimetableQueryKey } from '@/lib/api/lecturer'
+import { studentDashboardQueryKey } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
 import { notifyError, notifySuccess } from '@/lib/notify'
 
@@ -23,21 +44,77 @@ export const Route = createFileRoute('/_auth/academic/timetable')({
 })
 
 const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+const SESSION_TYPES = ['Lecture', 'Tutorial', 'Lab', 'Practical'] as const
+type SessionType = (typeof SESSION_TYPES)[number]
+
+type ClassForm = {
+  courseId: string
+  lecturerId: string
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  sessionType: SessionType
+  roomId: string
+}
+
+const EMPTY_FORM: ClassForm = {
+  courseId: '',
+  lecturerId: '',
+  dayOfWeek: 1,
+  startTime: '08:00',
+  endTime: '10:00',
+  sessionType: 'Lecture',
+  roomId: '',
+}
 
 function fmt(hour: number) {
   return `${String(hour).padStart(2, '0')}:00`
 }
 
+function clock(value: string) {
+  return value.slice(0, 5)
+}
+
+function sessionTypeOf(value: string): SessionType {
+  return SESSION_TYPES.includes(value as SessionType) ? (value as SessionType) : 'Lecture'
+}
+
 function TimetableManagerPage() {
+  const queryClient = useQueryClient()
   const { data, isPending, error } = useQuery({
     queryKey: academicTimetableQueryKey,
     queryFn: listAcademicTimetableSlots,
   })
-  const [selected, setSelected] = useState<AcademicTimetableSlot | null>(null)
-  const [message, setMessage] = useState('')
-  const [confirmAsk, setConfirmAsk] = useState(false)
+  const { data: courses = [] } = useQuery({
+    queryKey: academicCoursesQueryKey,
+    queryFn: listAcademicCourses,
+  })
+  const { data: lecturers = [] } = useQuery({
+    queryKey: academicLecturersQueryKey,
+    queryFn: listAcademicLecturers,
+  })
+  const { data: rooms = [] } = useQuery({
+    queryKey: academicRoomsQueryKey,
+    queryFn: listAcademicRooms,
+  })
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<ClassForm>(EMPTY_FORM)
+  const [confirmSave, setConfirmSave] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const slots = data ?? []
+  const selected = slots.find((slot) => slot.id === selectedId) ?? null
+  const editing = slots.find((slot) => slot.id === editingId) ?? null
+  const deleting = slots.find((slot) => slot.id === deleteId) ?? null
+  const activeCourses = courses.filter((course) => course.status === 'Active')
+  const lecturerOptions = lecturers.filter((row) => row.status === 'Active' || row.id === form.lecturerId)
+  const selectedCourse = activeCourses.find((course) => course.id === form.courseId)
+  const selectedLecturer = lecturerOptions.find((row) => row.id === form.lecturerId)
+  const selectedRoom = rooms.find((room) => room.id === form.roomId)
+
   const clashes = useMemo(
     () => findTimetableClashes(slots.map((slot) => ({
       id: slot.id,
@@ -53,36 +130,94 @@ function TimetableManagerPage() {
   )
   const clashIds = useMemo(() => new Set(clashes.flatMap((clash) => clash.slotIds)), [clashes])
 
-  const openSlot = (slot: AcademicTimetableSlot) => {
-    setSelected(slot)
-    setMessage('')
-    setConfirmAsk(false)
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: academicTimetableQueryKey })
+    await queryClient.invalidateQueries({ queryKey: academicCoursesQueryKey })
+    await queryClient.invalidateQueries({ queryKey: lecturerTimetableQueryKey })
+    await queryClient.invalidateQueries({ queryKey: lecturerDashboardQueryKey })
+    await queryClient.invalidateQueries({ queryKey: studentDashboardQueryKey })
   }
 
-  const askMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: () => {
-      if (!selected) throw new Error('No class selected.')
-      return askLecturerToFreeTimetableSlot(selected.id, { message })
+      const payload = {
+        lecturerId: form.lecturerId,
+        dayOfWeek: form.dayOfWeek,
+        startTime: clock(form.startTime),
+        endTime: clock(form.endTime),
+        sessionType: form.sessionType,
+        roomId: form.roomId,
+      }
+      return editing
+        ? updateAcademicTimetableSlot(editing.id, payload)
+        : createAcademicTimetableSlot({ ...payload, courseId: form.courseId })
     },
-    onSuccess: ({ lecturerName }) => {
-      notifySuccess(`Message sent to ${lecturerName}.`)
-      setConfirmAsk(false)
-      setMessage('')
-      setSelected(null)
+    onSuccess: async () => {
+      notifySuccess(editing ? 'Class updated. The lecturer needs to confirm again.' : 'Class saved. The lecturer has been asked to confirm.')
+      setConfirmSave(false)
+      setFormOpen(false)
+      setEditingId(null)
+      setForm(EMPTY_FORM)
+      await refresh()
     },
-    onError: (err) => notifyError(apiErrorMessage(err, 'Could not send that message.')),
+    onError: (err) => notifyError(apiErrorMessage(err, 'Could not save that class.')),
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (slotId: string) => deleteAcademicTimetableSlot(slotId),
+    onSuccess: async () => {
+      notifySuccess('Class removed from the timetable.')
+      setDeleteId(null)
+      setSelectedId(null)
+      await refresh()
+    },
+    onError: (err) => notifyError(apiErrorMessage(err, 'Could not remove that class.')),
+  })
+
+  const openCreate = () => {
+    const course = activeCourses[0]
+    setEditingId(null)
+    setForm({
+      ...EMPTY_FORM,
+      courseId: course?.id ?? '',
+      lecturerId: course?.lecturerId ?? '',
+    })
+    setFormOpen(true)
+  }
+
+  const openEdit = (slot: AcademicTimetableSlot) => {
+    setSelectedId(null)
+    setEditingId(slot.id)
+    setForm({
+      courseId: slot.courseId,
+      lecturerId: slot.lecturerId ?? '',
+      dayOfWeek: slot.day,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      sessionType: sessionTypeOf(slot.type),
+      roomId: slot.roomId ?? '',
+    })
+    setFormOpen(true)
+  }
+
+  const formReady = Boolean(form.courseId && form.lecturerId && form.roomId && form.startTime && form.endTime)
 
   return (
     <AcademicShell pageTitle="Timetable" guideKey="academic:Timetable:lifecycle">
       <div className="page-body animate-fade-up">
-        <div className="mb-6">
-          <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
-            Timetable
-          </h1>
-          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-            Live class times for this semester. Lecturers add or change a slot on their Timetable page.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
+              Timetable
+            </h1>
+            <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
+              Add the week here. Students see a class only after the lecturer confirms they are free.
+            </p>
+          </div>
+          <Button onClick={openCreate} disabled={activeCourses.length === 0} className="self-start sm:self-auto">
+            <Plus style={{ width: 16, height: 16, marginRight: 6 }} />
+            Add class
+          </Button>
         </div>
 
         {error ? (
@@ -92,14 +227,14 @@ function TimetableManagerPage() {
         <TimetableClashBanner
           clashes={clashes}
           uniqueCount={clashIds.size}
-          hint="Open a class and message the lecturer if you need that room. A taken room cannot be booked again."
+          hint="A taken room or lecturer cannot be booked again. Edit one of the classes."
         />
 
         {isPending ? (
           <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading timetable…</p>
         ) : slots.length === 0 ? (
           <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-            No class times yet. Lecturers add them from Timetable after you assign them to a course.
+            No classes yet. Add one with a course, lecturer, day, time, and location.
           </p>
         ) : (
           <>
@@ -123,7 +258,7 @@ function TimetableManagerPage() {
                           return (
                             <td key={day.iso} style={{ padding: 4, verticalAlign: 'top' }}>
                               {cellSlots.length === 0 ? (
-                                <div style={{ height: 64 }} />
+                                <div style={{ height: 72 }} />
                               ) : (
                                 <div className="flex flex-col gap-1">
                                   {cellSlots.map((slot) => (
@@ -131,7 +266,7 @@ function TimetableManagerPage() {
                                       key={slot.id}
                                       slot={slot}
                                       clashing={clashIds.has(slot.id)}
-                                      onOpen={() => openSlot(slot)}
+                                      onOpen={() => setSelectedId(slot.id)}
                                     />
                                   ))}
                                 </div>
@@ -171,7 +306,7 @@ function TimetableManagerPage() {
                         <button
                           key={slot.id}
                           type="button"
-                          onClick={() => openSlot(slot)}
+                          onClick={() => setSelectedId(slot.id)}
                           className="flex items-start gap-3 px-4 py-3 w-full text-left"
                           style={{
                             borderTop: '1px solid var(--border)',
@@ -182,8 +317,11 @@ function TimetableManagerPage() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{slot.courseName}</p>
                             <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                              {slot.startTime}–{slot.endTime}{slot.room ? ` · ${slot.room}` : ''}
+                              {slot.startTime}–{slot.endTime} · {slot.room ?? 'No location'}
                               {slot.lecturer ? ` · ${slot.lecturer}` : ''}
+                            </p>
+                            <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                              {timetableAvailabilityLabel(slot.availabilityStatus)}
                             </p>
                           </div>
                           <span className="t-label px-2 py-0.5 shrink-0" style={{ color: slot.color, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{slot.courseCode}</span>
@@ -198,7 +336,7 @@ function TimetableManagerPage() {
         )}
       </div>
 
-      <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) { setSelected(null); setMessage('') } }}>
+      <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
         <DialogContent className="max-w-md w-[calc(100%-2rem)]">
           {selected ? (
             <>
@@ -214,65 +352,172 @@ function TimetableManagerPage() {
                   {timetableWeekdayLabel(selected.day)} · {selected.startTime}–{selected.endTime}
                 </p>
                 <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                  {selected.room ?? 'No room yet'} · {selected.type}
+                  {selected.room ?? 'No location'} · {selected.type}
                 </p>
                 <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
                   {selected.lecturer ?? 'No lecturer assigned'}
                 </p>
+                <p className="text-sm mt-2" style={{ color: 'var(--foreground)' }}>
+                  {timetableAvailabilityLabel(selected.availabilityStatus)}
+                </p>
+                {selected.changeReason ? (
+                  <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    Lecturer’s reason: {selected.changeReason}
+                  </p>
+                ) : null}
               </div>
-              {clashIds.has(selected.id) ? (
-                <p className="text-sm" style={{ color: 'var(--error)' }}>
-                  This class overlaps another. A room cannot be booked twice. Message the lecturer if you need this hall.
-                </p>
-              ) : (
-                <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-                  To change the time or room, the lecturer edits it on their Timetable page. Message them if you need this hall for something else.
-                </p>
-              )}
-              {selected.lecturerId ? (
-                <div>
-                  <Label htmlFor="room-message" className="mb-1.5 block">Message to {selected.lecturer}</Label>
-                  <Textarea
-                    id="room-message"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Why this room is needed, and by when."
-                    rows={3}
-                  />
-                </div>
-              ) : (
-                <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>Assign a lecturer to this course before you can send a message.</p>
-              )}
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-                <Button variant="outline" onClick={() => { setSelected(null); setMessage('') }}>Close</Button>
-                <Button
-                  disabled={!selected.lecturerId || !message.trim() || askMutation.isPending}
-                  onClick={() => setConfirmAsk(true)}
-                >
-                  Message lecturer
-                </Button>
+                <Button variant="outline" onClick={() => setSelectedId(null)}>Close</Button>
+                <Button variant="outline" onClick={() => setDeleteId(selected.id)}>Remove</Button>
+                <Button onClick={() => openEdit(selected)}>Edit</Button>
               </div>
             </>
           ) : null}
         </DialogContent>
       </Dialog>
 
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditingId(null) } }}>
+        <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit class' : 'Add class'}</DialogTitle>
+            <FormInfoBox lines={editing ? formInfo.editTimetableSlot : formInfo.addTimetableSlot} />
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div>
+              <Label className="mb-1.5 block">Course</Label>
+              <Select
+                value={form.courseId || undefined}
+                onValueChange={(courseId) => {
+                  const course = activeCourses.find((row) => row.id === courseId)
+                  setForm((current) => ({
+                    ...current,
+                    courseId,
+                    lecturerId: course?.lecturerId ?? '',
+                  }))
+                }}
+                disabled={Boolean(editing)}
+              >
+                <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+                <SelectContent>
+                  {activeCourses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>{course.code} — {course.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Lecturer</Label>
+              <Select
+                value={form.lecturerId || undefined}
+                onValueChange={(lecturerId) => setForm((current) => ({ ...current, lecturerId }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select lecturer" /></SelectTrigger>
+                <SelectContent>
+                  {lecturerOptions.map((row) => (
+                    <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Day</Label>
+              <Select
+                value={String(form.dayOfWeek)}
+                onValueChange={(value) => setForm((current) => ({ ...current, dayOfWeek: Number(value) }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIMETABLE_GRID_DAYS.map((day) => (
+                    <SelectItem key={day.iso} value={String(day.iso)}>{day.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="mb-1.5 block">From</Label>
+                <Input type="time" value={form.startTime} onChange={(e) => setForm((current) => ({ ...current, startTime: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">To</Label>
+                <Input type="time" value={form.endTime} onChange={(e) => setForm((current) => ({ ...current, endTime: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Session type</Label>
+              <Select
+                value={form.sessionType}
+                onValueChange={(value) => setForm((current) => ({ ...current, sessionType: sessionTypeOf(value) }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SESSION_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Location</Label>
+              <Select
+                value={form.roomId || undefined}
+                onValueChange={(roomId) => setForm((current) => ({ ...current, roomId }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectContent>
+                  {rooms.map((room) => (
+                    <SelectItem key={room.id} value={room.id}>
+                      {room.name}{room.building ? ` (${room.building})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {rooms.length === 0 ? (
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  No locations yet. Ask ICT to add a room first.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+              <Button variant="outline" onClick={() => { setFormOpen(false); setEditingId(null) }}>Cancel</Button>
+              <Button disabled={!formReady || saveMutation.isPending} onClick={() => setConfirmSave(true)}>
+                {editing ? 'Save changes' : 'Save class'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <ConfirmAlertDialog
-        open={confirmAsk}
-        onOpenChange={setConfirmAsk}
-        title="Send this message?"
-        tone="info"
-        headline="Ask the lecturer to free the room"
-        summary={selected
-          ? `${selected.lecturer} · ${selected.room ?? 'This room'} · ${timetableWeekdayLabel(selected.day)} ${selected.startTime}–${selected.endTime}.`
-          : ''}
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title={editing ? 'Save this class?' : 'Add this class?'}
+        tone="success"
+        headline={editing ? 'Update the timetable' : 'Add to the timetable'}
+        summary={`${selectedCourse?.code ?? editing?.courseCode ?? 'Course'} · ${selectedLecturer?.name ?? 'Lecturer'} · ${timetableWeekdayLabel(form.dayOfWeek)} ${clock(form.startTime)}–${clock(form.endTime)}${selectedRoom ? ` · ${selectedRoom.name}` : ''}.`}
         notices={[
-          { icon: 'bell', label: 'The lecturer gets this in Notifications. If their phone browser is open but minimised, a popup can appear too.' },
+          { icon: 'bell', label: 'The lecturer is notified and must confirm they are free before students see this class.' },
+          { icon: 'shield', label: 'If this room or lecturer is already booked in that time, the save is refused.' },
         ]}
-        confirmLabel={askMutation.isPending ? 'Sending…' : 'Send message'}
+        confirmLabel={saveMutation.isPending ? 'Saving…' : editing ? 'Save changes' : 'Save class'}
         confirmVariant="brand"
-        loading={askMutation.isPending}
-        onConfirm={() => askMutation.mutate()}
+        loading={saveMutation.isPending}
+        onConfirm={() => saveMutation.mutate()}
+      />
+
+      <ConfirmAlertDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => { if (!open) setDeleteId(null) }}
+        title="Remove this class?"
+        tone="destructive"
+        headline="This cannot be undone"
+        summary={deleting
+          ? `${deleting.courseCode} on ${timetableWeekdayLabel(deleting.day)} ${deleting.startTime}–${deleting.endTime} will leave the timetable.`
+          : ''}
+        confirmLabel={deleteMutation.isPending ? 'Removing…' : 'Remove'}
+        confirmVariant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => { if (deleting) deleteMutation.mutate(deleting.id) }}
       />
     </AcademicShell>
   )
@@ -295,13 +540,15 @@ function SlotCard({
       style={{
         backgroundColor: clashing ? 'var(--error-bg)' : `${slot.color}18`,
         border: `1px solid ${clashing ? 'var(--error)' : `${slot.color}40`}`,
-        minHeight: 64,
+        minHeight: 72,
       }}
     >
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: clashing ? 'var(--error)' : slot.color, marginBottom: 2 }}>{slot.courseCode}</p>
       <p className="text-xs truncate" style={{ fontWeight: 500, marginBottom: 2 }}>{slot.courseName}</p>
-      <p className="text-xs truncate" style={{ color: 'var(--muted-foreground)' }}>{slot.room ?? 'No room yet'}</p>
-      <span style={{ fontSize: 9, fontWeight: 600, color: clashing ? 'var(--error)' : slot.color, textTransform: 'uppercase' }}>{slot.type}</span>
+      <p className="text-xs truncate" style={{ color: 'var(--muted-foreground)' }}>{slot.room ?? 'No location'}</p>
+      <span style={{ fontSize: 9, fontWeight: 600, color: clashing ? 'var(--error)' : slot.color, textTransform: 'uppercase' }}>
+        {timetableAvailabilityLabel(slot.availabilityStatus)}
+      </span>
     </button>
   )
 }

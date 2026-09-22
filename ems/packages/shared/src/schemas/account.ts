@@ -78,6 +78,15 @@ export const accountNotificationsResponseSchema = z.object({
   notifications: z.array(accountNotificationSchema),
 })
 
+/** Cheap stamps the signed-in app polls so open screens update without a reload. */
+export const accountLiveCursorSchema = z.object({
+  notificationsAt: z.string().nullable(),
+  admissionsAt: z.string().nullable(),
+  timetableAt: z.string().nullable(),
+})
+
+export type AccountLiveCursor = z.infer<typeof accountLiveCursorSchema>
+
 export const twoFactorSetupResponseSchema = z.object({
   secret: z.string(),
   otpauthUrl: z.string(),

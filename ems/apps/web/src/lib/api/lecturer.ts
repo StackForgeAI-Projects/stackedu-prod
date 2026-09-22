@@ -40,13 +40,12 @@ import type {
   SaveLecturerAttendanceRequest,
   SaveLecturerGradeRequest,
   SaveLecturerResultsRequest,
+  RequestTimetableChangeRequest,
   SaveLecturerAssessmentItemsRequest,
-  SaveLecturerTimetableSlotRequest,
   UpdateLecturerAnnouncementRequest,
   UpdateLecturerMaterialRequest,
   UpdateLecturerModuleRequest,
   UpdateLecturerQuestionRequest,
-  UpdateLecturerTimetableSlotRequest,
 } from '@stackedu/shared'
 import { mimeTypeForImportFile, mimeTypeForMaterialFile } from '@stackedu/shared'
 import { api, ApiClientError } from './client'
@@ -476,24 +475,20 @@ export async function listLecturerRooms(): Promise<LecturerRoomOption[]> {
   return rooms
 }
 
-export async function createLecturerTimetableSlot(
-  input: SaveLecturerTimetableSlotRequest,
-): Promise<LecturerTimetableSlot> {
-  const { slot } = await api.post<{ slot: LecturerTimetableSlot }>('/lecturer/timetable', input)
+export async function confirmLecturerTimetableSlot(slotId: string): Promise<LecturerTimetableSlot> {
+  const { slot } = await api.post<{ slot: LecturerTimetableSlot }>(`/lecturer/timetable/${slotId}/confirm`, {})
   return slot
 }
 
-export async function updateLecturerTimetableSlot(
+export async function requestLecturerTimetableChange(
   slotId: string,
-  input: UpdateLecturerTimetableSlotRequest,
+  input: RequestTimetableChangeRequest,
 ): Promise<LecturerTimetableSlot> {
-  const { slot } = await api.patch<{ slot: LecturerTimetableSlot }>(`/lecturer/timetable/${slotId}`, input)
+  const { slot } = await api.post<{ slot: LecturerTimetableSlot }>(
+    `/lecturer/timetable/${slotId}/request-change`,
+    input,
+  )
   return slot
-}
-
-export async function deleteLecturerTimetableSlot(slotId: string): Promise<LecturerTimetableSlot[]> {
-  const { slots } = await api.delete<{ slots: LecturerTimetableSlot[] }>(`/lecturer/timetable/${slotId}`)
-  return slots
 }
 
 export const lecturerClassroomQueryKey = (offeringId?: string) =>

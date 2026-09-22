@@ -97,7 +97,7 @@ Open **Calendar**. Event dates use **DD-MM-YYYY**. You can **Add event** or **Pu
 
 ## Timetable
 
-Open **Timetable**. This is a **review** grid. Lecturers add slots. A clash box lists booked rooms and when a lecturer is already teaching. Open a class and **message the lecturer** if you need that hall. You cannot double-book a taken room.
+Open **Timetable**. You add each class: course, lecturer, day, time from and to, and location. Confirm, then save. The lecturer is asked to confirm they are free. Students see the class only after that confirmation. A red box lists a room or lecturer that is already booked. You cannot save a second booking in that time. Open a class to edit it or remove it. A change request from the lecturer shows their reason.
 
 ---
 

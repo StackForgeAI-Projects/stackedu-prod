@@ -278,6 +278,7 @@ export async function seedStudentPortal(institutionId: string, studentUserId: st
       startTime: slot.start,
       endTime: slot.end,
       sessionType: slot.type,
+      availabilityStatus: 'Pending',
     })
   }
 
