@@ -139,7 +139,6 @@ export function ClassroomRoomView({
               ref={setStageEl}
               className="mb-4 w-full max-w-full min-w-0 overflow-hidden"
               style={{ height: 420, borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)' }}
-              data-lk-theme="default"
             />
           ) : session.status === 'Scheduled' && role === 'student' ? (
             <p className="t-body mb-4" style={{ color: 'var(--muted-foreground)' }}>This class has not started yet.</p>

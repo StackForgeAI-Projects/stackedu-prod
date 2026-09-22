@@ -102,9 +102,10 @@ On a **Live** class:
 1. **Join as host** (or **Start class** joins you).
 2. A red **Recording** mark shows on the video while a recording is running.
 3. Confirm **Mute all** to silence every student microphone. You stay unmuted.
-4. **Full screen** expands the video only. The name stays on the button. The same is true in picture-in-picture.
-5. Opening another sidebar page keeps the call in a small picture-in-picture window. **Back to class** returns. **Leave** drops you from the room. **End class** closes it for everyone.
-6. Draw on the whiteboard. Students see the same marks while the class is live.
+4. **Full screen** expands the video only. The name sits on a green button. The same is true in picture-in-picture.
+5. The red **Leave** control drops you from the room. It does not open picture-in-picture.
+6. Opening another sidebar page while you are still in the class keeps the call in a small picture-in-picture window. **Back to class** returns. **Leave** on that window drops you from the room. **End class** closes it for everyone.
+7. Draw on the whiteboard. Students see the same marks while the class is live.
 
 After you confirm **End class**, nobody can draw on the board. Students get a notice to download a ready recording before the keep-window ICT set (default 72 hours).
 

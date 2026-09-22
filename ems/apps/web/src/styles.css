@@ -760,6 +760,46 @@ h6 {
   height: 48px;
 }
 
+/* Live video / picture-in-picture labels. Brand fill so white LiveKit ink still reads. */
+.classroom-video-chrome {
+  color: var(--brand-ink);
+}
+
+.classroom-video-label-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-ink) !important;
+  background-color: var(--brand) !important;
+  background-image: none !important;
+  color: var(--brand-ink) !important;
+  -webkit-text-fill-color: var(--brand-ink) !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 1 !important;
+}
+
+.classroom-video-label-btn:hover {
+  background-color: var(--brand) !important;
+  color: var(--brand-ink) !important;
+  -webkit-text-fill-color: var(--brand-ink) !important;
+}
+
+.classroom-video-label-btn svg {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+  fill: none;
+  stroke: currentColor;
+}
+
 .course-code-pill__text {
   font-family: var(--font-mono);
   font-size: 10px;
