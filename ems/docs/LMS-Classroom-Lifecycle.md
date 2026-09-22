@@ -236,7 +236,7 @@ ICT sets the keep-window under **System Settings** (hours or days). The default 
 ### During a live class
 
 - The lecturer can confirm **Mute all students?** to silence every student microphone. The lecturer stays unmuted. Students may unmute themselves.
-- Participants can put the video in **full screen** (video only).
+- Participants can put the video in **full screen** (video only). The name stays on the button, including in picture-in-picture.
 - Leaving the class page does not drop the call. Video and audio continue in picture-in-picture so people can open other screens. Opening the class page again puts the video back.
 - The live class page does not scroll sideways.
 - The whiteboard stays in sync for everyone in the live class. A reload shows the latest saved board.

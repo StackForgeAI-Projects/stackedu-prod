@@ -105,7 +105,7 @@ Open **Classroom**. Pick a live class and click **Open**.
 
 The session page opens. If video is not set up yet, you may see a message that the whiteboard still works, or that the class has not started. Wait until the lecturer starts the class.
 
-When the class is **Live**, click **Join class**. You see the same whiteboard as the lecturer. A red **Recording** mark means the class is being recorded. **Full screen** expands the video only.
+When the class is **Live**, click **Join class**. You see the same whiteboard as the lecturer. A red **Recording** mark means the class is being recorded. **Full screen** expands the video only. The name stays on the button, including in picture-in-picture.
 
 Opening another sidebar page keeps the call in a small picture-in-picture window. **Back to class** returns. **Leave** drops you from the room.
 
