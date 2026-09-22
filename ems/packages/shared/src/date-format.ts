@@ -25,3 +25,21 @@ export function formatAppDateDdMmYyyy(value: string | Date | null | undefined): 
   const yyyy = parsed.getFullYear()
   return `${dd}-${mm}-${yyyy}`
 }
+
+/** Date and time on one line: DD-MM-YYYY HH:mm */
+export function formatAppDateTimeDdMmYyyy(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return '—'
+  const parsed = parseAppCalendarValue(value)
+  if (Number.isNaN(parsed.getTime())) return formatAppDateDdMmYyyy(value)
+  const hh = String(parsed.getHours()).padStart(2, '0')
+  const min = String(parsed.getMinutes()).padStart(2, '0')
+  return `${formatAppDateDdMmYyyy(parsed)} ${hh}:${min}`
+}
+
+/** YYYY-MM-DD is a calendar day, not UTC midnight. Local noon keeps that day in every time zone. */
+function parseAppCalendarValue(value: string | Date): Date {
+  if (value instanceof Date) return value
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return new Date(`${trimmed}T12:00:00`)
+  return new Date(trimmed)
+}

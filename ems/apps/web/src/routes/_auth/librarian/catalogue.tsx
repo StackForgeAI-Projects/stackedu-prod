@@ -10,6 +10,8 @@ import { LibraryResourceForm } from '@/components/library/LibraryResourceForm'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
@@ -74,7 +76,7 @@ function CataloguePage() {
             searchFilter={(row, query) => `${row.title} ${row.author ?? ''}`.toLowerCase().includes(query)}
             filters={[
               { id: 'type', label: 'types', getValue: (row) => RESOURCE_TYPE_LABELS[row.type] },
-              { id: 'status', label: 'status', getValue: (row) => (row.isPublished ? 'Published' : 'Draft') },
+              { id: 'status', label: 'status', allLabel: 'All statuses', getValue: (row) => (row.isPublished ? 'Published' : 'Draft') },
             ]}
             empty="No resources in the catalogue yet."
             columns={[
@@ -155,6 +157,7 @@ function CataloguePage() {
               <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>
                 {editing && editing !== 'new' ? 'Edit resource' : 'Add resource'}
               </SheetTitle>
+              <FormInfoBox lines={editing && editing !== 'new' ? formInfo.editLibraryResource : formInfo.addLibraryResource} />
             </SheetHeader>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-5">

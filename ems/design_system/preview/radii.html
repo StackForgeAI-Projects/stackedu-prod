@@ -1,0 +1,29 @@
+<!-- @dsCard group="Spacing" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Radii scale</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
+  .tok { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .box { width: 80px; height: 80px; background: var(--ink); }
+  .name { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+  .px { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="tok"><div class="box" style="border-radius:10px;"></div><div class="px">10</div><div class="name">radius-sm</div></div>
+    <div class="tok"><div class="box" style="border-radius:12px;"></div><div class="px">12</div><div class="name">radius-md</div></div>
+    <div class="tok"><div class="box" style="border-radius:14px;"></div><div class="px">14</div><div class="name">radius-lg</div></div>
+    <div class="tok"><div class="box" style="border-radius:18px;"></div><div class="px">18</div><div class="name">radius-xl</div></div>
+    <div class="tok"><div class="box" style="border-radius:22px;"></div><div class="px">22</div><div class="name">radius-2xl</div></div>
+    <div class="tok"><div class="box" style="border-radius:26px;"></div><div class="px">26</div><div class="name">radius-3xl</div></div>
+  </div>
+  <div class="note">sm → badges & chips. md/lg → inputs & buttons. xl/2xl → cards & modals. 3xl → marketing surfaces only.</div>
+</div>
+</body>
+</html>

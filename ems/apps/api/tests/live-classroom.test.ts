@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
+import {
+  DEFAULT_RECORDING_RETENTION,
+  recordingReminderAt,
+  recordingRetentionMs,
+} from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
+import { processClassroomRecordings } from '../src/lib/classroom-recordings'
+import { notifications } from '../src/db/institution/schema/communication'
 import {
   academicYears,
   courses,
@@ -16,6 +24,7 @@ import {
   courseOfferings,
   courseRegistrations,
   lecturerAssignments,
+  sessionRecordings,
 } from '../src/db/institution/schema/teaching'
 import { setMediaRoomAdapter } from '../src/lib/media-room'
 import {
@@ -23,10 +32,14 @@ import {
   createLecturerClassroomSession,
   draftClassroomSummary,
   endLecturerClassroomSession,
+  getLecturerClassroomPreferences,
+  getLecturerClassroomSession,
   joinStudentClassroomSession,
   listLecturerClassroomSessions,
+  muteAllClassroomStudents,
   publishClassroomSummary,
   saveClassroomWhiteboard,
+  saveLecturerClassroomPreferences,
   startLecturerClassroomSession,
   startLecturerRecording,
   stopLecturerRecording,
@@ -59,6 +72,7 @@ describe('live classroom, analytics, and study assistant', () => {
       closeRoom: async () => {},
       startRecording: async () => ({ jobId: 'job-1' }),
       stopRecording: async () => {},
+      muteAllStudents: async () => 2,
     })
 
     const result = await provisionInstitution({
@@ -236,18 +250,106 @@ describe('live classroom, analytics, and study assistant', () => {
 
     const listed = await listLecturerClassroomSessions(institutionId, lecturerActor.id, offeringId)
     expect(listed.some((row) => row.id === created.id)).toBe(true)
+
+    const notes = await (await getInstitutionDb(institutionId))
+      .select({ title: notifications.title, body: notifications.body })
+      .from(notifications)
+      .where(eq(notifications.userId, studentUserId))
+    expect(notes.some((row) => row.title.startsWith('Class recording:') && row.body.includes('will not be available after'))).toBe(true)
+    expect(ended.recordings[0]?.expiresAt).toBeTruthy()
   })
 
-  it('cancels a scheduled class and saves a whiteboard scene', async () => {
+  it('cancels a scheduled class', async () => {
     const created = await createLecturerClassroomSession(institutionId, lecturerActor, {
       offeringId,
       title: 'Spare class',
     })
+    await cancelLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    await expect(startLecturerClassroomSession(institutionId, lecturerActor, created.id)).rejects.toThrow(/finished/)
+  })
+
+  it('locks the whiteboard after class and mutes students while live', async () => {
+    const created = await createLecturerClassroomSession(institutionId, lecturerActor, {
+      offeringId,
+      title: 'Board lock class',
+    })
+    await expect(
+      saveClassroomWhiteboard(institutionId, lecturerActor.id, 'Lecturer', created.id, {
+        elements: [{ id: 'a', type: 'rectangle' }],
+      }),
+    ).rejects.toThrow(/read-only/)
+
+    await startLecturerClassroomSession(institutionId, lecturerActor, created.id)
     await saveClassroomWhiteboard(institutionId, lecturerActor.id, 'Lecturer', created.id, {
       elements: [{ id: 'a', type: 'rectangle' }],
     })
-    await cancelLecturerClassroomSession(institutionId, lecturerActor, created.id)
-    await expect(startLecturerClassroomSession(institutionId, lecturerActor, created.id)).rejects.toThrow(/finished/)
+    const muted = await muteAllClassroomStudents(institutionId, lecturerActor, created.id)
+    expect(muted.muted).toBe(2)
+
+    await endLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    await expect(
+      saveClassroomWhiteboard(institutionId, lecturerActor.id, 'Lecturer', created.id, {
+        elements: [{ id: 'b', type: 'freedraw' }],
+      }),
+    ).rejects.toThrow(/read-only/)
+    await expect(
+      saveClassroomWhiteboard(institutionId, studentUserId, 'Student', created.id, {
+        elements: [{ id: 'c', type: 'text' }],
+      }),
+    ).rejects.toThrow(/read-only/)
+  })
+
+  it('starts a recording automatically when the lecturer turns that setting on', async () => {
+    expect((await getLecturerClassroomPreferences(institutionId, lecturerActor.id)).autoRecord).toBe(false)
+    await saveLecturerClassroomPreferences(institutionId, lecturerActor, { autoRecord: true })
+    expect((await getLecturerClassroomPreferences(institutionId, lecturerActor.id)).autoRecord).toBe(true)
+
+    const created = await createLecturerClassroomSession(institutionId, lecturerActor, {
+      offeringId,
+      title: 'Auto record class',
+    })
+    const live = await startLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    expect(live.recordings.some((row) => row.status === 'Pending' || row.status === 'Ready')).toBe(true)
+    await endLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    await saveLecturerClassroomPreferences(institutionId, lecturerActor, { autoRecord: false })
+  })
+
+  it('reminds students and deletes an expired recording', async () => {
+    expect(recordingRetentionMs(DEFAULT_RECORDING_RETENTION)).toBe(72 * 60 * 60 * 1000)
+    const created = await createLecturerClassroomSession(institutionId, lecturerActor, {
+      offeringId,
+      title: 'Expiry class',
+    })
+    await startLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    await startLecturerRecording(institutionId, lecturerActor, created.id)
+    const stopped = await stopLecturerRecording(institutionId, lecturerActor, created.id)
+    const recording = stopped.recordings.find((row) => row.status === 'Ready')
+    expect(recording?.expiresAt).toBeTruthy()
+
+    const db = await getInstitutionDb(institutionId)
+    const soon = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    await db.update(sessionRecordings).set({ expiresAt: soon }).where(eq(sessionRecordings.id, recording!.id))
+
+    const reminderAt = recordingReminderAt(new Date(soon), DEFAULT_RECORDING_RETENTION)
+    expect(reminderAt.getTime()).toBeLessThan(new Date(soon).getTime())
+    const reminderNow = new Date(new Date(soon).getTime() - 30 * 60 * 1000)
+    const reminded = await processClassroomRecordings(db, reminderNow)
+    expect(reminded).toBeGreaterThan(0)
+    const reminderNotes = await db
+      .select({ title: notifications.title })
+      .from(notifications)
+      .where(eq(notifications.userId, studentUserId))
+    expect(reminderNotes.some((row) => row.title.startsWith('Recording ends soon:'))).toBe(true)
+
+    const purged = await processClassroomRecordings(db, new Date(new Date(soon).getTime() + 1000))
+    expect(purged).toBeGreaterThan(0)
+    const after = await getLecturerClassroomSession(
+      institutionId,
+      lecturerActor.id,
+      created.id,
+    )
+    expect(after.recordings.some((row) => row.id === recording!.id)).toBe(false)
+    await endLecturerClassroomSession(institutionId, lecturerActor, created.id)
   })
 
   it('joins attendance, materials, fees and grades on one analytics view', async () => {

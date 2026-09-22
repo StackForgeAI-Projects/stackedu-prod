@@ -14,11 +14,14 @@ import {
   formatLibraryFileSize,
   LIBRARY_RESOURCE_ACCEPT,
   LIBRARY_RESOURCE_MAX_BYTES,
+  MAX_UPLOAD_LABEL,
   RESOURCE_TYPE_LABELS,
   resourceTypeSchema,
+  uploadLimitMessage,
 } from '@stackedu/shared'
 import { Sparkles, Upload } from 'lucide-react'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,6 +60,7 @@ export function LibraryResourceForm({
   const [description, setDescription] = useState(resource?.description ?? '')
   const [publish, setPublish] = useState(resource?.isPublished ?? false)
   const [file, setFile] = useState<File | null>(null)
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
   const [files, setFiles] = useState(resource?.files ?? [])
   const [feeClearance, setFeeClearance] = useState(resource?.access.requiresFeeClearance ?? false)
   const [programmeIds, setProgrammeIds] = useState<string[]>(resource?.access.programmeIds ?? [])
@@ -80,7 +84,7 @@ export function LibraryResourceForm({
         ? await updateLibrarianResource(resource.id, { ...payload, isPublished: publish })
         : await createLibrarianResource(payload)
       if (file) {
-        if (file.size > LIBRARY_RESOURCE_MAX_BYTES) throw new Error('The file is too large.')
+        if (file.size > LIBRARY_RESOURCE_MAX_BYTES) throw new Error(uploadLimitMessage())
         const uploaded = await uploadLibraryFile(saved.id, file)
         await attachLibrarianFile(saved.id, uploaded)
       }
@@ -187,13 +191,17 @@ export function LibraryResourceForm({
         <Textarea id="lib-desc" value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
       </div>
       <div>
-        <Label htmlFor="lib-file">E-book file (PDF, Word, EPUB, office or video)</Label>
+        <Label htmlFor="lib-file">E-book file (PDF, Word, EPUB, office or video) · max {MAX_UPLOAD_LABEL}</Label>
         <Input
           id="lib-file"
           type="file"
           accept={LIBRARY_RESOURCE_ACCEPT}
           className="mt-1"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          onChange={(event) => {
+            const next = event.target.files?.[0] ?? null
+            event.target.value = ''
+            takeFile(next, setFile)
+          }}
         />
         {file ? (
           <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
@@ -330,6 +338,14 @@ export function LibraryResourceForm({
             {resource ? 'Save changes' : 'Add resource'}
           </Button>
         }
+      />
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          setFile(next)
+          setOversizeFile(null)
+        }}
+        onClose={() => setOversizeFile(null)}
       />
     </div>
   )

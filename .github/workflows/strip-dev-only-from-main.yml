@@ -50,7 +50,7 @@ jobs:
 
           existing="$(gh pr list --base main --head auto/strip-dev-only --state open --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
-            echo "Cleanup PR #$existing is already open."
+            echo "Cleanup PR #$existing is already open. It waits for a person to press Merge."
             exit 0
           fi
 
@@ -58,7 +58,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B auto/strip-dev-only
           for p in "${paths[@]}"; do
-            git rm -rf --ignore-unmatch "$p" || true
+            git rm -rf --ignore-unmatch "$p"
           done
           git commit -m "chore: remove development-only docs, context, and design from main."
           git push --force origin auto/strip-dev-only
@@ -67,7 +67,6 @@ jobs:
             --body "$(cat <<'EOF'
           These folders belong on `development` only. This PR removes them from `main` after a production merge.
 
-          Review and merge this PR so they do not stay on the live branch.
+          Review this PR, then press Merge. It does not merge by itself.
           EOF
           )"
-          gh pr merge --auto --merge || true

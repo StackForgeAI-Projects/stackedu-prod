@@ -1,10 +1,19 @@
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type {
   ClassroomJoin,
+  ClassroomPreferences,
   ClassroomSessionDetail,
   ClassroomSessionSummary,
   CreateClassroomSessionRequest,
   UserRole,
+} from '@stackedu/shared'
+import {
+  CLASSROOM_AUTO_RECORD_SETTING_KEY,
+  classroomAutoRecordUsersSchema,
+  DEFAULT_RECORDING_RETENTION,
+  RECORDING_RETENTION_SETTING_KEY,
+  recordingExpiresAt,
+  recordingRetentionSchema,
 } from '@stackedu/shared'
 import { getInstitutionDb } from '../db/connection'
 import { courses } from '../db/institution/schema/academic'
@@ -30,7 +39,9 @@ import {
   putStoredObject,
   readStoredObject,
 } from '../lib/storage'
+import { readInstitutionSetting, upsertInstitutionSetting } from '../lib/institution-settings'
 import { requireAssignedOffering, requireLecturer } from './lecturer'
+import { notifyEnrolledStudentsOfRecording } from './role-notifications'
 import { requireStudent } from './student'
 
 type InstitutionDb = Awaited<ReturnType<typeof getInstitutionDb>>
@@ -174,9 +185,10 @@ async function toDetail(institutionId: string, db: InstitutionDb, sessionId: str
       durationSeconds: sessionRecordings.durationSeconds,
       byteSize: sessionRecordings.byteSize,
       createdAt: sessionRecordings.createdAt,
+      expiresAt: sessionRecordings.expiresAt,
     })
     .from(sessionRecordings)
-    .where(eq(sessionRecordings.sessionId, sessionId))
+    .where(and(eq(sessionRecordings.sessionId, sessionId), isNull(sessionRecordings.purgedAt)))
     .orderBy(desc(sessionRecordings.createdAt))
   return {
     ...summary!,
@@ -295,6 +307,14 @@ export async function startLecturerClassroomSession(
       targetType: 'live_session',
       targetId: sessionId,
     })
+    if (await lecturerAutoRecordEnabled(db, actor.id)) {
+      try {
+        return await startLecturerRecording(institutionId, actor, sessionId)
+      } catch {
+        return toDetail(institutionId, db, sessionId)
+      }
+    }
+    return toDetail(institutionId, db, sessionId)
   }
   return toDetail(institutionId, db, sessionId)
 }
@@ -501,6 +521,12 @@ export async function startLecturerRecording(
   const row = await loadSessionRow(db, sessionId)
   await requireAssignedOffering(db, actor.id, row.offeringId)
   if (row.status !== 'Live') throw conflict('Start the class before recording it.')
+  const [already] = await db
+    .select({ id: sessionRecordings.id })
+    .from(sessionRecordings)
+    .where(and(eq(sessionRecordings.sessionId, sessionId), eq(sessionRecordings.status, 'Pending')))
+    .limit(1)
+  if (already) return toDetail(institutionId, db, sessionId)
   const fileKey = buildSessionObjectKey({
     institutionId,
     sessionId,
@@ -564,11 +590,14 @@ export async function finalizeRecording(institutionId: string, recordingId: stri
       id: sessionRecordings.id,
       fileKey: sessionRecordings.fileKey,
       sessionId: sessionRecordings.sessionId,
+      status: sessionRecordings.status,
+      expiresAt: sessionRecordings.expiresAt,
     })
     .from(sessionRecordings)
     .where(eq(sessionRecordings.id, recordingId))
     .limit(1)
   if (!row) return
+  if (row.status === 'Ready' && row.expiresAt) return
   if (row.fileKey) {
     const existing = await readStoredObject(row.fileKey)
     if (!existing) {
@@ -579,13 +608,33 @@ export async function finalizeRecording(institutionId: string, recordingId: stri
       })
     }
   }
+  const policy = await readInstitutionSetting(
+    db,
+    RECORDING_RETENTION_SETTING_KEY,
+    recordingRetentionSchema,
+    DEFAULT_RECORDING_RETENTION,
+  )
+  const expiresAt = recordingExpiresAt(new Date(), policy).toISOString()
   await db
     .update(sessionRecordings)
     .set({
       status: 'Ready',
       byteSize: 22,
+      expiresAt,
     })
     .where(eq(sessionRecordings.id, recordingId))
+  if (row.status !== 'Ready') {
+    const session = await loadSessionRow(db, row.sessionId)
+    await notifyEnrolledStudentsOfRecording(db, {
+      offeringId: session.offeringId,
+      sessionId: row.sessionId,
+      title: session.title,
+      courseCode: session.courseCode,
+      kind: 'ready',
+      expiresAt,
+      policy,
+    })
+  }
 }
 
 export async function getClassroomRecordingDownloadUrl(
@@ -602,13 +651,16 @@ export async function getClassroomRecordingDownloadUrl(
       fileName: sessionRecordings.fileName,
       status: sessionRecordings.status,
       sessionId: sessionRecordings.sessionId,
+      expiresAt: sessionRecordings.expiresAt,
+      purgedAt: sessionRecordings.purgedAt,
       offeringId: liveSessions.courseOfferingId,
     })
     .from(sessionRecordings)
     .innerJoin(liveSessions, eq(liveSessions.id, sessionRecordings.sessionId))
     .where(eq(sessionRecordings.id, recordingId))
     .limit(1)
-  if (!row || row.status !== 'Ready' || !row.fileKey) throw notFound('That recording')
+  if (!row || row.status !== 'Ready' || !row.fileKey || row.purgedAt) throw notFound('That recording')
+  if (row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now()) throw notFound('That recording')
   if (role === 'Lecturer') {
     await requireAssignedOffering(db, userId, row.offeringId)
   } else if (role === 'Student') {
@@ -642,10 +694,7 @@ export async function saveClassroomWhiteboard(
   const db = await getInstitutionDb(institutionId)
   const row = await loadSessionRow(db, sessionId)
   await assertCanAccessSession(institutionId, db, userId, role, row.offeringId)
-  if (row.status === 'Cancelled') throw conflict('That class was cancelled.')
-  if (role === 'Student' && row.status !== 'Live') {
-    throw conflict('The whiteboard is read-only after class.')
-  }
+  if (row.status !== 'Live') throw conflict('The whiteboard is read-only after class.')
   const body = Buffer.from(JSON.stringify(scene ?? {}))
   if (body.byteLength > 2 * 1024 * 1024) throw badRequest('The whiteboard is too large to save.')
   const fileKey =
@@ -829,4 +878,74 @@ export async function getStudentClassroomSession(
   const detail = await toDetail(institutionId, db, sessionId)
   if (!detail.summaryPublished) return { ...detail, summaryText: null }
   return detail
+}
+
+async function lecturerAutoRecordEnabled(db: InstitutionDb, userId: string): Promise<boolean> {
+  const stored = await readInstitutionSetting(
+    db,
+    CLASSROOM_AUTO_RECORD_SETTING_KEY,
+    classroomAutoRecordUsersSchema,
+    { userIds: [] },
+  )
+  return stored.userIds.includes(userId)
+}
+
+export async function getLecturerClassroomPreferences(
+  institutionId: string,
+  userId: string,
+): Promise<ClassroomPreferences> {
+  const { db } = await requireLecturer(institutionId, userId)
+  return { autoRecord: await lecturerAutoRecordEnabled(db, userId) }
+}
+
+export async function saveLecturerClassroomPreferences(
+  institutionId: string,
+  actor: Actor,
+  input: ClassroomPreferences,
+): Promise<ClassroomPreferences> {
+  const { db } = await requireLecturer(institutionId, actor.id)
+  const stored = await readInstitutionSetting(
+    db,
+    CLASSROOM_AUTO_RECORD_SETTING_KEY,
+    classroomAutoRecordUsersSchema,
+    { userIds: [] },
+  )
+  const userIds = new Set(stored.userIds)
+  if (input.autoRecord) userIds.add(actor.id)
+  else userIds.delete(actor.id)
+  await upsertInstitutionSetting(
+    db,
+    CLASSROOM_AUTO_RECORD_SETTING_KEY,
+    { userIds: [...userIds] },
+    {
+      category: 'Teaching',
+      description: 'Lecturers who start a recording automatically when a class goes live.',
+    },
+    actor.id,
+  )
+  return { autoRecord: input.autoRecord }
+}
+
+export async function muteAllClassroomStudents(
+  institutionId: string,
+  actor: Actor,
+  sessionId: string,
+): Promise<{ muted: number }> {
+  const { db } = await requireLecturer(institutionId, actor.id)
+  const row = await loadSessionRow(db, sessionId)
+  await requireAssignedOffering(db, actor.id, row.offeringId)
+  if (row.status !== 'Live') throw conflict('The class is not live.')
+  const live = await mediaRoomFor(institutionId)
+  const muted = await live.muteAllStudents(row.roomName, actor.id)
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'classroom.mute_all',
+    targetType: 'live_session',
+    targetId: sessionId,
+    metadata: { muted },
+  })
+  return { muted }
 }

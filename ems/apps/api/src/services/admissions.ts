@@ -12,6 +12,7 @@ import {
   type ProgrammeOption,
   type RegisterApplicantRequest,
   type SaveApplicationRequest,
+  uploadLimitMessage,
 } from '@stackedu/shared'
 import { env } from '../config/env'
 import { getInstitutionDb } from '../db/connection'
@@ -429,7 +430,7 @@ export async function presignDocument(
     throw badRequest('That file type is not accepted for this document.')
   }
   if (input.fileSizeBytes > maxBytes) {
-    throw badRequest('That file is too large for this document.')
+    throw badRequest(uploadLimitMessage())
   }
 
   const existing = application.documents.find((doc) => doc.documentType === input.documentType)

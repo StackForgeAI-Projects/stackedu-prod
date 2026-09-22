@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { userRoleSchema } from '../enums'
 import { attendancePolicySchema } from '../attendance-policy'
+import { recordingRetentionSchema } from '../recording-retention'
 import { paymentPolicySchema } from '../payment-policy'
 import { aiProviderSchema, ictAiSettingsSchema } from '../ai-provider'
 import { emailSchema, isoDateTimeSchema, phoneSchema, uuidSchema } from '../primitives'
@@ -164,6 +165,7 @@ export const ictSettingsSchema = z.object({
   logoUrl: z.string().nullable(),
   brandColor: z.string().nullable(),
   attendancePolicy: attendancePolicySchema,
+  recordingRetention: recordingRetentionSchema,
   paymentPolicy: paymentPolicySchema,
   ai: ictAiSettingsSchema,
 })
@@ -178,6 +180,7 @@ export const updateIctSettingsRequestSchema = z.object({
   location: z.string().trim().max(200).nullable().optional(),
   brandColor: brandColorSchema.nullable().optional(),
   attendancePolicy: attendancePolicySchema.partial().optional(),
+  recordingRetention: recordingRetentionSchema.optional(),
   paymentPolicy: paymentPolicySchema.partial().optional(),
   aiProvider: aiProviderSchema.optional(),
   aiModel: z.string().trim().max(80).nullable().optional(),

@@ -5,13 +5,15 @@ import { STUDENT_IDENTITY_CONTACT_MESSAGE } from '@stackedu/shared'
 import { createApp } from '../src/app'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
-import { verificationTokens } from '../src/db/institution/schema'
+import { notifications, verificationTokens } from '../src/db/institution/schema'
 import { users } from '../src/db/institution/schema/people'
 import { SESSION_COOKIE } from '../src/lib/cookies'
 import { AppError } from '../src/lib/errors'
 import { login } from '../src/services/auth'
+import { unreadCount } from '../src/services/academic'
 import {
   getAccountProfile,
+  markAccountNotificationRead,
   requestStudentPhoneVerification,
   updateAccountProfile,
   verifyStudentPhoneUpdate,
@@ -156,5 +158,24 @@ describe('account profile', () => {
     expect(response.status).toBe(400)
     const body = (await response.json()) as { error: { message: string } }
     expect(body.error.message).toContain(STUDENT_IDENTITY_CONTACT_MESSAGE)
+  })
+
+  it('marks an account notification read and drops unread count', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const [row] = await db
+      .insert(notifications)
+      .values({
+        userId: studentUserId,
+        title: 'Fee reminder',
+        body: 'A dummy fee notice for the header bell.',
+        category: 'Fees',
+      })
+      .returning({ id: notifications.id })
+
+    expect(await unreadCount(institutionId, studentUserId)).toBe(1)
+
+    const listed = await markAccountNotificationRead(institutionId, studentUserId, row!.id)
+    expect(listed.find((item) => item.id === row!.id)?.readAt).toBeTruthy()
+    expect(await unreadCount(institutionId, studentUserId)).toBe(0)
   })
 })

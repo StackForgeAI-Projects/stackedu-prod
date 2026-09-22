@@ -10,7 +10,7 @@ import { StatTile } from '@/components/StatTile'
 import { Button } from '@/components/ui/button'
 import { getLecturerDashboard, lecturerDashboardQueryKey } from '@/lib/api/lecturer'
 import { apiErrorMessage } from '@/lib/api/client'
-import { formatDateShort } from '@/lib/utils'
+import { formatDateLong, formatDateShort } from '@/lib/utils'
 
 export const Route = createFileRoute('/_auth/lecturer/dashboard')({
   component: LecturerDashboardPage,
@@ -25,7 +25,7 @@ function LecturerDashboardPage() {
   const today = new Date()
   const hours = today.getHours()
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening'
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = formatDateLong(today)
 
   return (
     <LecturerShell pageTitle="Dashboard" guide="Your assigned courses, today's classes, attendance, pending result submissions and at-risk students from live records.">

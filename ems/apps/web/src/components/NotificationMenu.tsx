@@ -14,10 +14,10 @@ import {
   getAccountNotifications,
   markAccountNotificationRead,
 } from '@/lib/api/account'
-import { academicProfileQueryKey } from '@/lib/api/academic'
-import { ictProfileQueryKey } from '@/lib/api/ict'
-import { librarianProfileQueryKey } from '@/lib/api/library'
-import { studentProfileQueryKey } from '@/lib/api/student'
+import {
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 import { cn, formatDateShort, parseAppDateTime } from '@/lib/utils'
 
 interface NotificationMenuProps {
@@ -47,12 +47,13 @@ export function NotificationMenu({ unreadCount = 0, notificationsHref }: Notific
   const notifications = data ?? []
 
   async function markRead(id: string) {
-    const updated = await markAccountNotificationRead(id)
-    queryClient.setQueryData(accountNotificationsQueryKey, updated)
-    await queryClient.invalidateQueries({ queryKey: ictProfileQueryKey })
-    await queryClient.invalidateQueries({ queryKey: academicProfileQueryKey })
-    await queryClient.invalidateQueries({ queryKey: studentProfileQueryKey })
-    await queryClient.invalidateQueries({ queryKey: librarianProfileQueryKey })
+    const applied = applyNotificationReadLocally(queryClient, id)
+    if (!applied) return
+    try {
+      await markAccountNotificationRead(id)
+    } catch {
+      await invalidateNotificationReadCaches(queryClient)
+    }
   }
 
   return (
@@ -94,8 +95,11 @@ export function NotificationMenu({ unreadCount = 0, notificationsHref }: Notific
               <DropdownMenuItem
                 key={item.id}
                 className="flex flex-col items-start gap-1 rounded-none px-4 py-3 cursor-pointer whitespace-normal"
-                onClick={() => {
-                  if (!item.readAt) void markRead(item.id)
+                onSelect={(event) => {
+                  if (!item.readAt) {
+                    event.preventDefault()
+                    void markRead(item.id)
+                  }
                 }}
               >
                 <div className="flex w-full items-start justify-between gap-2">

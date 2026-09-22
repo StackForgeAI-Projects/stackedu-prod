@@ -2,6 +2,8 @@ import { userRoleSchema } from '@stackedu/shared/enums'
 import {
   ATTENDANCE_POLICY_SETTING_KEY,
   DEFAULT_ATTENDANCE_POLICY,
+  DEFAULT_RECORDING_RETENTION,
+  RECORDING_RETENTION_SETTING_KEY,
 } from '@stackedu/shared'
 import type { UserRole } from '@stackedu/shared'
 import type { InstitutionDb } from './connection'
@@ -159,6 +161,10 @@ export async function seedInstitutionDefaults(db: InstitutionDb): Promise<void> 
   await upsertInstitutionSetting(db, ATTENDANCE_POLICY_SETTING_KEY, DEFAULT_ATTENDANCE_POLICY, {
     category: 'Teaching',
     description: 'Whether lecturers may edit submitted attendance and for how long.',
+  })
+  await upsertInstitutionSetting(db, RECORDING_RETENTION_SETTING_KEY, DEFAULT_RECORDING_RETENTION, {
+    category: 'Teaching',
+    description: 'How long a ready classroom recording is kept before it is deleted.',
   })
 }
 

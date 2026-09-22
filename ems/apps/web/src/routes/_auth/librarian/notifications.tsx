@@ -6,9 +6,12 @@ import { apiErrorMessage } from '@/lib/api/client'
 import {
   getLibrarianNotifications,
   librarianNotificationsQueryKey,
-  librarianProfileQueryKey,
   markLibrarianNotificationRead,
 } from '@/lib/api/library'
+import {
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 import { formatAppDateDdMmYyyy } from '@stackedu/shared'
 
 export const Route = createFileRoute('/_auth/librarian/notifications')({
@@ -23,9 +26,11 @@ function LibrarianNotificationsPage() {
   })
   const mutation = useMutation({
     mutationFn: markLibrarianNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: librarianNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: librarianProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 

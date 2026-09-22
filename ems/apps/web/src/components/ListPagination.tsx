@@ -23,7 +23,8 @@ export function ListPagination({
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1)
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
-  const noun = total === 1 ? itemLabel.replace(/s$/, '') : itemLabel
+  const singular: Record<string, string> = { classes: 'class', courses: 'course', items: 'item' }
+  const noun = total === 1 ? (singular[itemLabel] ?? itemLabel.replace(/s$/, '')) : itemLabel
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 py-3">

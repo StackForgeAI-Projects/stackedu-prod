@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { AcademicShell } from '@/components/AcademicShell'
 import { calEventColors } from '@/data/academic'
@@ -305,6 +307,7 @@ function CalendarPage() {
             <SheetTitle style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
               {editing ? 'Edit calendar event' : 'Add calendar event'}
             </SheetTitle>
+            <FormInfoBox lines={editing ? formInfo.editCalendarEvent : formInfo.addCalendarEvent} />
           </SheetHeader>
           <div className="px-6 sm:px-8 py-6 flex flex-col gap-4">
             <div className="space-y-2">

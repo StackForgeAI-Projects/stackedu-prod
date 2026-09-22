@@ -42,6 +42,7 @@ import {
   COURSE_MATERIAL_MIME_TYPES,
   DEFAULT_ATTENDANCE_POLICY,
   isAttendanceSessionEditable,
+  uploadLimitMessage,
 } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { readInstitutionSetting, upsertInstitutionSetting } from '../lib/institution-settings'
@@ -1142,7 +1143,7 @@ function assertMaterialFileInput(input: {
     throw badRequest('Upload a PDF, Word document, or image file.')
   }
   if (!input.fileSizeBytes || input.fileSizeBytes > COURSE_MATERIAL_MAX_BYTES) {
-    throw badRequest('The file is too large. Maximum size is 10 MB.')
+    throw badRequest(uploadLimitMessage())
   }
   return { fileKey: input.fileKey, mimeType: input.mimeType, fileSizeBytes: input.fileSizeBytes }
 }
@@ -1228,6 +1229,9 @@ export async function createLecturerMaterial(
     offeringId: input.offeringId,
   })
 
+  if (!input.moduleId) {
+    throw badRequest('Add a module to this course first, then attach the material to that module.')
+  }
   const moduleId = await resolveMaterialModuleId(db, input.offeringId, input.moduleId)
 
   const publish = input.publish ?? true
@@ -1328,6 +1332,9 @@ export async function updateLecturerMaterial(
         ? null
         : existing.publishedAt
 
+  if (input.moduleId === null) {
+    throw badRequest('Course material must stay in a module.')
+  }
   const nextModuleId =
     input.moduleId === undefined
       ? undefined

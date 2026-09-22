@@ -5,6 +5,8 @@ import { Plus, ChevronRight } from 'lucide-react'
 import type { LecturerAssessmentRow, LecturerCourseRow } from '@stackedu/shared'
 import { isQuizAssessmentType } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { LecturerShell } from '@/components/LecturerShell'
 import { PagedList } from '@/components/ListPagination'
 import { AssessmentWeightField } from '@/components/AssessmentWeightField'
@@ -161,11 +163,12 @@ function CreateAssignmentForm({ courses, onClose }: { courses: LecturerCourseRow
     <div className="flex flex-col h-full overflow-y-auto">
       <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)' }}>
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>Create Assignment</h3>
+        <FormInfoBox lines={formInfo.createAssignment} />
       </div>
       <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Assignment title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lab Exercise 2" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Assignment title" />
         </div>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Course</label>

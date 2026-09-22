@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { AcademicAtRiskStudent } from '@stackedu/shared'
-import { CheckCircle2 } from 'lucide-react'
 import { AcademicShell } from '@/components/AcademicShell'
 import { riskColors } from '@/data/academic'
 import {
@@ -10,7 +10,6 @@ import {
   listAcademicAtRiskStudents,
 } from '@/lib/api/academic'
 import { apiErrorMessage } from '@/lib/api/client'
-import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_auth/academic/at-risk')({
   component: AtRiskManagementPage,
@@ -59,7 +58,11 @@ function AtRiskManagementPage() {
           <div>
             <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>At-Risk Students</h1>
             <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              {isPending ? 'Loading…' : `${active.length} students currently flagged`}
+              {isPending
+                ? 'Loading…'
+                : active.length === 1
+                  ? '1 student currently flagged'
+                  : `${active.length} students currently flagged`}
             </p>
           </div>
           <select value={programme} onChange={(e) => setProgramme(e.target.value)}
@@ -124,24 +127,20 @@ function RiskCard({ student: s }: { student: AcademicAtRiskStudent }) {
   const rc = riskColors(s.riskLevel === 'Critical' ? 'High' : s.riskLevel as Parameters<typeof riskColors>[0])
   return (
     <div style={{ backgroundColor: 'var(--card)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)', padding: 20 }}>
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center justify-center rounded-full flex-shrink-0 text-sm font-bold" style={{ width: 44, height: 44, backgroundColor: 'var(--muted)' }}>{s.initials}</div>
-        <div className="flex-shrink-0" style={{ minWidth: 160 }}>
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="flex items-center justify-center rounded-full shrink-0 text-sm font-bold" style={{ width: 44, height: 44, backgroundColor: 'var(--muted)' }}>{s.initials}</div>
+        <div className="min-w-0 flex-1 basis-35">
           <Link to="/academic/student" search={{ id: s.studentNumber }} className="text-sm font-semibold" style={{ color: 'var(--foreground)', textDecoration: 'none' }}>{s.name}</Link>
           <p className="t-mono text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{s.studentNumber}</p>
           <p className="t-caption mt-0.5">{s.programme} · Year {s.year}</p>
         </div>
-        <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+        <div className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
           {s.riskFactors.map((f, i) => (
-            <span key={i} className="t-label px-2 py-0.5" style={{ backgroundColor: f.severity === 'error' ? 'var(--error-bg)' : 'var(--warning-bg)', color: f.severity === 'error' ? 'var(--error)' : 'var(--warning)', borderRadius: 'var(--radius-sm)' }}>{f.label}</span>
+            <span key={i} className="t-label px-2 py-0.5 max-w-full whitespace-normal" style={{ backgroundColor: f.severity === 'error' ? 'var(--error-bg)' : 'var(--warning-bg)', color: f.severity === 'error' ? 'var(--error)' : 'var(--warning)', borderRadius: 'var(--radius-sm)' }}>{f.label}</span>
           ))}
         </div>
-        <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
+        <div className="flex flex-col items-start sm:items-end gap-2.5">
           <span className="t-label px-2.5 py-1" style={{ backgroundColor: rc.bg, color: rc.color, borderRadius: 'var(--radius-sm)' }}>{s.riskLevel} Risk</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => toast.info('Advisor assignment is not available yet.')} className="text-xs font-medium px-2.5 py-1.5 rounded-lg" style={{ border: '1px solid var(--border)', cursor: 'pointer' }}>Assign advisor</button>
-            <button type="button" onClick={() => toast.info('Notifications are not available from this screen yet.')} className="text-xs font-medium px-2.5 py-1.5 rounded-lg" style={{ border: '1px solid var(--border)', cursor: 'pointer' }}>Send notification</button>
-          </div>
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import type { ClassroomSessionSummary, LecturerCourseRow } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { PagedList } from '@/components/ListPagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -172,8 +174,9 @@ function ScheduleClassForm({
       style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}
     >
       <p className="t-label" style={{ color: 'var(--muted-foreground)' }}>Schedule a live class</p>
+      <FormInfoBox lines={formInfo.scheduleLiveClass} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Week 3 live class" />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Live class title" />
         <Input type="datetime-local" value={when} onChange={(event) => setWhen(event.target.value)} />
       </div>
       {!offeringId && courses.length > 0 ? (

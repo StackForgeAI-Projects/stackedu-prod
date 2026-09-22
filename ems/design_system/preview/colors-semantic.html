@@ -1,0 +1,53 @@
+<!-- @dsCard group="Colors" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colors — Semantic</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .row-of-pairs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+  }
+  .pair {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .pair .stem { height: 56px; display: flex; align-items: center; padding: 0 12px; color: white; font-weight: 600; font-size: 13px; }
+  .pair .bg { height: 36px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600; }
+  .pair .row-meta { display: flex; justify-content: space-between; padding: 10px 12px; background: var(--card); font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row-of-pairs">
+    <div class="pair">
+      <div class="stem" style="background:#16A34A;">Success</div>
+      <div class="bg" style="background:#DCFCE7; color:#16A34A;">Paid · Passed</div>
+      <div class="row-meta"><span>#16A34A</span><span>#DCFCE7</span></div>
+    </div>
+    <div class="pair">
+      <div class="stem" style="background:#CA8A04;">Warning</div>
+      <div class="bg" style="background:#FEF9C3; color:#854D0E;">Pending</div>
+      <div class="row-meta"><span>#CA8A04</span><span>#FEF9C3</span></div>
+    </div>
+    <div class="pair">
+      <div class="stem" style="background:#DC2626;">Error</div>
+      <div class="bg" style="background:#FEE2E2; color:#B91C1C;">Unpaid · Failed</div>
+      <div class="row-meta"><span>#DC2626</span><span>#FEE2E2</span></div>
+    </div>
+    <div class="pair">
+      <div class="stem" style="background:#2563EB;">Info</div>
+      <div class="bg" style="background:#DBEAFE; color:#1D4ED8;">Notice</div>
+      <div class="row-meta"><span>#2563EB</span><span>#DBEAFE</span></div>
+    </div>
+  </div>
+  <div class="note">Each semantic role is a stem + a desaturated background. Backgrounds carry badge fills and inline alerts; stems carry text and icons on top.</div>
+</div>
+</body>
+</html>

@@ -201,7 +201,7 @@ describe('course modules and announcements', () => {
     })
 
     it('files a material under a module and counts it', async () => {
-      const module = await createLecturerModule(institutionId, lecturerActor, {
+      const courseModule = await createLecturerModule(institutionId, lecturerActor, {
         offeringId,
         title: 'Week 3: Loops',
         publish: true,
@@ -209,39 +209,39 @@ describe('course modules and announcements', () => {
 
       await createLecturerMaterial(institutionId, lecturerActor, {
         offeringId,
-        moduleId: module.id,
+        moduleId: courseModule.id,
         title: 'Loops explained',
         bodyText: 'A loop repeats a block of code.',
         publish: true,
       })
 
       const course = await getLecturerCourse(institutionId, lecturerActor.id, offeringId)
-      const saved = course.modules.find((row) => row.id === module.id)
+      const saved = course.modules.find((row) => row.id === courseModule.id)
       expect(saved?.materialCount).toBe(1)
 
       const material = course.materials.find((row) => row.title === 'Loops explained')
-      expect(material?.moduleId).toBe(module.id)
+      expect(material?.moduleId).toBe(courseModule.id)
       expect(material?.bodyText).toBe('A loop repeats a block of code.')
     })
 
     it('keeps the materials when a module is deleted', async () => {
-      const module = await createLecturerModule(institutionId, lecturerActor, {
+      const courseModule = await createLecturerModule(institutionId, lecturerActor, {
         offeringId,
         title: 'Week 4: Temporary',
         publish: true,
       })
       const material = await createLecturerMaterial(institutionId, lecturerActor, {
         offeringId,
-        moduleId: module.id,
+        moduleId: courseModule.id,
         title: 'Survives its module',
         bodyText: 'Still here.',
         publish: true,
       })
 
-      await deleteLecturerModule(institutionId, lecturerActor, module.id)
+      await deleteLecturerModule(institutionId, lecturerActor, courseModule.id)
 
       const course = await getLecturerCourse(institutionId, lecturerActor.id, offeringId)
-      expect(course.modules.some((row) => row.id === module.id)).toBe(false)
+      expect(course.modules.some((row) => row.id === courseModule.id)).toBe(false)
 
       const kept = course.materials.find((row) => row.id === material.id)
       expect(kept).toBeDefined()
@@ -460,23 +460,40 @@ describe('course modules and announcements', () => {
     })
 
     it('stops an unassigned lecturer editing another lecturer module', async () => {
-      const module = await createLecturerModule(institutionId, lecturerActor, {
+      const courseModule = await createLecturerModule(institutionId, lecturerActor, {
         offeringId,
         title: 'Owned by the assigned lecturer',
       })
 
       await expect(
-        updateLecturerModule(institutionId, otherLecturerActor, module.id, { title: 'Hijacked' }),
+        updateLecturerModule(institutionId, otherLecturerActor, courseModule.id, { title: 'Hijacked' }),
       ).rejects.toThrow(/not assigned/i)
 
       await expect(
-        deleteLecturerModule(institutionId, otherLecturerActor, module.id),
+        deleteLecturerModule(institutionId, otherLecturerActor, courseModule.id),
       ).rejects.toThrow(/not assigned/i)
     })
 
+    it('refuses material that is not attached to a module', async () => {
+      await expect(
+        createLecturerMaterial(institutionId, lecturerActor, {
+          offeringId,
+          title: 'No module',
+          bodyText: 'Should not save.',
+          publish: true,
+        }),
+      ).rejects.toThrow(/module/i)
+    })
+
     it('stops a student who is not enrolled from recording a view', async () => {
+      const courseModule = await createLecturerModule(institutionId, lecturerActor, {
+        offeringId,
+        title: 'Restricted reading',
+        publish: true,
+      })
       const material = await createLecturerMaterial(institutionId, lecturerActor, {
         offeringId,
+        moduleId: courseModule.id,
         title: 'Enrolled students only',
         bodyText: 'Restricted.',
         publish: true,

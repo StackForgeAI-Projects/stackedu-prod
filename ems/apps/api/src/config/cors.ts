@@ -24,9 +24,14 @@ export function corsOrigin(env: Env) {
  * preview URLs and localhost so a preview build can talk to a preview API.
  */
 export function expandOriginsForEnvironment(env: Env): Env {
-  if (env.NODE_ENV === 'production') return env
+  if (env.NODE_ENV !== 'development') return env
 
-  const extras = ['http://localhost:3000', 'http://127.0.0.1:3000']
+  const extras = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+  ]
   const merged = new Set([...env.ALLOWED_ORIGINS, ...extras])
   return { ...env, ALLOWED_ORIGINS: [...merged] }
 }

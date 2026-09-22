@@ -132,6 +132,12 @@ function CourseRegistrationPage() {
               <div className="min-w-0">
                 <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Register for courses</h1>
                 <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>{totalsLabel}</p>
+                {profileQuery.data?.programmeName ? (
+                  <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    {profileQuery.data.programmeName}
+                    {profileQuery.data.departmentName ? ` · ${profileQuery.data.departmentName}` : ''}
+                  </p>
+                ) : null}
               </div>
               <Button
                 variant="outline"
@@ -221,8 +227,11 @@ function CourseRegistrationPage() {
 
             <div className="mb-6 p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
               <h2 className="t-h3 mb-3">Available</h2>
+              <p className="t-caption mb-3" style={{ color: 'var(--muted-foreground)' }}>
+                These are the courses for your programme and department this semester.
+              </p>
               {available.length === 0 ? (
-                <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No extra offerings to add.</p>
+                <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>No extra offerings for your programme this semester.</p>
               ) : (
                 <>
                   {closedOfferings.length > 0 && data.registrationOpen ? (

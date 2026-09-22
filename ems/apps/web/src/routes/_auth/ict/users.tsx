@@ -19,6 +19,7 @@ import {
 } from '@/lib/api/ict'
 import { apiErrorMessage } from '@/lib/api/client'
 import { roleLabel } from '@/lib/auth/portals'
+import { formInfo } from '@/lib/form-info-copy'
 
 export const Route = createFileRoute('/_auth/ict/users')({
   component: UserManagementPage,
@@ -113,7 +114,7 @@ function UserManagementPage() {
         open={creating}
         onOpenChange={setCreating}
         title="Add user"
-        description="Create a login. A student account also creates their student record."
+        infoLines={formInfo.addIctUser}
       >
         <form
           className="grid grid-cols-1 sm:grid-cols-2 gap-4"

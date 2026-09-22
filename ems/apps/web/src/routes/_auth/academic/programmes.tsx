@@ -7,6 +7,8 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { Switch } from '@/components/ui/switch'
 import { AcademicShell } from '@/components/AcademicShell'
@@ -269,6 +271,7 @@ function ProgrammesPage() {
             <SheetTitle style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
               {editProg ? 'Edit Programme' : 'Add Programme'}
             </SheetTitle>
+            <FormInfoBox lines={editProg ? formInfo.editProgramme : formInfo.addProgramme} />
           </SheetHeader>
           <div className="px-8 py-6 flex flex-col gap-4">
             <div>
@@ -278,7 +281,7 @@ function ProgrammesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 className="w-full text-sm rounded-lg px-3 h-9 outline-none"
                 style={inputStyle}
-                placeholder="e.g. BSc Computer Science"
+                placeholder="Programme name"
               />
             </div>
             <div>

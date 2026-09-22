@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Users, ChevronRight, Search, Plus, ExternalLink } from 'lucide-react'
+import { Users, ChevronRight, Search, ExternalLink } from 'lucide-react'
 import type {
   LecturerCourseDetail,
   LecturerCourseMaterial,
@@ -14,6 +14,7 @@ import { CourseCodePill } from '@/components/CourseCodePill'
 import { DataTable } from '@/components/DataTable'
 import { AnalyticsChartCard, analyticsTooltipStyle } from '@/components/AnalyticsChartCard'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { AddMaterialControl } from '@/components/lecturer/AddMaterialControl'
 import { MaterialForm, MaterialRowActions } from '@/components/lecturer/CourseMaterialEditor'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -110,11 +111,15 @@ function MyCoursesPage() {
 function CourseListCard({ course, active, onClick }: { course: LecturerCourseRow; active: boolean; onClick: () => void }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      aria-pressed={active}
       style={{
+        width: '100%',
+        textAlign: 'left',
         backgroundColor: active ? 'rgba(var(--brand-rgb),0.06)' : hovered ? 'var(--muted)' : 'var(--card)',
         border: active ? '1px solid rgba(var(--brand-rgb),0.2)' : '1px solid var(--border)',
         borderRadius: 'var(--radius-xl)', padding: '14px 14px', cursor: 'pointer',
@@ -130,7 +135,7 @@ function CourseListCard({ course, active, onClick }: { course: LecturerCourseRow
         <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Next: {course.nextClassShort}</p>
       </div>
       <ChevronRight style={{ width: 15, height: 15, color: active ? 'var(--brand)' : 'var(--muted-foreground)', flexShrink: 0 }} />
-    </div>
+    </button>
   )
 }
 
@@ -225,14 +230,12 @@ function CourseDetail({
               Reading materials for this course. Modules, pages and announcements are managed from Course Management.
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => { setEditingMaterial(null); setMaterialOpen(true) }}
-                style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)', gap: 6 }}
-              >
-                <Plus style={{ width: 14, height: 14 }} /> Add material
-              </Button>
-              <Link to="/lecturer/course-management">
+              <AddMaterialControl
+                offeringId={course.offeringId}
+                hasModules={(detail?.modules ?? []).length > 0}
+                onAdd={() => { setEditingMaterial(null); setMaterialOpen(true) }}
+              />
+              <Link to="/lecturer/course-management" search={{ offeringId: course.offeringId, addModule: false }}>
                 <Button type="button" variant="outline" className="gap-1.5">
                   Course Management <ExternalLink style={{ width: 13, height: 13 }} />
                 </Button>
@@ -413,7 +416,7 @@ function CourseDetail({
           <MaterialForm
             offeringId={course.offeringId}
             material={editingMaterial}
-            modules={detail?.modules}
+            modules={detail?.modules ?? []}
             onClose={() => { setMaterialOpen(false); setEditingMaterial(null) }}
             onSuccess={async () => {
               await queryClient.invalidateQueries({ queryKey: lecturerCourseQueryKey(course.offeringId) })

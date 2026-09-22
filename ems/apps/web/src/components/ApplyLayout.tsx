@@ -17,6 +17,8 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 import { BrandMark } from '@/components/BrandMark'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -184,6 +186,7 @@ export function ApplyLayout({
             <SheetTitle style={{ fontFamily: 'var(--font-display)', fontSize: '1.125rem' }}>
               Change Password
             </SheetTitle>
+            <FormInfoBox lines={formInfo.changePassword} />
           </SheetHeader>
           <ChangePasswordForm onClose={() => setPasswordSheetOpen(false)} />
         </SheetContent>

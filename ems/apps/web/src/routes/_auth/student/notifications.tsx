@@ -7,8 +7,11 @@ import {
   getStudentNotifications,
   markStudentNotificationRead,
   studentNotificationsQueryKey,
-  studentProfileQueryKey,
 } from '@/lib/api/student'
+import {
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 import { apiErrorMessage } from '@/lib/api/client'
 
 export const Route = createFileRoute('/_auth/student/notifications')({
@@ -23,9 +26,11 @@ function NotificationsPage() {
   })
   const mutation = useMutation({
     mutationFn: markStudentNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: studentNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: studentProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 

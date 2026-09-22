@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 import { BursarShell } from '@/components/BursarShell'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { DataTable } from '@/components/DataTable'
 import { IconActionButton } from '@/components/IconActionButton'
 import { StatTile } from '@/components/StatTile'
@@ -443,6 +445,7 @@ function ManualPaymentSheet({
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
             Record Manual Payment
           </h2>
+          <FormInfoBox lines={formInfo.recordManualPayment} />
         </div>
 
         <div className="flex items-start gap-3 p-4 mb-6 rounded-xl" style={{ backgroundColor: 'var(--warning-bg)', border: '1px solid rgba(202,138,4,0.25)' }}>

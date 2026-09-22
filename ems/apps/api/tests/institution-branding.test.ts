@@ -103,7 +103,7 @@ describe('institution branding', () => {
     expect(served.headers.get('cross-origin-resource-policy')).toBe('cross-origin')
   })
 
-  it('accepts a logo larger than the general request limit, up to 2 MB', async () => {
+  it('accepts a logo larger than the general request limit, up to 14 MB', async () => {
     const response = await app.request('/ict/settings/logo', {
       method: 'POST',
       headers: { Cookie: sessionCookie, 'Content-Type': 'image/png' },
@@ -160,6 +160,18 @@ describe('institution branding', () => {
     const cleared = await updateIctSettings(institutionId, actor, { brandColor: null })
     expect(cleared.brandColor).toBeNull()
     expect((await getIctSettings(institutionId)).brandColor).toBeNull()
+  })
+
+  it('lets ICT set how long a classroom recording is kept', async () => {
+    expect((await getIctSettings(institutionId)).recordingRetention).toEqual({ unit: 'hours', value: 72 })
+    const saved = await updateIctSettings(institutionId, actor, {
+      recordingRetention: { unit: 'days', value: 2 },
+    })
+    expect(saved.recordingRetention).toEqual({ unit: 'days', value: 2 })
+    expect(updateIctSettingsRequestSchema.safeParse({ recordingRetention: { unit: 'days', value: 40 } }).success).toBe(false)
+    await updateIctSettings(institutionId, actor, {
+      recordingRetention: { unit: 'hours', value: 72 },
+    })
   })
 
   it('will not accept a colour that is not a hex code', () => {

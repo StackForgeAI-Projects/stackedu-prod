@@ -123,6 +123,9 @@ export const resultBatchStatusSchema = z.enum([
   'Rejected',
 ])
 
+/** Academic Admin approve-and-publish, plus any older Approved batches, are visible to students. */
+export const RELEASED_RESULT_BATCH_STATUSES = ['Approved', 'Published'] as const
+
 export const invoiceStatusSchema = z.enum([
   'Draft',
   'Issued',

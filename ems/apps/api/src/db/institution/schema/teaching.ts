@@ -385,7 +385,13 @@ export const sessionRecordings = pgTable(
     /** Provider job id from the media server, not a Cloud-specific type. */
     jobId: text('job_id'),
     status: recordingStatusEnum('status').notNull().default('Pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
+    expiryReminderSentAt: timestamp('expiry_reminder_sent_at', { withTimezone: true, mode: 'string' }),
+    purgedAt: timestamp('purged_at', { withTimezone: true, mode: 'string' }),
     ...timestamps(),
   },
-  (t) => [index('session_recordings_session_idx').on(t.sessionId, t.createdAt)],
+  (t) => [
+    index('session_recordings_session_idx').on(t.sessionId, t.createdAt),
+    index('session_recordings_expiry_idx').on(t.expiresAt),
+  ],
 )

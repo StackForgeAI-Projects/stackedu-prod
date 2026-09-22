@@ -17,7 +17,7 @@ import {
 } from '@/lib/api/academic'
 import { ApplicationStatusBadge } from '@/lib/application-status'
 import { apiErrorMessage } from '@/lib/api/client'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateLong, formatDateShort, formatDateTime } from '@/lib/utils'
 
 export const Route = createFileRoute('/_auth/academic/dashboard')({
   component: AcademicDashboardPage,
@@ -40,7 +40,7 @@ function AcademicDashboardPage() {
   const today = new Date()
   const hours = today.getHours()
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening'
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = formatDateLong(today)
 
   return (
     <AcademicShell pageTitle="Dashboard">
@@ -243,7 +243,7 @@ function UpcomingEventsCard({ events }: { events: AcademicDashboard['upcomingEve
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{ev.title}</p>
                   <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                    {ev.startDate}{ev.endDate && ev.endDate !== ev.startDate ? ` – ${ev.endDate}` : ''}
+                    {formatDateShort(ev.startDate)}{ev.endDate && ev.endDate !== ev.startDate ? ` – ${formatDateShort(ev.endDate)}` : ''}
                   </p>
                 </div>
                 <span className="t-label px-1.5 py-0.5 flex-shrink-0" style={{ backgroundColor: bg, color, borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{ev.category}</span>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Mail, Pencil, Phone } from 'lucide-react'
 import { STUDENT_IDENTITY_CONTACT_MESSAGE } from '@stackedu/shared'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -377,7 +379,7 @@ function EditProfileForm({
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.125rem', fontWeight: 600, letterSpacing: '-0.01em' }}>Edit Profile</h2>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>Update your personal contact details.</p>
+        <FormInfoBox lines={formInfo.editProfile} />
       </div>
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col gap-4">

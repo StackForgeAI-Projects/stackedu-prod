@@ -4,6 +4,7 @@ import { createApp } from './app'
 import { closeAllConnections, getInstitutionDb, getPlatformDb } from './db/connection'
 import { migrateAllInstitutions, migratePlatform } from './db/migrate'
 import { institutions } from './db/platform/schema'
+import { processClassroomRecordings } from './lib/classroom-recordings'
 import { processFeeDueReminders } from './lib/fee-due-reminders'
 import { processTimetableReminders } from './services/timetable-reminders'
 
@@ -43,6 +44,24 @@ async function runFeeDueReminders() {
   }
 }
 
+async function runClassroomRecordings() {
+  try {
+    const platform = getPlatformDb()
+    const rows = await platform.select({ id: institutions.id }).from(institutions)
+    for (const row of rows) {
+      try {
+        const db = await getInstitutionDb(row.id)
+        const changed = await processClassroomRecordings(db)
+        if (changed > 0) logger.info('Classroom recordings processed', { institutionId: row.id, changed })
+      } catch (error) {
+        logger.error('Classroom recording job failed for institution', { institutionId: row.id, error })
+      }
+    }
+  } catch (error) {
+    logger.error('Classroom recording job failed', { error })
+  }
+}
+
 async function runTimetableReminders() {
   try {
     const platform = getPlatformDb()
@@ -63,8 +82,10 @@ async function start() {
   if (env.NODE_ENV !== 'test') {
     void runFeeDueReminders()
     void runTimetableReminders()
+    void runClassroomRecordings()
     setInterval(() => void runFeeDueReminders(), 60 * 60 * 1000).unref()
     setInterval(() => void runTimetableReminders(), 60 * 1000).unref()
+    setInterval(() => void runClassroomRecordings(), 60 * 60 * 1000).unref()
   }
 
   const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {

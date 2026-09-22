@@ -261,7 +261,7 @@ function ResultManagementPage() {
                 ))}
               </div>
               <p className="t-caption mb-6" style={{ color: 'var(--muted-foreground)' }}>
-                Based on {viewResult.studentCount} student{viewResult.studentCount === 1 ? '' : 's'} in this batch.
+                Based on {viewResult.studentCount === 1 ? '1 student' : `${viewResult.studentCount} students`} in this batch.
                 {viewResult.studentCount === 1
                   ? ' Average, highest and lowest match because there is only one mark.'
                   : null}

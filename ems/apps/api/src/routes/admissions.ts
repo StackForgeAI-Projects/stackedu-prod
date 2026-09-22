@@ -20,6 +20,7 @@ import {
   type PresignDocumentResponse,
   type ProgrammesResponse,
   type SessionResponse,
+  MAX_UPLOAD_BYTES,
 } from '@stackedu/shared'
 import { env } from '../config/env'
 import { SESSION_COOKIE, sessionCookieOptions } from '../lib/cookies'
@@ -107,7 +108,7 @@ admissionRoutes.post('/apply/register', async (c) => {
  */
 admissionRoutes.put(
   '/apply/documents/upload/:token',
-  bodyLimit({ maxSize: 10 * 1024 * 1024 }),
+  bodyLimit({ maxSize: MAX_UPLOAD_BYTES }),
   async (c) => {
     const token = c.req.param('token')
     const lengthHeader = c.req.header('content-length')

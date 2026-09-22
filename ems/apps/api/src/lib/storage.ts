@@ -13,6 +13,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { MAX_UPLOAD_BYTES, uploadLimitMessage } from '@stackedu/shared'
 import { env } from '../config/env'
 import { badRequest, internalError } from './errors'
 
@@ -299,7 +300,7 @@ const LOGO_MIME_BY_EXTENSION: Record<string, string> = {
 const LOGO_TYPE_MESSAGE = 'Upload a PNG, JPEG, WebP or SVG logo.'
 
 /** Must stay in step with the body limit the upload route allows through. */
-export const LOGO_MAX_BYTES = 2 * 1024 * 1024
+export const LOGO_MAX_BYTES = MAX_UPLOAD_BYTES
 
 /**
  * The extension is part of the key because it is the only place the image
@@ -471,7 +472,7 @@ export async function writeInstitutionLogo(input: {
 }): Promise<string> {
   if (!LOGO_EXTENSIONS[input.mimeType]) throw badRequest(LOGO_TYPE_MESSAGE)
   if (input.body.byteLength > LOGO_MAX_BYTES) {
-    throw badRequest('The logo must be 2 MB or smaller.')
+    throw badRequest(uploadLimitMessage())
   }
 
   const fileKey = buildInstitutionLogoKey(input.institutionId, input.mimeType)

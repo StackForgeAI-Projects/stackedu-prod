@@ -13,11 +13,15 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 import {
   bursarNotificationsQueryKey,
-  bursarProfileQueryKey,
   listBursarNotifications,
   markAllBursarNotificationsRead,
   markBursarNotificationRead,
 } from '@/lib/api/bursar'
+import {
+  applyAllNotificationsReadLocally,
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 
 export const Route = createFileRoute('/_auth/bursar/notifications')({
   component: BursarNotificationsPage,
@@ -40,16 +44,23 @@ function BursarNotificationsPage() {
 
   const markRead = useMutation({
     mutationFn: markBursarNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: bursarNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: bursarProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
   const markAll = useMutation({
     mutationFn: markAllBursarNotificationsRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: bursarNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: bursarProfileQueryKey })
+    onMutate: () => {
+      applyAllNotificationsReadLocally(queryClient)
+    },
+    onSuccess: (notifications) => {
+      queryClient.setQueryData(bursarNotificationsQueryKey, notifications)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 

@@ -1,6 +1,7 @@
 import type { ApplicationDocumentType, RequestedDocuments } from '@stackedu/shared'
 import {
   APPLICATION_DOCUMENT_LABELS,
+  MAX_UPLOAD_BYTES,
   buildCustomDocumentType,
   isAllowedRequestedDocument,
   isCustomDocumentType,
@@ -17,16 +18,16 @@ const ALLOWED_MIME: Record<ApplicationDocumentType, readonly string[]> = {
 }
 
 const MAX_BYTES: Record<ApplicationDocumentType, number> = {
-  NationalId: 5 * 1024 * 1024,
-  SchoolCertificate: 10 * 1024 * 1024,
-  Transcript: 10 * 1024 * 1024,
-  Photo: 2 * 1024 * 1024,
-  MedicalInsurance: 5 * 1024 * 1024,
-  BirthCertificate: 5 * 1024 * 1024,
+  NationalId: MAX_UPLOAD_BYTES,
+  SchoolCertificate: MAX_UPLOAD_BYTES,
+  Transcript: MAX_UPLOAD_BYTES,
+  Photo: MAX_UPLOAD_BYTES,
+  MedicalInsurance: MAX_UPLOAD_BYTES,
+  BirthCertificate: MAX_UPLOAD_BYTES,
 }
 
 const CUSTOM_ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png'] as const
-const CUSTOM_MAX_BYTES = 10 * 1024 * 1024
+const CUSTOM_MAX_BYTES = MAX_UPLOAD_BYTES
 
 export function normalizeRequestedDocuments(
   input: RequestedDocuments | null | undefined,

@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { DEFAULT_SEMESTER_MAX_CREDITS, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, reachableNotificationActionUrl } from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
 import { academicYears, courses, departments, faculties, programmes, semesters, academicCalendarEvents } from '../src/db/institution/schema/academic'
 import { notifications } from '../src/db/institution/schema/communication'
 import { students } from '../src/db/institution/schema/students'
+import { courseOfferings, courseRegistrations } from '../src/db/institution/schema/teaching'
 import { AppError } from '../src/lib/errors'
 import {
   createAcademicCourse,
@@ -389,5 +390,67 @@ describe('academic courses', () => {
     expect((await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)?.maxCredits).toBe(
       DEFAULT_SEMESTER_MAX_CREDITS,
     )
+  })
+
+  it('lists only offerings from the student programme department', async () => {
+    const current = (await listAcademicSemesters(institutionId)).find((row) => row.isCurrent)
+    expect(current?.id).toBeTruthy()
+
+    await createAcademicCourse(institutionId, actor, {
+      code: 'CMP310',
+      name: 'Department Algorithms',
+      departmentName: 'Department of Computing',
+      credits: 3,
+      lecturerId,
+      semesterId: current!.id,
+      openForRegistration: true,
+    }, { notify: false })
+
+    const other = await createAcademicCourse(institutionId, actor, {
+      code: 'MEE210',
+      name: 'Thermodynamics',
+      departmentName: 'Department of Engineering',
+      credits: 3,
+      lecturerId,
+      semesterId: current!.id,
+      openForRegistration: true,
+    }, { notify: false })
+
+    const state = await getRegistrationState(institutionId, studentUserId)
+    expect(state.offerings.some((row) => row.name === 'Department Algorithms')).toBe(true)
+    expect(state.offerings.some((row) => row.name === 'Thermodynamics')).toBe(false)
+
+    const db = await getInstitutionDb(institutionId)
+    const [otherOffering] = await db
+      .select({ id: courseOfferings.id })
+      .from(courseOfferings)
+      .where(and(eq(courseOfferings.courseId, other.id), eq(courseOfferings.semesterId, current!.id)))
+      .limit(1)
+    expect(otherOffering?.id).toBeTruthy()
+
+    const rejected = await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [otherOffering!.id],
+      dropOfferingIds: [],
+    }).catch((cause: AppError) => cause)
+    expect(rejected).toBeInstanceOf(AppError)
+    expect((rejected as AppError).message).toBe('One or more selected courses are not available this semester.')
+
+    const profile = await getStudentProfile(institutionId, studentUserId)
+    await db.insert(courseRegistrations).values({
+      studentId: profile.studentId,
+      courseOfferingId: otherOffering!.id,
+      status: 'Approved',
+      registeredAt: new Date().toISOString(),
+    })
+
+    const afterRegister = await getRegistrationState(institutionId, studentUserId)
+    expect(afterRegister.offerings.find((row) => row.name === 'Thermodynamics')?.registered).toBe(true)
+
+    await registerForCourses(institutionId, studentUserId, {
+      offeringIds: [],
+      dropOfferingIds: [otherOffering!.id],
+    })
+    const afterDrop = await getRegistrationState(institutionId, studentUserId)
+    expect(afterDrop.offerings.some((row) => row.name === 'Thermodynamics')).toBe(false)
   })
 })

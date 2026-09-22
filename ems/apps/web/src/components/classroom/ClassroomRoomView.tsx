@@ -1,11 +1,11 @@
-import { LiveKitRoom, VideoConference } from '@livekit/components-react'
-import '@livekit/components-styles'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
-import type { ClassroomJoin, ClassroomSessionDetail } from '@stackedu/shared'
+import { useEffect } from 'react'
+import type { ClassroomSessionDetail } from '@stackedu/shared'
+import { formatAppDateTimeDdMmYyyy } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { ClassroomWhiteboard } from '@/components/classroom/ClassroomWhiteboard'
+import { useClassroomLive } from '@/components/classroom/ClassroomLiveProvider'
 import { classroomStatusStyle } from '@/components/classroom/ClassroomSessionList'
 import { Button } from '@/components/ui/button'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -44,14 +44,19 @@ export function ClassroomRoomView({
   sessionId: string
 }) {
   const queryClient = useQueryClient()
-  const [join, setJoin] = useState<ClassroomJoin | null>(null)
+  const { join: liveJoin, session: liveSession, sessionId: liveSessionId, connect, updateSession, setStageEl } = useClassroomLive()
   const sessionQuery = useQuery({
     queryKey: role === 'lecturer' ? lecturerClassroomSessionQueryKey(sessionId) : studentClassroomSessionQueryKey(sessionId),
     queryFn: () =>
       role === 'lecturer' ? getLecturerClassroomSession(sessionId) : getStudentClassroomSession(sessionId),
     enabled: Boolean(sessionId),
   })
-  const session = join?.session ?? sessionQuery.data
+  const joinedHere = liveSessionId === sessionId && Boolean(liveJoin)
+  const session = sessionQuery.data ?? (joinedHere ? liveSession : null)
+
+  useEffect(() => {
+    return () => setStageEl(null)
+  }, [setStageEl])
 
   const refresh = async (next?: ClassroomSessionDetail) => {
     if (next) {
@@ -59,6 +64,7 @@ export function ClassroomRoomView({
         role === 'lecturer' ? lecturerClassroomSessionQueryKey(sessionId) : studentClassroomSessionQueryKey(sessionId),
         next,
       )
+      updateSession(next)
     }
     await queryClient.invalidateQueries({ queryKey: lecturerClassroomQueryKey() })
     await queryClient.invalidateQueries({ queryKey: studentClassroomQueryKey })
@@ -68,17 +74,17 @@ export function ClassroomRoomView({
     mutationFn: () =>
       role === 'lecturer' ? joinLecturerClassroomSession(sessionId) : joinStudentClassroomSession(sessionId),
     onSuccess: async (payload) => {
-      setJoin(payload)
+      connect({ role, sessionId, join: payload })
       await refresh(payload.session)
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not join that class.')),
   })
 
   const canEditBoard = Boolean(session && session.status === 'Live')
-  const showLive = Boolean(join?.media && session?.status === 'Live')
+  const showLive = Boolean(joinedHere && liveJoin?.media && session?.status === 'Live')
 
   return (
-    <div className="animate-fade-up" style={{ padding: '24px 16px 56px', maxWidth: 1100, margin: '0 auto' }}>
+    <div className="animate-fade-up w-full max-w-full min-w-0 overflow-x-hidden" style={{ padding: '24px 16px 56px', maxWidth: 1100, margin: '0 auto' }}>
       {role === 'lecturer' ? (
         <Link to="/lecturer/classroom" className="t-caption mb-4 inline-block" style={{ color: 'var(--success)' }}>← Classroom</Link>
       ) : (
@@ -93,7 +99,7 @@ export function ClassroomRoomView({
       ) : session ? (
         <>
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-5">
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="t-h1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>{session.title}</h1>
                 <span
@@ -115,7 +121,7 @@ export function ClassroomRoomView({
             <HostControls
               role={role}
               session={session}
-              joined={Boolean(join)}
+              joined={joinedHere}
               joining={joinMutation.isPending}
               onJoin={() => joinMutation.mutate()}
               onChanged={refresh}
@@ -129,41 +135,37 @@ export function ClassroomRoomView({
           ) : null}
 
           {showLive ? (
-            <div className="mb-4 overflow-hidden" style={{ minHeight: 280, borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)' }} data-lk-theme="default">
-              <LiveKitRoom
-                serverUrl={join!.media!.url}
-                token={join!.media!.token}
-                connect
-                audio
-                video
-                style={{ height: 420 }}
-              >
-                <VideoConference />
-              </LiveKitRoom>
-            </div>
+            <div
+              ref={setStageEl}
+              className="mb-4 w-full max-w-full min-w-0 overflow-hidden"
+              style={{ height: 420, borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)' }}
+              data-lk-theme="default"
+            />
           ) : session.status === 'Scheduled' && role === 'student' ? (
             <p className="t-body mb-4" style={{ color: 'var(--muted-foreground)' }}>This class has not started yet.</p>
           ) : null}
 
-          <section className="mb-6">
+          <section className="mb-6 min-w-0">
             <h2 className="t-h3 mb-3" style={{ fontFamily: 'var(--font-display)' }}>Whiteboard</h2>
             <ClassroomWhiteboard
               sessionId={sessionId}
               canEdit={canEditBoard}
-              collab={join?.collab ?? null}
+              isLive={session.status === 'Live'}
+              collab={joinedHere ? liveJoin?.collab ?? null : null}
               loadScene={role === 'lecturer' ? getLecturerClassroomWhiteboard : getStudentClassroomWhiteboard}
               saveScene={role === 'lecturer' ? saveLecturerClassroomWhiteboard : saveStudentClassroomWhiteboard}
             />
           </section>
 
           {session.recordings.length > 0 ? (
-            <section className="mb-6 p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
+            <section className="mb-6 p-5 min-w-0" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
               <h2 className="t-h3 mb-3" style={{ fontFamily: 'var(--font-display)' }}>Recordings</h2>
               {session.recordings.map((row) => (
                 <div key={row.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2" style={{ borderTop: '1px solid var(--border)' }}>
                   <p className="t-body-sm" style={{ color: 'var(--foreground)' }}>
                     {row.status} · {formatDateShort(row.createdAt)} {formatTime(row.createdAt)}
                     {row.durationSeconds ? ` · ${row.durationSeconds}s` : ''}
+                    {row.expiresAt ? ` · Available until ${formatAppDateTimeDdMmYyyy(row.expiresAt)}` : ''}
                   </p>
                   {row.status === 'Ready' ? (
                     <Button
@@ -188,7 +190,7 @@ export function ClassroomRoomView({
           ) : null}
 
           {session.summaryText || (role === 'lecturer' && session.status === 'Ended') ? (
-            <section className="p-5" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
+            <section className="p-5 min-w-0" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}>
               <h2 className="t-h3 mb-3" style={{ fontFamily: 'var(--font-display)' }}>Class summary</h2>
               {session.summaryText ? (
                 <p className="t-body whitespace-pre-wrap" style={{ color: 'var(--foreground)' }}>{session.summaryText}</p>
@@ -222,25 +224,13 @@ function HostControls({
   onChanged: (next?: ClassroomSessionDetail) => Promise<void>
 }) {
   const queryClient = useQueryClient()
+  const { updateSession } = useClassroomLive()
   const recording = session.recordings.some((row) => row.status === 'Pending')
-
-  if (role === 'student') {
-    if (session.status !== 'Live') return null
-    return (
-      <Button
-        onClick={onJoin}
-        disabled={joining || joined}
-        style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
-      >
-        {joined ? 'In class' : joining ? 'Joining…' : 'Join class'}
-      </Button>
-    )
-  }
 
   const startMutation = useMutation({
     mutationFn: () => startLecturerClassroomSession(session.id),
     onSuccess: async (next) => {
-      toast.success('Class is live.')
+      toast.success(next.recordings.some((row) => row.status === 'Pending') ? 'Class is live and recording.' : 'Class is live.')
       await onChanged(next)
       onJoin()
     },
@@ -250,6 +240,7 @@ function HostControls({
     mutationFn: () => endLecturerClassroomSession(session.id),
     onSuccess: async (next) => {
       toast.success('Class ended.')
+      updateSession(next)
       await queryClient.invalidateQueries({ queryKey: lecturerClassroomQueryKey() })
       await onChanged(next)
     },
@@ -263,6 +254,19 @@ function HostControls({
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not update the recording.')),
   })
+
+  if (role === 'student') {
+    if (session.status !== 'Live') return null
+    return (
+      <Button
+        onClick={onJoin}
+        disabled={joining || joined}
+        style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
+      >
+        {joined ? 'In class' : joining ? 'Joining…' : 'Join class'}
+      </Button>
+    )
+  }
 
   return (
     <div className="flex flex-wrap gap-2">

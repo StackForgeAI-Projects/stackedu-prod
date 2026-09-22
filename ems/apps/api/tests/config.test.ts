@@ -13,6 +13,7 @@ import {
 } from '../src/db/naming'
 
 const BASE = {
+  NODE_ENV: 'development',
   PLATFORM_DATABASE_URL: 'postgres://user:pass@localhost:5433/stackedu_platform',
 }
 
@@ -26,7 +27,13 @@ describe('environment validation', () => {
   })
 
   it('fails immediately when the database URL is missing', () => {
-    expect(() => loadEnv({} as NodeJS.ProcessEnv)).toThrow(/PLATFORM_DATABASE_URL/)
+    expect(() => loadEnv({ NODE_ENV: 'development' } as NodeJS.ProcessEnv)).toThrow(/PLATFORM_DATABASE_URL/)
+  })
+
+  it('fails when NODE_ENV is missing or invalid', () => {
+    const { NODE_ENV: _nodeEnv, ...rest } = BASE
+    expect(() => loadEnv(rest as NodeJS.ProcessEnv)).toThrow(/NODE_ENV/)
+    expect(() => loadEnv({ ...BASE, NODE_ENV: 'staging' } as NodeJS.ProcessEnv)).toThrow(/NODE_ENV/)
   })
 
   it('parses a comma separated origin list', () => {
@@ -89,12 +96,15 @@ describe('cross-origin allowlist', () => {
     expect(isOriginAllowed('*', env)).toBe(false)
   })
 
-  it('adds localhost outside production but never within it', () => {
+  it('adds localhost only in development', () => {
     const dev = expandOriginsForEnvironment(env)
     expect(dev.ALLOWED_ORIGINS).toContain('http://localhost:3000')
 
     const prod = expandOriginsForEnvironment({ ...env, NODE_ENV: 'production' })
     expect(prod.ALLOWED_ORIGINS).not.toContain('http://localhost:3000')
+
+    const testEnv = expandOriginsForEnvironment({ ...env, NODE_ENV: 'test' })
+    expect(testEnv.ALLOWED_ORIGINS).not.toContain('http://localhost:3001')
   })
 })
 

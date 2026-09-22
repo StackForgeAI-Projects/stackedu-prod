@@ -5,6 +5,8 @@ import { formatAppDateDdMmYyyy } from '@stackedu/shared'
 import { DataTable } from '@/components/DataTable'
 import { LibrarianShell } from '@/components/LibrarianShell'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -81,7 +83,7 @@ function RequestsPage() {
             rowKey={(row) => row.id}
             searchPlaceholder="Search title or requester…"
             searchFilter={(row, query) => `${row.title} ${row.requesterName}`.toLowerCase().includes(query)}
-            filters={[{ id: 'status', label: 'status', getValue: (row) => row.status }]}
+            filters={[{ id: 'status', label: 'status', allLabel: 'All statuses', getValue: (row) => row.status }]}
             empty="No requests yet."
             columns={[
               {
@@ -117,6 +119,7 @@ function RequestsPage() {
           <div className="px-6 pt-6 pb-4 pr-12" style={{ borderBottom: '1px solid var(--border)' }}>
             <SheetHeader className="text-left">
               <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>Fulfil request</SheetTitle>
+              <FormInfoBox lines={formInfo.fulfilRequest} />
             </SheetHeader>
           </div>
           <div className="flex flex-col gap-4 px-6 py-5">
@@ -152,6 +155,7 @@ function RequestsPage() {
           <div className="px-6 pt-6 pb-4 pr-12" style={{ borderBottom: '1px solid var(--border)' }}>
             <SheetHeader className="text-left">
               <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>Decline request</SheetTitle>
+              <FormInfoBox lines={formInfo.declineRequest} />
             </SheetHeader>
           </div>
           <div className="flex flex-col gap-4 px-6 py-5">

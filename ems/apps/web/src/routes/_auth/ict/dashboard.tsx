@@ -9,7 +9,7 @@ import { StatTile } from '@/components/StatTile'
 import { getIctDashboard, ictDashboardQueryKey } from '@/lib/api/ict'
 import { apiErrorMessage } from '@/lib/api/client'
 import { roleLabel } from '@/lib/auth/portals'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateLong, formatDateTime } from '@/lib/utils'
 
 export const Route = createFileRoute('/_auth/ict/dashboard')({
   component: IctDashboardPage,
@@ -24,7 +24,7 @@ function IctDashboardPage() {
   const hours = today.getHours()
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening'
   const [entryId, setEntryId] = useState<string | null>(null)
-  const selectedAudit = data?.recentAudit.find((row) => row.id === entryId)
+  const selectedAudit = data?.recentAudit?.find((row) => row.id === entryId)
 
   return (
     <IctShell
@@ -41,7 +41,7 @@ function IctDashboardPage() {
             {greeting}, {data.profile.firstName}
           </h1>
           <p className="t-body mb-6" style={{ color: 'var(--muted-foreground)' }}>
-            {data.profile.institutionName}
+            {formatDateLong(today)} · {data.profile.institutionName}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">

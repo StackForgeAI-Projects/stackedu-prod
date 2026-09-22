@@ -10,6 +10,9 @@ import {
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { AcademicShell } from '@/components/AcademicShell'
 import { DataTable } from '@/components/DataTable'
@@ -97,6 +100,7 @@ function CoursesCataloguePage() {
   const [importFileName, setImportFileName] = useState<string | null>(null)
   const [parsedImport, setParsedImport] = useState<CreateAcademicCourseRequest[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -201,6 +205,10 @@ function CoursesCataloguePage() {
 
   const handleImportFile = async (file: File | null) => {
     if (!file) return
+    takeFile(file, (next) => { void parseImportFile(next) })
+  }
+
+  const parseImportFile = async (file: File) => {
     try {
       const rows = await parseCourseSpreadsheet(file, '')
       if (rows.length === 0) {
@@ -449,6 +457,7 @@ function CoursesCataloguePage() {
             <SheetTitle style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
               {editing ? `Edit Course — ${editing.code}` : 'Add Course'}
             </SheetTitle>
+            <FormInfoBox lines={editing ? formInfo.editCourse : formInfo.addCourse} />
           </SheetHeader>
           <div className="px-8 py-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -547,7 +556,7 @@ function CoursesCataloguePage() {
                   style={{ border: '1px dashed var(--border)', backgroundColor: 'var(--muted)' }}
                 >
                   <p className="t-caption mb-3" style={{ color: 'var(--muted-foreground)' }}>
-                    Upload a .csv or .xlsx file with columns: Code, Name, Department, Credits, Type (optional), Description, Prerequisites. Each row needs its own department. A new department name is created if it does not exist.
+                    Upload a .csv or .xlsx file of 14 MB or less with columns: Code, Name, Department, Credits, Type (optional), Description, Prerequisites. Each row needs its own department. A new department name is created if it does not exist.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
@@ -555,7 +564,11 @@ function CoursesCataloguePage() {
                       type="file"
                       accept=".csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       className="hidden"
-                      onChange={(event) => void handleImportFile(event.target.files?.[0] ?? null)}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null
+                        event.target.value = ''
+                        void handleImportFile(file)
+                      }}
                     />
                     <button
                       type="button"
@@ -711,6 +724,14 @@ function CoursesCataloguePage() {
           </div>
         </SheetContent>
       </Sheet>
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          setOversizeFile(null)
+          void parseImportFile(next)
+        }}
+        onClose={() => setOversizeFile(null)}
+      />
     </AcademicShell>
   )
 }

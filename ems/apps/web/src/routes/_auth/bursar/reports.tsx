@@ -18,7 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { brandColorValue } from '@/lib/brand-theme'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateLong } from '@/lib/utils'
 import { bursarReportsQueryKey, getBursarReports } from '@/lib/api/bursar'
 import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 
@@ -230,7 +230,7 @@ function ReportsPage() {
                     {data.label || reportTitle}
                   </h2>
                   <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-                    Generated on {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    Generated on {formatDateLong(new Date())}
                   </p>
                 </div>
                 <div className="flex gap-2">
