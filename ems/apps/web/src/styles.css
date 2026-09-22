@@ -760,6 +760,14 @@ h6 {
   height: 48px;
 }
 
+/* Overlay labels on the live video must stay ink-on-card even inside LiveKit. */
+.classroom-video-label-btn {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  -webkit-text-fill-color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
 .course-code-pill__text {
   font-family: var(--font-mono);
   font-size: 10px;

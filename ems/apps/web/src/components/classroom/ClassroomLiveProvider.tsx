@@ -401,7 +401,7 @@ const ClassroomVideoLabelButton = forwardRef<HTMLButtonElement, ButtonHTMLAttrib
         size="sm"
         variant="outline"
         {...props}
-        className={cn('shrink-0 gap-1.5 hover:text-(--foreground)', className)}
+        className={cn('classroom-video-label-btn shrink-0 gap-1.5 hover:text-(--foreground)', className)}
         style={{
           ...style,
           backgroundColor: 'var(--card)',
