@@ -20,7 +20,6 @@ import { createPortal } from 'react-dom'
 import type { ClassroomJoin, ClassroomSessionDetail } from '@stackedu/shared'
 import { cn } from '@/lib/utils'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
-import { Button } from '@/components/ui/button'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
   endLecturerClassroomSession,
@@ -307,7 +306,7 @@ function ClassroomMediaChrome({
           Recording
         </div>
       ) : null}
-      <div className="absolute top-3 right-3 z-20 flex flex-wrap items-center justify-end gap-2">
+      <div className="classroom-video-chrome absolute top-3 right-3 z-20 flex flex-wrap items-center justify-end gap-2">
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
             trigger={<ClassroomVideoLabelButton>Mute all</ClassroomVideoLabelButton>}
@@ -354,7 +353,7 @@ function ClassroomMediaChrome({
         boxShadow: 'var(--shadow-md)',
       }}
     >
-      <div className="px-3 py-2 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="classroom-video-chrome px-3 py-2 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--border)' }}>
         <p className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>
           {session?.title ?? 'Live class'}
         </p>
@@ -370,7 +369,7 @@ function ClassroomMediaChrome({
         </ClassroomVideoLabelButton>
       </div>
       <div style={{ height: 200 }}>{media}</div>
-      <div className="flex flex-wrap gap-2 px-3 py-2">
+      <div className="classroom-video-chrome flex flex-wrap gap-2 px-3 py-2">
         <ClassroomVideoLabelButton onClick={onEnded}>Leave</ClassroomVideoLabelButton>
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
@@ -393,25 +392,23 @@ function ClassroomMediaChrome({
 }
 
 const ClassroomVideoLabelButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(
-  function ClassroomVideoLabelButton({ children, className, style, ...props }, ref) {
+  function ClassroomVideoLabelButton({ children, className, style, type, ...props }, ref) {
     return (
-      <Button
+      <button
         ref={ref}
-        type="button"
-        size="sm"
-        variant="outline"
+        type={type ?? 'button'}
         {...props}
-        className={cn('classroom-video-label-btn shrink-0 gap-1.5 hover:text-(--foreground)', className)}
+        className={cn('classroom-video-label-btn', className)}
         style={{
           ...style,
-          backgroundColor: 'var(--card)',
-          color: 'var(--foreground)',
-          borderColor: 'var(--border)',
-          WebkitTextFillColor: 'var(--foreground)',
+          backgroundColor: 'var(--brand)',
+          color: 'var(--brand-ink)',
+          WebkitTextFillColor: 'var(--brand-ink)',
+          borderColor: 'var(--brand-ink)',
         }}
       >
         {children}
-      </Button>
+      </button>
     )
   },
 )
