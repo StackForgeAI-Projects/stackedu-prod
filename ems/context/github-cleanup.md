@@ -21,12 +21,15 @@ So the cleanup robot does not push to `main`. If a merge accidentally copies doc
 
 ## Daily flow
 
-1. Work and push on `development`.
+1. Work and push on `development`. That push does not update the live website.
 2. Open a pull request: `development` → `main`.
-3. Wait for CodeRabbit’s review check to finish (green).
-4. **You** press **Merge pull request**. GitHub must not merge by itself. Auto-merge is off. Enable auto-merge is not used.
-5. Use a **merge commit** (not squash, not rebase). Do not delete `development`.
-6. If docs/context/design landed on `main`, the cleanup robot opens a pull request. You merge that one too. It does not merge itself.
+3. Wait until the **CodeRabbit** check is green. GitHub blocks **Merge pull request** while that check is still running or has failed.
+4. **You** press **Merge pull request**. GitHub must not merge by itself. Auto-merge is off.
+5. That merge is the only thing that updates `main`. Vercel deploys the live site from `main` only, after the merge.
+6. Use a **merge commit** (not squash, not rebase). Do not delete `development`.
+7. If docs/context/design landed on `main`, the cleanup robot opens a pull request. You merge that one too, after its CodeRabbit check is green. It does not merge itself.
+
+A green “deployed” line on a pull request is not the live site. Live Vercel deploys are the rows marked Production on `main`.
 
 ## Work list — 22 Sep 2026
 
@@ -48,6 +51,7 @@ Mark each item DONE when it is finished. Do not reopen a DONE item.
 14. DONE — Turn off GitHub auto-merge so `main` waits for your Merge click. `allow_auto_merge` is false. Pull request 10 has no auto-merge request.
 15. DONE — E-library lifecycle stays the plain-English guide in `ems/docs/E-Library-Lifecycle.md`.
 16. DONE — Relevant API tests passed: config, live classroom, course modules, role notifications, and provisioning. The web production build passed.
+17. DONE — Live Vercel deploy waits for a manual merge to `main`. CodeRabbit is a required check, so Merge stays blocked until that review finishes. Pull-request builds are ignored; only a production deploy of `main` is built.
 
 Track new files under the development-only paths with `git add -f`.
 
@@ -61,6 +65,8 @@ Track new files under the development-only paths with `git add -f`.
 - Only merge commits (squash and rebase are off, so `development` is not rewritten or deleted)
 - Auto-delete of the head branch is off (so merging does not delete `development`)
 - Auto-merge is off. A green review does not merge the pull request. You press **Merge pull request**.
+- The CodeRabbit check is required. Merge stays blocked until that check is green.
+- Vercel builds the live site only when `main` is updated. A pull request does not deploy the live site.
 
 ## What stays off `main`
 

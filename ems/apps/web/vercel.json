@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then exit 1; else exit 0; fi",
   "buildCommand": "cd ../.. && bun run --filter '@stackedu/web' build",
   "outputDirectory": "dist",
   "installCommand": "cd ../.. && bun install --frozen-lockfile",
