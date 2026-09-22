@@ -30,6 +30,7 @@ import {
 } from '../src/db/institution/schema/teaching'
 import {
   createLecturerMaterial,
+  createLecturerModule,
   deleteLecturerAttendanceSession,
   deleteLecturerMaterial,
   getLecturerCourse,
@@ -441,8 +442,14 @@ describe('institution provisioning', () => {
     })
 
     const actor = { id: lecturer.id, email: lecturer.email, role: lecturer.role as 'Lecturer' }
+    const module = await createLecturerModule(result.institutionId, actor, {
+      offeringId: offering!.id,
+      title: 'Week 1',
+      publish: true,
+    })
     const material = await createLecturerMaterial(result.institutionId, actor, {
       offeringId: offering!.id,
+      moduleId: module.id,
       title: 'Week 1 lecture notes',
       moduleName: 'Week 1',
       description: 'Introduction to nursing practice',
@@ -468,6 +475,7 @@ describe('institution provisioning', () => {
 
     const materialWithFile = await createLecturerMaterial(result.institutionId, actor, {
       offeringId: offering!.id,
+      moduleId: module.id,
       title: 'Week 1 slides',
       moduleName: 'Week 1',
       fileKey: upload.fileKey,

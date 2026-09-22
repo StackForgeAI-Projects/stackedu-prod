@@ -30,6 +30,7 @@ import {
   LIBRARY_RESOURCE_MAX_BYTES,
   LIBRARY_RESOURCE_MIME_TYPES,
   titleAndFirstName,
+  uploadLimitMessage,
 } from '@stackedu/shared'
 import { completeLibraryDescription } from '../lib/ai-complete'
 import { writeAudit } from '../lib/audit'
@@ -326,7 +327,7 @@ export async function reserveLibraryUpload(
     throw badRequest('Upload a PDF, Word, EPUB, office, text or video file.')
   }
   if (input.fileSizeBytes > LIBRARY_RESOURCE_MAX_BYTES) {
-    throw badRequest('The file is too large.')
+    throw badRequest(uploadLimitMessage())
   }
   const fileKey = buildLibraryFileKey({ institutionId, resourceId, fileName: input.fileName })
   const target = await createUploadTarget({

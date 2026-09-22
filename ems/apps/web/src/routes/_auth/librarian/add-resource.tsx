@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { LibrarianShell } from '@/components/LibrarianShell'
 import { LibraryResourceForm } from '@/components/library/LibraryResourceForm'
 import {
@@ -27,6 +29,7 @@ function AddResourcePage() {
     >
       <div className="animate-fade-up px-4 py-6 sm:px-8" style={{ maxWidth: 720, margin: '0 auto' }}>
         <h1 className="t-h1 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Add resource</h1>
+        <FormInfoBox lines={formInfo.addLibraryResource} />
         <LibraryResourceForm
           accessOptions={accessQuery.data}
           onSaved={async () => {

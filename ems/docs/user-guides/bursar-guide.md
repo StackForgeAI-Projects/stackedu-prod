@@ -20,6 +20,7 @@ This guide walks you through fees and payments in StackEDU: the ledger, fee stru
 7. [Fee Messages](#fee-messages)
 8. [Reports](#reports)
 9. [Reconciliation](#reconciliation)
+10. [Notifications](#notifications)
 
 ---
 
@@ -29,7 +30,7 @@ This guide walks you through fees and payments in StackEDU: the ledger, fee stru
 2. Enter your email and password.
 3. Click **Sign in**.
 
-The sidebar shows: Dashboard, Payment Ledger, Fee Structure, Student Accounts, Receipts, Fee Messages, Reports, Reconciliation.
+The sidebar shows: Dashboard, Payment Ledger, Fee Structure, Student Accounts, Receipts, Fee Messages, Reports, Reconciliation, Notifications.
 
 ---
 
@@ -108,6 +109,12 @@ You see total collected, outstanding, collection rate, and transaction count. Th
 ## Reconciliation
 
 Open **Reconciliation**. Work through gateway items that are pending or mismatched. If the list is clear, there is nothing to match. Use **Sync gateway** when you are matching real payments.
+
+---
+
+## Notifications
+
+Open the bell in the header, or open **Notifications** in the sidebar. Click an unread item in the dropdown or on the page. It marks as read at once and the red number on the bell drops.
 
 ---
 

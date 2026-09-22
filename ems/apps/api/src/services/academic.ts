@@ -28,7 +28,7 @@ import type {
   UpdateAcademicProgrammeRequest,
   UserRole,
 } from '@stackedu/shared'
-import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, timetableWeekdayLabel } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, formatAppDateDdMmYyyy, COURSE_DELETE_HAS_ENROLLMENTS, isSemesterCalendarCategory, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, RELEASED_RESULT_BATCH_STATUSES, timetableWeekdayLabel } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions } from '../db/platform/schema'
 import { applications } from '../db/institution/schema/admissions'
@@ -440,7 +440,7 @@ export async function getAcademicStudent(
     .innerJoin(resultBatches, eq(resultBatches.id, results.resultBatchId))
     .innerJoin(courseOfferings, eq(courseOfferings.id, results.courseOfferingId))
     .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
-    .where(and(eq(results.studentId, row.id), eq(resultBatches.status, 'Published')))
+    .where(and(eq(results.studentId, row.id), inArray(resultBatches.status, [...RELEASED_RESULT_BATCH_STATUSES])))
 
   const historyRows = await db
     .select({
@@ -986,7 +986,11 @@ export async function listAcademicResultBatches(
   const dbStatus = dbBatchStatus(filters.status)
   const conditions = [
     ...(filters.semesterId ? [eq(resultBatches.semesterId, filters.semesterId)] : []),
-    ...(dbStatus ? [eq(resultBatches.status, dbStatus as 'Draft' | 'PendingReview' | 'Approved' | 'Published' | 'Rejected')] : []),
+    ...(filters.status === 'Published'
+      ? [inArray(resultBatches.status, [...RELEASED_RESULT_BATCH_STATUSES])]
+      : dbStatus
+        ? [eq(resultBatches.status, dbStatus as 'Draft' | 'PendingReview' | 'Approved' | 'Published' | 'Rejected')]
+        : []),
   ]
 
   const rows = await db
@@ -1093,7 +1097,7 @@ export async function approveAcademicResultBatch(
   await db
     .update(resultBatches)
     .set({
-      status: 'Approved',
+      status: 'Published',
       reviewedBy: actor.id,
       reviewedAt: now,
       rejectionReason: null,
@@ -1378,7 +1382,7 @@ export async function getAcademicReports(
       })
       .from(results)
       .innerJoin(resultBatches, eq(resultBatches.id, results.resultBatchId))
-      .where(eq(resultBatches.status, 'Published'))
+      .where(inArray(resultBatches.status, [...RELEASED_RESULT_BATCH_STATUSES]))
       .groupBy(results.grade)
 
     const total = gradeRows.reduce((sum, row) => sum + row.count, 0)

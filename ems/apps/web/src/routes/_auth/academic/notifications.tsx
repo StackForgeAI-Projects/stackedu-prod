@@ -13,10 +13,14 @@ import { AcademicShell } from '@/components/AcademicShell'
 import { PagedList } from '@/components/ListPagination'
 import {
   academicNotificationsQueryKey,
-  academicProfileQueryKey,
   listAcademicNotifications,
   markAcademicNotificationRead,
 } from '@/lib/api/academic'
+import {
+  applyAllNotificationsReadLocally,
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 import { apiErrorMessage } from '@/lib/api/client'
 
 export const Route = createFileRoute('/_auth/academic/notifications')({
@@ -75,9 +79,11 @@ function AcademicNotificationsPage() {
 
   const markRead = useMutation({
     mutationFn: markAcademicNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: academicNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: academicProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 
@@ -104,9 +110,12 @@ function AcademicNotificationsPage() {
 
   const markAllRead = async () => {
     const unread = notifs.filter((n) => !n.read)
-    await Promise.all(unread.map((n) => markAcademicNotificationRead(n.id)))
-    await queryClient.invalidateQueries({ queryKey: academicNotificationsQueryKey })
-    await queryClient.invalidateQueries({ queryKey: academicProfileQueryKey })
+    applyAllNotificationsReadLocally(queryClient)
+    try {
+      await Promise.all(unread.map((n) => markAcademicNotificationRead(n.id)))
+    } catch {
+      await invalidateNotificationReadCaches(queryClient)
+    }
   }
 
   return (

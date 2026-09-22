@@ -7,6 +7,8 @@ import { TIMETABLE_WEEKDAYS, findTimetableClashes, timetableWeekdayLabel } from 
 import { LecturerShell } from '@/components/LecturerShell'
 import { CourseCodePill } from '@/components/CourseCodePill'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { PagedList } from '@/components/ListPagination'
 import { TimetableClashBanner } from '@/components/timetable/TimetableClashBanner'
 import { Button } from '@/components/ui/button'
@@ -303,6 +305,7 @@ function LecturerTimetablePage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle>{editingSlot ? 'Edit timetable slot' : 'Add timetable slot'}</DialogTitle>
+            <FormInfoBox lines={editingSlot ? formInfo.editTimetableSlot : formInfo.addTimetableSlot} />
           </DialogHeader>
           <div className="flex flex-col gap-4 pt-2">
             <div>

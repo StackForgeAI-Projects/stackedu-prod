@@ -5,9 +5,12 @@ import { PagedList } from '@/components/ListPagination'
 import {
   getIctNotifications,
   ictNotificationsQueryKey,
-  ictProfileQueryKey,
   markIctNotificationRead,
 } from '@/lib/api/ict'
+import {
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 import { apiErrorMessage } from '@/lib/api/client'
 
 export const Route = createFileRoute('/_auth/ict/notifications')({
@@ -22,9 +25,14 @@ function NotificationsPage() {
   })
   const mutation = useMutation({
     mutationFn: markIctNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ictNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: ictProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onSuccess: (notifications) => {
+      queryClient.setQueryData(ictNotificationsQueryKey, notifications)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 

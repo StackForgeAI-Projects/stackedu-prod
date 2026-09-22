@@ -158,9 +158,9 @@ The librarian sees the request.
 
 ## Notifications
 
-Open **Notifications**. Filters include All, Unread, Applications, Results, Registration, At-Risk.
+Open the bell in the header, or open **Notifications** in the sidebar. Filters include All, Unread, Applications, Results, Registration, At-Risk.
 
-Dates use **DD-MM-YYYY**. Click a row to open it. Opening an unread item marks it read. The bell count drops.
+Dates use **DD-MM-YYYY**. Click a row to open it. Opening an unread item in the dropdown or on the page marks it read at once. The red number on the bell drops.
 
 ---
 

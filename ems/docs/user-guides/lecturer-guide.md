@@ -58,6 +58,8 @@ Open **My Courses**. The left list has your assigned courses. Click a course nam
 
 Use the tabs for students, attendance, and course content. Use **Add material**, **Course Management**, or **Create assignment** when you need them.
 
+**Add material** needs at least one module on that course. If there is none, hover **Add material** (or the info icon) and use the link to open **Add module** in Course Management. After you create a module, you can add a page, file, or link and attach it to that module. Files must be 14 MB or less.
+
 ---
 
 ## Course Management
@@ -65,6 +67,16 @@ Use the tabs for students, attendance, and course content. Use **Add material**,
 Pick a course in the list at the top.
 
 You should see modules, pages, announcements, live classes, and discussions for that course.
+
+### Add a module
+
+A module is a named part of the course. It could be Week 1, Week 2, and so on. It is a simple way to break learning into smaller bits for your students. You add pages, files, and other course content inside it. Students open that content by module. If you set a prerequisite, they cannot open this module until they finish the earlier one.
+
+1. Click **Add module**.
+2. Enter a title. A summary and prerequisite are optional.
+3. Confirm **Add this module?**
+
+You need at least one module before you can add course material. The info box on the form explains this in the same words.
 
 ### Post an announcement
 
@@ -82,6 +94,19 @@ The announcement appears in the list. Students see it on that course page.
 ## Classroom
 
 Open **Classroom**. Pick a course and schedule a class, or open an existing session. Live video needs classroom keys to be set by ICT.
+
+**Automatically record live classes** sits at the top. Confirm to turn it on or off. When it is on, starting a class also starts a recording if storage is set.
+
+On a **Live** class:
+
+1. **Join as host** (or **Start class** joins you).
+2. A red **Recording** mark shows on the video while a recording is running.
+3. Confirm **Mute all** to silence every student microphone. You stay unmuted.
+4. **Full screen** expands the video only.
+5. Opening another sidebar page keeps the call in a small picture-in-picture window. **Back to class** returns. **Leave** drops you from the room. **End class** closes it for everyone.
+6. Draw on the whiteboard. Students see the same marks while the class is live.
+
+After you confirm **End class**, nobody can draw on the board. Students get a notice to download a ready recording before the keep-window ICT set (default 72 hours).
 
 ---
 
@@ -148,7 +173,7 @@ Open **Analytics**. Pick a course. Tiles show attendance, materials opened, aver
 
 ## Notifications
 
-Open **Notifications**. Dates on the list are **DD-MM-YYYY**. Click **Open →** on a row.
+Open the bell in the header, or open **Notifications** in the sidebar. Dates on the list are **DD-MM-YYYY**. Click an unread item in the dropdown or on the page. It marks as read at once and the red number on the bell drops. **View all notifications** opens the full list.
 
 ---
 

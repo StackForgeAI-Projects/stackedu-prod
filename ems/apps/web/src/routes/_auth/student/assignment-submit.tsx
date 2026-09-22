@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { StudentShell } from '@/components/StudentShell'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -16,7 +18,7 @@ import {
   submitStudentAssessment,
 } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateShort, formatDateTime } from '@/lib/utils'
 
 export const Route = createFileRoute('/_auth/student/assignment-submit')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -85,6 +87,7 @@ function AssignmentSubmitPage() {
           ← My courses
         </Link>
         <h1 className="t-h1 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Submit assignment</h1>
+        <FormInfoBox lines={formInfo.submitAssignment} />
         <p className="t-body mb-6" style={{ color: 'var(--muted-foreground)' }}>
           Written work is saved as you submitted it. Quiz answers are marked against the question version you sat.
         </p>
@@ -108,7 +111,7 @@ function AssignmentSubmitPage() {
                 <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{item.title}</p>
                 <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
                   {item.courseCode} · {item.courseName}
-                  {item.dueAt ? ` · due ${item.dueAt.slice(0, 10)}` : ''}
+                  {item.dueAt ? ` · due ${formatDateShort(item.dueAt)}` : ''}
                   {item.questionCount > 0 ? ` · ${item.questionCount} questions` : ''}
                   {item.submitted ? ' · submitted' : ''}
                 </p>

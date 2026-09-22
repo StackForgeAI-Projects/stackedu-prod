@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { CreateLecturerDiscussionRequest, DiscussionThreadDetail, DiscussionThreadSummary } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { PagedList } from '@/components/ListPagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -142,9 +144,7 @@ function DiscussionForm({
     <div className="flex flex-col h-full overflow-y-auto">
       <div style={{ padding: '20px 56px 18px 24px', borderBottom: '1px solid var(--border)' }}>
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600 }}>Start discussion</h3>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          Students reply in a thread. If this is graded, a coursework column is created for the same title.
-        </p>
+        <FormInfoBox lines={formInfo.startDiscussion} />
       </div>
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
         <div>

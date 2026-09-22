@@ -3,33 +3,58 @@ import '@excalidraw/excalidraw/index.css'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { useEffect, useRef, useState } from 'react'
 import type { ClassroomJoin } from '@stackedu/shared'
+import { useClassroomWhiteboardSync, type WhiteboardScene } from '@/components/classroom/ClassroomLiveProvider'
 
-type Scene = { elements?: readonly unknown[]; appState?: Record<string, unknown> }
+type Scene = WhiteboardScene
+
+function stampOf(scene: Scene): number {
+  return typeof scene.t === 'number' ? scene.t : 0
+}
 
 export function ClassroomWhiteboard({
   sessionId,
   canEdit,
+  isLive,
   collab,
   loadScene,
   saveScene,
 }: {
   sessionId: string
   canEdit: boolean
+  isLive: boolean
   collab: ClassroomJoin['collab']
   loadScene: (id: string) => Promise<unknown>
   saveScene: (id: string, scene: unknown) => Promise<void>
 }) {
+  const sync = useClassroomWhiteboardSync()
   const [initial, setInitial] = useState<Scene | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const providerRef = useRef<HocuspocusProvider | null>(null)
   const applyingRemote = useRef(false)
+  const lastStamp = useRef(0)
   const apiRef = useRef<{ updateScene: (scene: Scene) => void } | null>(null)
+
+  const applyRemote = (scene: Scene) => {
+    const stamp = stampOf(scene)
+    if (stamp && stamp <= lastStamp.current) return
+    lastStamp.current = stamp || Date.now()
+    if (!apiRef.current) return
+    applyingRemote.current = true
+    try {
+      apiRef.current.updateScene({ elements: scene.elements ?? [] })
+    } finally {
+      applyingRemote.current = false
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
     void loadScene(sessionId)
       .then((scene) => {
-        if (!cancelled) setInitial((scene as Scene) ?? { elements: [] })
+        if (cancelled) return
+        const next = (scene as Scene) ?? { elements: [] }
+        lastStamp.current = stampOf(next)
+        setInitial(next)
       })
       .catch(() => {
         if (!cancelled) setInitial({ elements: [] })
@@ -38,6 +63,20 @@ export function ClassroomWhiteboard({
       cancelled = true
     }
   }, [sessionId, loadScene])
+
+  useEffect(() => {
+    return sync.subscribe((scene) => applyRemote(scene))
+  }, [sync])
+
+  useEffect(() => {
+    if (!isLive) return
+    const tick = window.setInterval(() => {
+      void loadScene(sessionId)
+        .then((scene) => applyRemote((scene as Scene) ?? {}))
+        .catch(() => undefined)
+    }, 2000)
+    return () => window.clearInterval(tick)
+  }, [isLive, sessionId, loadScene])
 
   useEffect(() => {
     if (!collab) return
@@ -50,15 +89,11 @@ export function ClassroomWhiteboard({
     const map = provider.document.getMap<string>('scene')
     const onUpdate = () => {
       const raw = map.get('payload')
-      if (!raw || !apiRef.current) return
+      if (!raw) return
       try {
-        const parsed = JSON.parse(raw) as Scene
-        applyingRemote.current = true
-        apiRef.current.updateScene({ elements: parsed.elements ?? [] })
+        applyRemote(JSON.parse(raw) as Scene)
       } catch {
         // Ignore a partial live payload.
-      } finally {
-        applyingRemote.current = false
       }
     }
     map.observe(onUpdate)
@@ -70,13 +105,15 @@ export function ClassroomWhiteboard({
   }, [collab])
 
   const persist = (scene: Scene) => {
+    if (!canEdit || applyingRemote.current) return
+    const payload = { ...scene, t: Date.now() }
+    lastStamp.current = payload.t
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      void saveScene(sessionId, scene).catch(() => undefined)
+      void saveScene(sessionId, payload).catch(() => undefined)
     }, 800)
-    if (!applyingRemote.current) {
-      providerRef.current?.document.getMap<string>('scene').set('payload', JSON.stringify(scene))
-    }
+    sync.publish(payload)
+    providerRef.current?.document.getMap<string>('scene').set('payload', JSON.stringify(payload))
   }
 
   if (!initial) {
@@ -84,8 +121,9 @@ export function ClassroomWhiteboard({
   }
 
   return (
-    <div className="w-full overflow-hidden" style={{ height: 420, border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+    <div className="w-full max-w-full min-w-0 overflow-hidden" style={{ height: 420, border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
       <Excalidraw
+        key={`${sessionId}-${canEdit ? 'edit' : 'view'}`}
         excalidrawAPI={(api) => {
           apiRef.current = {
             updateScene: (scene) => {

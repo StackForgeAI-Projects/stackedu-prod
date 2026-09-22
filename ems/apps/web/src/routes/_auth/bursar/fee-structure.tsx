@@ -7,6 +7,8 @@ import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { BursarShell } from '@/components/BursarShell'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { DataTable } from '@/components/DataTable'
@@ -507,10 +509,11 @@ function FeeStructurePage() {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="overflow-y-auto sheet-lg" style={{ padding: 0 }}>
           <div style={{ padding: '28px 28px 40px' }}>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6">
               <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
                 {editItem ? 'Edit Fee Item' : 'Add Fee Item'}
               </h2>
+              <FormInfoBox lines={editItem ? formInfo.editFeeItem : formInfo.addFeeItem} />
             </div>
 
             <div className="flex flex-col gap-5">

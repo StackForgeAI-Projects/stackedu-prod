@@ -134,7 +134,9 @@ function CourseDetailPage() {
                 <div key={item.id} className="flex items-start justify-between gap-3 py-2" style={{ borderTop: '1px solid var(--border)' }}>
                   <div>
                     <p className="text-sm font-medium">{item.title}</p>
-                    <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>{item.type}{item.dueAt ? ` · due ${item.dueAt.slice(0, 10)}` : ''}</p>
+                    <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
+                      {item.type}{item.dueAt ? ` · due ${formatDateShort(item.dueAt)}` : ''}
+                    </p>
                   </div>
                   {item.acceptsSubmissions ? (
                     <Link to="/student/assignment-submit" search={{ id: item.id }} className="t-caption flex-shrink-0" style={{ color: 'var(--success)' }}>

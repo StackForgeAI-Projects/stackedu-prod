@@ -474,9 +474,26 @@ describe('course modules and announcements', () => {
       ).rejects.toThrow(/not assigned/i)
     })
 
+    it('refuses material that is not attached to a module', async () => {
+      await expect(
+        createLecturerMaterial(institutionId, lecturerActor, {
+          offeringId,
+          title: 'No module',
+          bodyText: 'Should not save.',
+          publish: true,
+        }),
+      ).rejects.toThrow(/module/i)
+    })
+
     it('stops a student who is not enrolled from recording a view', async () => {
+      const module = await createLecturerModule(institutionId, lecturerActor, {
+        offeringId,
+        title: 'Restricted reading',
+        publish: true,
+      })
       const material = await createLecturerMaterial(institutionId, lecturerActor, {
         offeringId,
+        moduleId: module.id,
         title: 'Enrolled students only',
         bodyText: 'Restricted.',
         publish: true,

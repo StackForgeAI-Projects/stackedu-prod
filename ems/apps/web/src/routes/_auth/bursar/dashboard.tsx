@@ -13,7 +13,7 @@ import { BursarShell } from '@/components/BursarShell'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { DataTable } from '@/components/DataTable'
 import { StatTile } from '@/components/StatTile'
-import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { formatCurrency, formatDateLong, formatDateShort } from '@/lib/utils'
 import { getBursarDashboard, bursarDashboardQueryKey } from '@/lib/api/bursar'
 import { BURSAR_GUIDES } from '@/lib/bursar-guides'
 import { accountStatusColors, paymentMethodColors, paymentMethodLabel, paymentStatusLabel } from '@/lib/bursar-display'
@@ -31,7 +31,7 @@ function BursarDashboardPage() {
   const today = new Date()
   const hours = today.getHours()
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening'
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = formatDateLong(today)
 
   return (
     <BursarShell pageTitle="Dashboard" guide={BURSAR_GUIDES.dashboard}>

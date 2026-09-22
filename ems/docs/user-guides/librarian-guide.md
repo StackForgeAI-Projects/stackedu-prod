@@ -86,7 +86,7 @@ Open **Analytics**. You see resources, downloads, views, and pending requests. *
 
 ## Notifications
 
-Open **Notifications**. New library requests appear here with dates as **DD-MM-YYYY**. The bell may show unread until you open them.
+Open the bell in the header, or open **Notifications** in the sidebar. New library requests appear here with dates as **DD-MM-YYYY**. Click an unread item in the dropdown or on the page. It marks as read at once and the red number on the bell drops.
 
 ---
 

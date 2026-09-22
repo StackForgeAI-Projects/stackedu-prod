@@ -17,6 +17,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { BrandMark } from '@/components/BrandMark'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { APPLY_FEATURES, AuthHero } from '@/components/AuthHero'
 import { getProgrammes, programmesQueryKey, registerApplicant } from '@/lib/api/admissions'
 import { apiErrorMessage } from '@/lib/api/client'
@@ -121,6 +123,7 @@ function ApplyCreateAccountPage() {
                 >
                   Create your applicant account
                 </h2>
+                <FormInfoBox lines={formInfo.createApplicantAccount} />
                 <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
                   Already applied?{' '}
                   <Link

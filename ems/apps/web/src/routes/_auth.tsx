@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { ClassroomLiveProvider } from '@/components/classroom/ClassroomLiveProvider'
 import { loadSession } from '@/lib/auth/guards'
 import { dashboardFor, roleForPath } from '@/lib/auth/portals'
 
@@ -25,5 +26,9 @@ export const Route = createFileRoute('/_auth')({
 })
 
 function AuthLayout() {
-  return <Outlet />
+  return (
+    <ClassroomLiveProvider>
+      <Outlet />
+    </ClassroomLiveProvider>
+  )
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { emsAppRedirectUrl, isEmsAppPath } from "@/lib/ems-app";
 import {
   AFRICA_HOSTS,
   RW_HOSTS,
@@ -7,6 +8,10 @@ import {
 } from "@/lib/market";
 
 export function middleware(request: NextRequest) {
+  if (isEmsAppPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(emsAppRedirectUrl(request.nextUrl), 307);
+  }
+
   const hostname = request.nextUrl.hostname.toLowerCase();
 
   if (!isKnownMarketHost(hostname)) {

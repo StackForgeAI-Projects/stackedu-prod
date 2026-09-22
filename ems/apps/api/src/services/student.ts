@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { randomInt } from 'node:crypto'
 import type {
   CreateDiscussionPostRequest,
@@ -29,6 +29,7 @@ import {
   displayFullName,
   formatDisplayName,
   isTimetableReminderOffset,
+  RELEASED_RESULT_BATCH_STATUSES,
 } from '@stackedu/shared'
 import { env } from '../config/env'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
@@ -107,6 +108,15 @@ function gradePointNumber(value: string | number | null): number | null {
   if (value === null || value === undefined) return null
   const parsed = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function publishedGpaFromRows(rows: { credits: number; gradePoint: string | number | null }[]): number | null {
+  const earned = rows
+    .map((row) => ({ credits: row.credits, gradePoint: gradePointNumber(row.gradePoint) }))
+    .filter((row) => row.gradePoint !== null)
+  const credits = earned.reduce((sum, row) => sum + row.credits, 0)
+  const points = earned.reduce((sum, row) => sum + (row.gradePoint ?? 0) * row.credits, 0)
+  return credits === 0 ? null : Math.round((points / credits) * 100) / 100
 }
 
 function courseType(yearOfStudy: number | null, studentYear: number): 'Compulsory' | 'Elective' {
@@ -272,9 +282,8 @@ export async function getStudentDashboard(
     .innerJoin(resultBatches, eq(resultBatches.id, results.resultBatchId))
     .innerJoin(courseOfferings, eq(courseOfferings.id, results.courseOfferingId))
     .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
-    .where(and(eq(results.studentId, profile.studentId), eq(resultBatches.status, 'Published')))
+    .where(and(eq(results.studentId, profile.studentId), inArray(resultBatches.status, [...RELEASED_RESULT_BATCH_STATUSES])))
     .orderBy(desc(results.createdAt))
-    .limit(5)
 
   const schedule = semester
     ? await db
@@ -407,11 +416,11 @@ export async function getStudentDashboard(
 
   return {
     profile,
-    gpa: gradePointNumber(enrolment?.cgpa ?? enrolment?.semesterGpa ?? null),
+    gpa: publishedGpaFromRows(publishedResults) ?? gradePointNumber(enrolment?.cgpa ?? enrolment?.semesterGpa ?? null),
     outstandingFees: Math.max(0, account?.balance ?? 0),
     attendanceRate,
     courses: registeredCourses,
-    recentResults: publishedResults.map((row) => ({
+    recentResults: publishedResults.slice(0, 5).map((row) => ({
       offeringId: row.offeringId,
       courseCode: row.courseCode,
       courseName: row.courseName,
@@ -863,11 +872,23 @@ export async function recordStudentMaterialView(
   })
 }
 
+const REGISTERED_OFFERING_STATUSES = ['Approved', 'Pending'] as const
+
+function isRegisteredOffering(status: string | null): boolean {
+  return status === 'Approved' || status === 'Pending'
+}
+
+function programmeDepartmentScope(departmentId: string | null) {
+  const alreadyRegistered = inArray(courseRegistrations.status, REGISTERED_OFFERING_STATUSES)
+  if (!departmentId) return alreadyRegistered
+  return or(eq(courses.departmentId, departmentId), alreadyRegistered)
+}
+
 export async function getRegistrationState(
   institutionId: string,
   userId: string,
 ): Promise<StudentRegistrationState> {
-  const profile = await getStudentProfile(institutionId, userId)
+  const profile = await requireStudent(institutionId, userId)
   const semester = await currentSemester(institutionId)
   if (!semester) {
     return {
@@ -909,11 +930,11 @@ export async function getRegistrationState(
         eq(courseRegistrations.studentId, profile.studentId),
       ),
     )
-    .where(eq(courseOfferings.semesterId, semester.id))
+    .where(and(eq(courseOfferings.semesterId, semester.id), programmeDepartmentScope(profile.departmentId)))
     .orderBy(courses.code)
 
   const registeredCredits = rows
-    .filter((row) => row.status === 'Approved' || row.status === 'Pending')
+    .filter((row) => isRegisteredOffering(row.status))
     .reduce((sum, row) => sum + row.credits, 0)
 
   return {
@@ -931,7 +952,7 @@ export async function getRegistrationState(
       credits: row.credits,
       lecturerName: row.lecturerName,
       type: courseType(row.yearOfStudy, profile.yearOfStudy),
-      registered: row.status === 'Approved' || row.status === 'Pending',
+      registered: isRegisteredOffering(row.status),
       status: row.status,
       openForRegistration: row.isOpen,
     })),
@@ -1062,7 +1083,7 @@ export async function getStudentResults(
     .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
     .innerJoin(semesters, eq(semesters.id, courseOfferings.semesterId))
     .innerJoin(academicYears, eq(academicYears.id, semesters.academicYearId))
-    .where(and(eq(results.studentId, profile.studentId), eq(resultBatches.status, 'Published')))
+    .where(and(eq(results.studentId, profile.studentId), inArray(resultBatches.status, [...RELEASED_RESULT_BATCH_STATUSES])))
     .orderBy(desc(semesters.startDate), courses.code)
 
   const grouped = new Map<string, StudentResults['semesters'][number]>()
@@ -1087,21 +1108,12 @@ export async function getStudentResults(
     grouped.set(key, existing)
   }
 
-  const semestersOut = [...grouped.values()].map((semester) => {
-    const earned = semester.courses.filter((course) => course.gradePoint !== null)
-    const credits = earned.reduce((sum, course) => sum + course.credits, 0)
-    const points = earned.reduce((sum, course) => sum + (course.gradePoint ?? 0) * course.credits, 0)
-    return {
-      ...semester,
-      gpa: credits === 0 ? null : Math.round((points / credits) * 100) / 100,
-    }
-  })
+  const semestersOut = [...grouped.values()].map((semester) => ({
+    ...semester,
+    gpa: publishedGpaFromRows(semester.courses),
+  }))
 
   const all = semestersOut.flatMap((semester) => semester.courses)
-  const credits = all.filter((course) => course.gradePoint !== null).reduce((sum, course) => sum + course.credits, 0)
-  const points = all
-    .filter((course) => course.gradePoint !== null)
-    .reduce((sum, course) => sum + (course.gradePoint ?? 0) * course.credits, 0)
 
   const [enrolment] = await db
     .select({ standing: enrolments.academicStanding })
@@ -1111,7 +1123,7 @@ export async function getStudentResults(
     .limit(1)
 
   return {
-    cgpa: credits === 0 ? null : Math.round((points / credits) * 100) / 100,
+    cgpa: publishedGpaFromRows(all),
     standing: enrolment?.standing ?? null,
     semesters: semestersOut,
   }

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { formatAppDateDdMmYyyy } from '@stackedu/shared'
 import { LibrarianShell } from '@/components/LibrarianShell'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -133,6 +135,7 @@ function CollectionsPage() {
           <div className="px-6 pt-6 pb-4 pr-12" style={{ borderBottom: '1px solid var(--border)' }}>
             <SheetHeader className="text-left">
               <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>{editing ? 'Edit collection' : 'Create collection'}</SheetTitle>
+              <FormInfoBox lines={editing ? formInfo.editCollection : formInfo.addCollection} />
             </SheetHeader>
           </div>
           <div className="flex flex-col gap-4 px-6 py-5">

@@ -8,6 +8,8 @@ import {
 } from '@stackedu/shared'
 import { Download, Inbox } from 'lucide-react'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { DataTable } from '@/components/DataTable'
 import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
@@ -89,6 +91,9 @@ export function LibraryBrowsePanel({
           className="mb-5 grid grid-cols-1 gap-3 p-4 sm:grid-cols-2"
           style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)' }}
         >
+          <div className="sm:col-span-2">
+            <FormInfoBox lines={formInfo.requestLibraryTitle} />
+          </div>
           <div className="sm:col-span-2">
             <Label htmlFor="lib-req-title">Title</Label>
             <Input id="lib-req-title" value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1" />

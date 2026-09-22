@@ -5,8 +5,13 @@ import type { LecturerCourseMaterial, LecturerCourseModule } from '@stackedu/sha
 import {
   COURSE_MATERIAL_ACCEPT,
   COURSE_MATERIAL_MAX_BYTES,
+  MAX_UPLOAD_LABEL,
+  uploadLimitMessage,
 } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,8 +29,6 @@ import {
   uploadLecturerMaterialFile,
 } from '@/lib/api/lecturer'
 import { toast } from 'sonner'
-
-const UNASSIGNED_MODULE = 'none'
 
 export function TableIconButton({
   label,
@@ -107,15 +110,16 @@ export function MaterialForm({
 }: {
   offeringId: string
   material: LecturerCourseMaterial | null
-  modules?: LecturerCourseModule[]
+  modules: LecturerCourseModule[]
   onClose: () => void
   onSuccess: () => Promise<void>
 }) {
   const isEdit = material !== null
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
+  const firstModuleId = modules[0]?.id ?? ''
   const [title, setTitle] = useState(material?.title ?? '')
-  const [moduleId, setModuleId] = useState(material?.moduleId ?? UNASSIGNED_MODULE)
-  const [moduleName, setModuleName] = useState(material?.moduleName ?? '')
+  const [moduleId, setModuleId] = useState(material?.moduleId ?? firstModuleId)
   const [description, setDescription] = useState(material?.description ?? '')
   const [bodyText, setBodyText] = useState(material?.bodyText ?? '')
   const [externalUrl, setExternalUrl] = useState(material?.externalUrl ?? '')
@@ -132,22 +136,29 @@ export function MaterialForm({
 
   useEffect(() => {
     setTitle(material?.title ?? '')
-    setModuleId(material?.moduleId ?? UNASSIGNED_MODULE)
-    setModuleName(material?.moduleName ?? '')
+    setModuleId(material?.moduleId ?? modules[0]?.id ?? '')
     setDescription(material?.description ?? '')
     setBodyText(material?.bodyText ?? '')
     setExternalUrl(material?.externalUrl ?? '')
     setSelectedFile(null)
     setUploadedFile(null)
     setRemoveFile(false)
-  }, [material])
+  }, [material, modules])
 
   const currentFileLabel = selectedFile?.name ?? (removeFile ? null : material?.fileName ?? null)
-  const usesModuleSelect = Boolean(modules && modules.length > 0)
+  const canSave = title.trim().length >= 2 && Boolean(moduleId)
+
+  const pickFile = (file: File | null) => {
+    takeFile(file, (next) => {
+      setSelectedFile(next)
+      setUploadedFile(null)
+      setRemoveFile(false)
+    })
+  }
 
   const ensureUploadedFile = async () => {
     if (selectedFile && selectedFile.size > COURSE_MATERIAL_MAX_BYTES) {
-      toast.error('The file must be 10 MB or smaller.')
+      toast.error(uploadLimitMessage())
       return null
     }
     if (selectedFile) {
@@ -196,9 +207,9 @@ export function MaterialForm({
   }
 
   const saveMaterial = async () => {
-    if (title.trim().length < 2) return
+    if (!canSave) return
     if (selectedFile && selectedFile.size > COURSE_MATERIAL_MAX_BYTES) {
-      toast.error('The file must be 10 MB or smaller.')
+      toast.error(uploadLimitMessage())
       return
     }
 
@@ -207,9 +218,7 @@ export function MaterialForm({
       const filePayload = selectedFile ? await ensureUploadedFile() : undefined
       if (selectedFile && !filePayload) return
 
-      const moduleFields = usesModuleSelect
-        ? { moduleId: moduleId === UNASSIGNED_MODULE ? null : moduleId }
-        : { moduleName: moduleName.trim() || undefined }
+      const moduleFields = { moduleId }
 
       if (isEdit && material) {
         await updateLecturerMaterial(material.id, {
@@ -264,34 +273,24 @@ export function MaterialForm({
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
           {isEdit ? 'Edit course material' : 'Add course material'}
         </h3>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          Publish a page, a file, a link, or any mix of the three. Students see published items only.
-        </p>
+        <FormInfoBox lines={isEdit ? formInfo.editMaterial : formInfo.addMaterial} />
       </div>
       <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 1 lecture slides" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Material title" />
         </div>
-        {usesModuleSelect ? (
-          <div>
-            <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Module (optional)</label>
-            <Select value={moduleId} onValueChange={setModuleId}>
-              <SelectTrigger><SelectValue placeholder="Ungrouped" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED_MODULE}>Ungrouped</SelectItem>
-                {modules!.map((module) => (
-                  <SelectItem key={module.id} value={module.id}>{module.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div>
-            <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Module / week (optional)</label>
-            <Input value={moduleName} onChange={(e) => setModuleName(e.target.value)} placeholder="e.g. Week 1" />
-          </div>
-        )}
+        <div>
+          <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Module</label>
+          <Select value={moduleId} onValueChange={setModuleId} disabled={modules.length === 0}>
+            <SelectTrigger><SelectValue placeholder="Choose a module" /></SelectTrigger>
+            <SelectContent>
+              {modules.map((module) => (
+                <SelectItem key={module.id} value={module.id}>{module.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div>
           <div className="mb-1.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className="t-label" style={{ color: 'var(--foreground)' }}>Description (optional)</label>
@@ -326,9 +325,8 @@ export function MaterialForm({
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0] ?? null
-              setSelectedFile(file)
-              setUploadedFile(null)
-              if (file) setRemoveFile(false)
+              e.target.value = ''
+              pickFile(file)
             }}
           />
           <button
@@ -346,7 +344,7 @@ export function MaterialForm({
                   {currentFileLabel ?? 'Upload PDF, Word document, or image'}
                 </p>
                 <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Max 10 MB · PDF, DOCX, DOC, PNG, JPG, WEBP, GIF
+                  Max {MAX_UPLOAD_LABEL} · PDF, DOCX, DOC, PNG, JPG, WEBP, GIF
                 </p>
               </div>
             </div>
@@ -362,7 +360,7 @@ export function MaterialForm({
             trigger={
               <Button
                 type="button"
-                disabled={title.trim().length < 2 || saving}
+                disabled={!canSave || saving}
                 style={{ backgroundColor: 'var(--brand)', color: 'var(--brand-ink)' }}
               >
                 {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Publish material'}
@@ -387,6 +385,16 @@ export function MaterialForm({
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
         </div>
       </div>
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          setSelectedFile(next)
+          setUploadedFile(null)
+          setRemoveFile(false)
+          setOversizeFile(null)
+        }}
+        onClose={() => setOversizeFile(null)}
+      />
     </div>
   )
 }

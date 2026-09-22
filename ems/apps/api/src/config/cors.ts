@@ -26,7 +26,12 @@ export function corsOrigin(env: Env) {
 export function expandOriginsForEnvironment(env: Env): Env {
   if (env.NODE_ENV === 'production') return env
 
-  const extras = ['http://localhost:3000', 'http://127.0.0.1:3000']
+  const extras = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+  ]
   const merged = new Set([...env.ALLOWED_ORIGINS, ...extras])
   return { ...env, ALLOWED_ORIGINS: [...merged] }
 }

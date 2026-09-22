@@ -7,7 +7,7 @@ A live class is not the same thing as the attendance register. Opening a video r
 ## Who does what
 
 - **Academic Admin** creates programmes, courses, and the semester offering. They assign a lead lecturer to a course for a semester, open the calendar and timetable, and later approve result batches. They do not run the live room, upload course files, or mark assignments.
-- **ICT Manager** creates user accounts (including lecturers and students). They turn LiveKit on under **Integrations** so video can start. They set the attendance edit window under **System Settings**. They do not teach, join a class as a student, or see course materials.
+- **ICT Manager** creates user accounts (including lecturers and students). They turn LiveKit on under **Integrations** so video can start. They set the attendance edit window and the classroom recording keep-window under **System Settings**. They do not teach, join a class as a student, or see course materials.
 - **Bursar** can place or release a fee hold on a student account. A hold blocks **course registration**. It does not by itself lock an already enrolled student out of materials or the live room.
 - **Lecturer** owns the course they are assigned to: modules, materials, announcements, discussions, assignments, quizzes, live classes, the attendance register, grades, and the draft results they submit for review.
 - **Student** must be enrolled (**Approved** registration) on that offering. Then they can open published content, join a class that is **Live**, submit work, post in discussions, ask the study assistant, view attendance, and download a recording or a published class summary.
@@ -52,7 +52,7 @@ Lecturers can still **schedule** a class without LiveKit. Students cannot see vi
 
 Recording a live class also needs object storage (R2) on the server. Local disk cannot receive a live recording. The Record button will say so.
 
-Live drawing that follows everyone in the room uses a separate collaboration URL on the server. If that is not set, people can still save a whiteboard snapshot; they will not see each other’s pens in real time.
+While the class is live, marks on the whiteboard go out on the video room and are also saved. A short refresh keeps a reload in sync. If a separate collaboration URL is set, that is used as well. After the class ends, the board is a snapshot only.
 
 ---
 
@@ -77,6 +77,8 @@ Open **Course Management**, pick the course.
 
 ### Modules
 
+A module is a named part of the course. It could be Week 1, Week 2, and so on. It is a simple way to break learning into smaller bits for students. You add pages, files, and other course content inside it. Students open that content by module.
+
 1. **Add module**. Title, optional summary, optional **prerequisite** (another module on the same course). A module cannot require itself, and two modules cannot point at each other in a loop.
 2. Turn **Publish** on when students may see it. Leave it off for a draft.
 3. Confirm, then save.
@@ -87,8 +89,8 @@ A published module with a prerequisite stays locked for the student until they h
 ### Materials (pages, files, links)
 
 1. **Add material**. Title, optional body text, optional link (`https://…`), optional file.
-2. Files: PDF, Word, or image. Maximum 10 MB.
-3. Optionally attach it to a module.
+2. Files: PDF, Word, or image. Maximum 14 MB. A file over 14 MB opens a size dialog; images are reduced automatically when possible. A course must have at least one module before material can be added.
+3. Attach it to a module. Material always belongs to one module.
 4. Optionally use **Describe** to draft a description. Read it before you save.
 5. Publish when students may see it. Confirm, then save.
 6. Enrolled students are notified when a material is **published**.
@@ -223,15 +225,27 @@ Statuses: **Scheduled** → **Live** → **Ended**. Or **Cancelled** before it s
 
 ### Record (Lecturer, only while Live)
 
-1. Confirm **Start recording?** Needs LiveKit and R2 storage.
-2. Confirm **Stop recording?** when done. Ending the class also stops a recording that is still going.
-3. Status goes Pending, then **Ready**. Lecturer and enrolled students can **Download** a Ready recording (signed, short-lived link).
+1. On **Classroom**, the lecturer can turn **Automatically record live classes** on or off (confirm). When it is on, starting the class also starts a recording if LiveKit and object storage allow it.
+2. Confirm **Start recording?** Needs LiveKit and R2 storage. A red **Recording** notice stays on the video until it is stopped.
+3. Confirm **Stop recording?** when done. Ending the class also stops a recording that is still going.
+4. Status goes Pending, then **Ready**. Lecturer and enrolled students can **Download** a Ready recording (signed, short-lived link) until ICT’s keep-window ends.
+5. When a recording becomes **Ready**, every enrolled student on that course (in class or not) is notified to download it, with the date and time it will be removed. A reminder is sent as that time gets close. After the window, the file is deleted.
+
+ICT sets the keep-window under **System Settings** (hours or days). The default is 72 hours.
+
+### During a live class
+
+- The lecturer can confirm **Mute all students?** to silence every student microphone. The lecturer stays unmuted. Students may unmute themselves.
+- Participants can put the video in **full screen** (video only).
+- Leaving the class page does not drop the call. Video and audio continue in picture-in-picture so people can open other screens. Opening the class page again puts the video back.
+- The live class page does not scroll sideways.
+- The whiteboard stays in sync for everyone in the live class. A reload shows the latest saved board.
 
 ### End (Lecturer)
 
 1. Confirm **End this class?**
-2. Students drop from the room. Whiteboard becomes read-only for students. Status **Ended**.
-3. Lecturer may still save the whiteboard snapshot after end. Students may look at it but cannot save changes.
+2. Students drop from the room. The whiteboard becomes read-only for **everyone**. Status **Ended**.
+3. Nobody can add marks after end. The board stays as a snapshot.
 
 ### Summary (Lecturer, after end)
 
@@ -249,7 +263,7 @@ On an **Ended** class:
 
 - No live video.
 - Whiteboard (view).
-- **Recordings** that are Ready (download).
+- **Recordings** that are Ready and still inside the ICT keep-window (download). After that window the file is gone.
 - **Class summary** only if the lecturer published it.
 
 Cancelled classes do not appear for the student.
@@ -313,10 +327,12 @@ The same engagement rows can appear on the student profile (per offering). Acade
 | Announcement published | Enrolled students |
 | Assignment or quiz published | Enrolled students |
 | Discussion published | Enrolled students |
+| Recording ready to download | Enrolled students (present or absent) |
+| Recording about to be removed | Enrolled students (present or absent) |
 | Results submitted for review | Academic admins |
 | Results approved or returned | The lecturer who submitted |
 
-Scheduling, starting, ending, or cancelling a live class is written to the audit log. Enrolled students are not emailed for those classroom actions. They see the new status when they open **Classroom**.
+Scheduling, starting, ending, or cancelling a live class is written to the audit log. Enrolled students are not emailed for those classroom actions. They see the new status when they open **Classroom**. Recording notices are in-app only.
 
 Each role reads their own **Notifications** page.
 
@@ -326,7 +342,7 @@ Each role reads their own **Notifications** page.
 
 Creates, updates, and deletes use a confirm dialog. The form collects the values; the dialog is what commits them. Deletes use the destructive tone.
 
-Examples: schedule class, cancel class, start class, record / stop recording, end class, draft summary, publish summary, save module/material/announcement, start/close/delete discussion, submit assignment, ask the study assistant, save a grade, submit results, approve or return results, submit attendance, delete an attendance session.
+Examples: schedule class, cancel class, start class, record / stop recording, mute all students, auto-record setting, end class, draft summary, publish summary, save module/material/announcement, start/close/delete discussion, submit assignment, ask the study assistant, save a grade, submit results, approve or return results, submit attendance, delete an attendance session.
 
 **Join class** (student) and **Join as host** (lecturer, already Live) are immediate joins, not a second confirm.
 
@@ -337,7 +353,7 @@ Examples: schedule class, cancel class, start class, record / stop recording, en
 - **Applicant** — no courses, no live class.
 - **Librarian** — no course files, no live class (e-library only).
 - **Bursar** — no teaching screens. Fee hold only blocks **registration**.
-- **ICT Manager** — LiveKit keys and attendance policy only. No host controls, no marking.
+- **ICT Manager** — LiveKit keys, attendance policy, and recording keep-window only. No host controls, no marking.
 - **Academic Admin** — no host controls, no uploading week-1 PDFs, no joining as a student. They set the course, the lecturer, the calendar, and they approve results.
 - **Lecturer** — cannot open another lecturer’s offering they are not assigned to. Cannot join as a student.
 - **Student** — cannot schedule, start, record, end, or publish a summary. Cannot see drafts. Cannot open a locked module. Cannot join until the class is Live.

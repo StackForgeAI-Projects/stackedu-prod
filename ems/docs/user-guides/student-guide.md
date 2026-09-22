@@ -86,7 +86,7 @@ When it works, the page says the assignment is already submitted. The lecturer m
 
 ## Register
 
-Open **Register**. You see how many courses and credits you already have, and whether registration is open.
+Open **Register**. You see how many courses and credits you already have, your programme and department, and whether registration is open. The **Available** list is only courses for your programme and department — not other departments.
 
 What you can do:
 
@@ -104,6 +104,12 @@ What you can do:
 Open **Classroom**. Pick a live class and click **Open**.
 
 The session page opens. If video is not set up yet, you may see a message that the whiteboard still works, or that the class has not started. Wait until the lecturer starts the class.
+
+When the class is **Live**, click **Join class**. You see the same whiteboard as the lecturer. A red **Recording** mark means the class is being recorded. **Full screen** expands the video only.
+
+Opening another sidebar page keeps the call in a small picture-in-picture window. **Back to class** returns. **Leave** drops you from the room.
+
+After class, the board is view-only. If there is a recording, download it from the class page or from the notice. The notice says when the file will be removed. A reminder is sent when that time is close.
 
 ---
 
@@ -149,7 +155,7 @@ The librarian later sees that request.
 
 ## Notifications
 
-Open **Notifications**. You see reminders, assignments, fees, registration, and results. Each row has **Open →**. Tap an unread item to mark it read.
+Open the bell in the header, or open **Notifications** in the sidebar. You see reminders, assignments, fees, registration, and results. Each row has **Open →**. Tap an unread item in the dropdown or on the page. It marks as read at once and the red number on the bell drops.
 
 ---
 

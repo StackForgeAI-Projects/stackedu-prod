@@ -1,8 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { MAX_UPLOAD_LABEL } from '@stackedu/shared'
 import { toast } from 'sonner'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IctShell } from '@/components/IctShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,6 +81,8 @@ function SystemSettingsPage() {
     location: '',
     allowEditAfterSubmit: true,
     editWindowMinutes: 60,
+    recordingRetentionUnit: 'hours' as 'hours' | 'days',
+    recordingRetentionValue: 72,
     applicationFullOnly: true,
     tuitionFullOnly: false,
     levyFullOnly: false,
@@ -85,6 +91,7 @@ function SystemSettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPalette, setLogoPalette] = useState<string[]>([])
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
 
   useEffect(() => {
     if (data) {
@@ -98,6 +105,8 @@ function SystemSettingsPage() {
         location: data.location ?? '',
         allowEditAfterSubmit: data.attendancePolicy.allowEditAfterSubmit,
         editWindowMinutes: data.attendancePolicy.editWindowMinutes,
+        recordingRetentionUnit: data.recordingRetention?.unit ?? 'hours',
+        recordingRetentionValue: data.recordingRetention?.value ?? 72,
         applicationFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'ApplicationFee')?.mode === 'FullOnly',
         tuitionFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'TuitionFee')?.mode === 'FullOnly',
         levyFullOnly: data.paymentPolicy.rules.find((rule) => rule.feeKind === 'Levy')?.mode === 'FullOnly',
@@ -150,6 +159,10 @@ function SystemSettingsPage() {
           allowEditAfterSubmit: form.allowEditAfterSubmit,
           editWindowMinutes: form.editWindowMinutes,
         },
+        recordingRetention: {
+          unit: form.recordingRetentionUnit,
+          value: form.recordingRetentionValue,
+        },
         paymentPolicy: {
           rules: [
             { feeKind: 'ApplicationFee', mode: form.applicationFullOnly ? 'FullOnly' : 'PartialAllowed' },
@@ -171,10 +184,8 @@ function SystemSettingsPage() {
     onError: (err) => toast.error(apiErrorMessage(err, 'Could not save settings.')),
   })
 
-  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    if (!LOGO_TYPES.includes(file.type)) {
+  const applyLogo = async (file: File) => {
+    if (!LOGO_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
       toast.error('Choose a PNG, JPEG, WebP or SVG image.')
       return
     }
@@ -192,6 +203,17 @@ function SystemSettingsPage() {
     }
   }
 
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!LOGO_TYPES.includes(file.type)) {
+      toast.error('Choose a PNG, JPEG, WebP or SVG image.')
+      return
+    }
+    takeFile(file, (next) => { void applyLogo(next) })
+  }
+
   return (
     <IctShell
       pageTitle="Settings"
@@ -199,6 +221,7 @@ function SystemSettingsPage() {
     >
       <div className="animate-fade-up mx-auto w-full max-w-[760px]" style={{ padding: '32px 0 48px' }}>
         <h1 className="t-h1 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Institution settings</h1>
+        <FormInfoBox lines={formInfo.ictSettings} />
         {isPending ? (
           <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading settings…</p>
         ) : error ? (
@@ -261,7 +284,7 @@ function SystemSettingsPage() {
                 <div className="flex flex-1 flex-col gap-2">
                   <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
                     Used on the sign-in, apply and portal screens, and on email notifications. PNG, JPEG, WebP or
-                    SVG up to 2 MB. The colours in the logo are read automatically and offered below.
+                    SVG up to {MAX_UPLOAD_LABEL}. The colours in the logo are read automatically and offered below.
                   </p>
                   <input
                     ref={fileInputRef}
@@ -418,6 +441,61 @@ function SystemSettingsPage() {
             >
               <div>
                 <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
+                  Classroom recording keep-window
+                </p>
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  How long a ready class recording stays available. After this, the file is deleted. Students are told when it is ready and again when time is nearly up.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="recording-unit">Unit</Label>
+                  <select
+                    id="recording-unit"
+                    className="w-full text-sm px-3 py-2 rounded-lg mt-1"
+                    style={{ border: '1px solid var(--border)' }}
+                    value={form.recordingRetentionUnit}
+                    onChange={(e) => setForm({
+                      ...form,
+                      recordingRetentionUnit: e.target.value as 'hours' | 'days',
+                      recordingRetentionValue: e.target.value === 'days'
+                        ? Math.min(form.recordingRetentionValue, 30)
+                        : form.recordingRetentionValue,
+                    })}
+                  >
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="recording-value">Keep for</Label>
+                  <Input
+                    id="recording-value"
+                    type="number"
+                    min={1}
+                    max={form.recordingRetentionUnit === 'days' ? 30 : 720}
+                    value={form.recordingRetentionValue}
+                    onChange={(e) => {
+                      const max = form.recordingRetentionUnit === 'days' ? 30 : 720
+                      setForm({
+                        ...form,
+                        recordingRetentionValue: Math.max(1, Math.min(max, Number(e.target.value) || 1)),
+                      })
+                    }}
+                  />
+                  <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    Default is 72 hours. Shortest is 1 hour. Longest is 30 days.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl p-4 flex flex-col gap-4"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--muted)' }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
                   Payment collection
                 </p>
                 <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
@@ -478,7 +556,7 @@ function SystemSettingsPage() {
               tone="success"
               headlineLabel="Action"
               headline="Update institution settings"
-              summary="Name, branding, attendance and payments for this institution will be updated."
+              summary="Name, branding, attendance, recording keep-window and payments for this institution will be updated."
               notices={[
                 { icon: 'email', label: 'The logo and system colour also appear on email notifications.' },
               ]}
@@ -490,6 +568,14 @@ function SystemSettingsPage() {
           </form>
         )}
       </div>
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          setOversizeFile(null)
+          void applyLogo(next)
+        }}
+        onClose={() => setOversizeFile(null)}
+      />
     </IctShell>
   )
 }

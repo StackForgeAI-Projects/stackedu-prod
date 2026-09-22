@@ -24,6 +24,7 @@ export const classroomRecordingSchema = z.object({
   durationSeconds: z.number().int().nonnegative().nullable(),
   byteSize: z.number().int().nonnegative().nullable(),
   createdAt: isoDateTimeSchema,
+  expiresAt: isoDateTimeSchema.nullable(),
 })
 
 export const classroomSessionDetailSchema = classroomSessionSummarySchema.extend({

@@ -2,7 +2,6 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import type { AcademicAtRiskStudent } from '@stackedu/shared'
-import { CheckCircle2 } from 'lucide-react'
 import { AcademicShell } from '@/components/AcademicShell'
 import { riskColors } from '@/data/academic'
 import {
@@ -10,7 +9,6 @@ import {
   listAcademicAtRiskStudents,
 } from '@/lib/api/academic'
 import { apiErrorMessage } from '@/lib/api/client'
-import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_auth/academic/at-risk')({
   component: AtRiskManagementPage,
@@ -59,7 +57,11 @@ function AtRiskManagementPage() {
           <div>
             <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>At-Risk Students</h1>
             <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              {isPending ? 'Loading…' : `${active.length} students currently flagged`}
+              {isPending
+                ? 'Loading…'
+                : active.length === 1
+                  ? '1 student currently flagged'
+                  : `${active.length} students currently flagged`}
             </p>
           </div>
           <select value={programme} onChange={(e) => setProgramme(e.target.value)}
@@ -138,10 +140,6 @@ function RiskCard({ student: s }: { student: AcademicAtRiskStudent }) {
         </div>
         <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
           <span className="t-label px-2.5 py-1" style={{ backgroundColor: rc.bg, color: rc.color, borderRadius: 'var(--radius-sm)' }}>{s.riskLevel} Risk</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => toast.info('Advisor assignment is not available yet.')} className="text-xs font-medium px-2.5 py-1.5 rounded-lg" style={{ border: '1px solid var(--border)', cursor: 'pointer' }}>Assign advisor</button>
-            <button type="button" onClick={() => toast.info('Notifications are not available from this screen yet.')} className="text-xs font-medium px-2.5 py-1.5 rounded-lg" style={{ border: '1px solid var(--border)', cursor: 'pointer' }}>Send notification</button>
-          </div>
         </div>
       </div>
     </div>

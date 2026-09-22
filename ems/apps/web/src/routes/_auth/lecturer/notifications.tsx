@@ -14,11 +14,15 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
   lecturerNotificationsQueryKey,
-  lecturerProfileQueryKey,
   listLecturerNotifications,
   markAllLecturerNotificationsRead,
   markLecturerNotificationRead,
 } from '@/lib/api/lecturer'
+import {
+  applyAllNotificationsReadLocally,
+  applyNotificationReadLocally,
+  invalidateNotificationReadCaches,
+} from '@/lib/notification-read-sync'
 
 export const Route = createFileRoute('/_auth/lecturer/notifications')({
   component: LecturerNotificationsPage,
@@ -45,16 +49,26 @@ function LecturerNotificationsPage() {
 
   const markRead = useMutation({
     mutationFn: markLecturerNotificationRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: lecturerNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: lecturerProfileQueryKey })
+    onMutate: (id) => {
+      applyNotificationReadLocally(queryClient, id)
+    },
+    onSuccess: (notifications) => {
+      queryClient.setQueryData(lecturerNotificationsQueryKey, notifications)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
   const markAll = useMutation({
     mutationFn: markAllLecturerNotificationsRead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: lecturerNotificationsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: lecturerProfileQueryKey })
+    onMutate: () => {
+      applyAllNotificationsReadLocally(queryClient)
+    },
+    onSuccess: (notifications) => {
+      queryClient.setQueryData(lecturerNotificationsQueryKey, notifications)
+    },
+    onError: () => {
+      void invalidateNotificationReadCaches(queryClient)
     },
   })
 

@@ -33,7 +33,10 @@ import {
   auditActionLabel,
   auditSummary,
   DEFAULT_ATTENDANCE_POLICY,
+  DEFAULT_RECORDING_RETENTION,
   DEFAULT_PAYMENT_POLICY,
+  RECORDING_RETENTION_SETTING_KEY,
+  recordingRetentionSchema,
   INTEGRATION_CATALOG,
   integrationCatalogItem,
   isIntegrationCatalogProvider,
@@ -910,9 +913,15 @@ export async function getIctSettings(institutionId: string): Promise<IctSettings
     attendancePolicySchema,
     DEFAULT_ATTENDANCE_POLICY,
   )
+  const recordingRetention = await readInstitutionSetting(
+    db,
+    RECORDING_RETENTION_SETTING_KEY,
+    recordingRetentionSchema,
+    DEFAULT_RECORDING_RETENTION,
+  )
   const paymentPolicy = await readPaymentPolicy(db)
   const ai = await readPublicAiSettings(institutionId)
-  return mapIctSettings(row, attendancePolicy, paymentPolicy, ai)
+  return mapIctSettings(row, attendancePolicy, recordingRetention, paymentPolicy, ai)
 }
 
 function mapIctSettings(
@@ -930,6 +939,7 @@ function mapIctSettings(
     updatedAt: string
   },
   attendancePolicy = DEFAULT_ATTENDANCE_POLICY,
+  recordingRetention = DEFAULT_RECORDING_RETENTION,
   paymentPolicy = DEFAULT_PAYMENT_POLICY,
   ai: IctSettings['ai'] = {
     provider: 'builtin',
@@ -949,6 +959,7 @@ function mapIctSettings(
     logoUrl: publicLogoUrl(row),
     brandColor: row.brandColor,
     attendancePolicy,
+    recordingRetention,
     paymentPolicy,
     ai,
   }
@@ -1005,6 +1016,21 @@ export async function updateIctSettings(
       {
         category: 'Teaching',
         description: 'Whether lecturers may edit submitted attendance and for how long.',
+      },
+      actor.id,
+    )
+  }
+
+  if (input.recordingRetention) {
+    const db = await getInstitutionDb(institutionId)
+    const nextRetention = recordingRetentionSchema.parse(input.recordingRetention)
+    await upsertInstitutionSetting(
+      db,
+      RECORDING_RETENTION_SETTING_KEY,
+      nextRetention,
+      {
+        category: 'Teaching',
+        description: 'How long a ready classroom recording is kept before it is deleted.',
       },
       actor.id,
     )

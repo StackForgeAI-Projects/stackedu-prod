@@ -1,5 +1,6 @@
 import type {
   ClassroomJoin,
+  ClassroomPreferences,
   ClassroomSessionDetail,
   ClassroomSessionSummary,
   CourseAnalytics,
@@ -536,6 +537,27 @@ export async function cancelLecturerClassroomSession(id: string): Promise<void> 
 export async function joinLecturerClassroomSession(id: string): Promise<ClassroomJoin> {
   const { join } = await api.post<{ join: ClassroomJoin }>(`/lecturer/classroom/${id}/join`)
   return join
+}
+
+export const lecturerClassroomPreferencesQueryKey = ['lecturer', 'classroom-preferences'] as const
+
+export async function getLecturerClassroomPreferences(): Promise<ClassroomPreferences> {
+  const { preferences } = await api.get<{ preferences: ClassroomPreferences }>('/lecturer/classroom/preferences')
+  return preferences
+}
+
+export async function saveLecturerClassroomPreferences(
+  input: ClassroomPreferences,
+): Promise<ClassroomPreferences> {
+  const { preferences } = await api.put<{ preferences: ClassroomPreferences }>(
+    '/lecturer/classroom/preferences',
+    input,
+  )
+  return preferences
+}
+
+export async function muteAllLecturerClassroomStudents(id: string): Promise<{ muted: number }> {
+  return api.post<{ muted: number }>(`/lecturer/classroom/${id}/mute-all`)
 }
 
 export async function startLecturerRecording(id: string): Promise<ClassroomSessionDetail> {

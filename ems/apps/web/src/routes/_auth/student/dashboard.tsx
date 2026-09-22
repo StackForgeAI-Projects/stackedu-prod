@@ -9,7 +9,7 @@ import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
 import { StudentShell } from '@/components/StudentShell'
 import { StatTile } from '@/components/StatTile'
 import { TimetableEventDialog, type StudentTimetableSlot } from '@/components/timetable/TimetableEventDialog'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateLong, formatDateShort } from '@/lib/utils'
 import { getStudentDashboard, studentDashboardQueryKey } from '@/lib/api/student'
 import { apiErrorMessage } from '@/lib/api/client'
 import { showNewStudentWelcomeIfPresent } from '@/lib/new-student-welcome'
@@ -69,7 +69,7 @@ function StudentDashboardPage() {
   const today = new Date()
   const hours = today.getHours()
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening'
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = formatDateLong(today)
 
   return (
     <StudentShell pageTitle="Dashboard" guide="Your live record: GPA, outstanding fees, attendance, registered courses and this week's classes. StackEDU AI is paused.">
@@ -119,8 +119,8 @@ function StudentDashboardPage() {
                 iconColor="var(--brand)"
                 iconBg="rgba(var(--brand-rgb),0.08)"
                 label="CURRENT GPA"
-                value={data.gpa === null ? '—' : data.gpa.toFixed(1)}
-                valueUnit={data.gpa === null ? '' : '/ 4.0'}
+                value={data.gpa === null ? '—' : data.gpa.toFixed(2)}
+                valueUnit={data.gpa === null ? '' : '/ 4.00'}
                 animationDelay={0}
               />
               <StatTile
@@ -132,7 +132,7 @@ function StudentDashboardPage() {
                 animationDelay={60}
                 footer={
                   <Link to="/student/fees" className="text-xs font-semibold mt-2 transition-opacity hover:opacity-70 w-fit" style={{ color: 'var(--success)' }}>
-                    Pay now →
+                    {data.outstandingFees > 0 ? 'Pay now →' : 'View statement →'}
                   </Link>
                 }
               />
@@ -283,7 +283,7 @@ function CalendarCard({
           <Link to="/student/timetable" className="text-xs font-medium" style={{ color: 'var(--success)' }}>Full timetable →</Link>
         </div>
         <p className="t-caption mb-4" style={{ color: 'var(--muted-foreground)' }}>
-          {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+          {formatDateLong(selectedDate)}
         </p>
         {daySchedule.length === 0 ? (
           <p className="text-sm text-center py-4" style={{ color: 'var(--muted-foreground)' }}>No classes scheduled</p>
@@ -326,7 +326,7 @@ function CalendarCard({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{item.title}</p>
                   <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                    {item.date ? new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date TBC'}
+                    {item.date ? formatDateShort(item.date) : 'Date TBC'}
                   </p>
                 </div>
               </div>

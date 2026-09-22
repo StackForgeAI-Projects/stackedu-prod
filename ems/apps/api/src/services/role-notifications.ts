@@ -1,5 +1,12 @@
 import { and, eq } from 'drizzle-orm'
-import { formatAppDateDdMmYyyy, type UserRole } from '@stackedu/shared'
+import {
+  formatAppDateDdMmYyyy,
+  formatAppDateTimeDdMmYyyy,
+  formatDurationUntil,
+  formatRetentionWindow,
+  type RecordingRetention,
+  type UserRole,
+} from '@stackedu/shared'
 import type { InstitutionDb } from '../db/connection'
 import { courses } from '../db/institution/schema/academic'
 import { notifications } from '../db/institution/schema/communication'
@@ -241,6 +248,36 @@ export async function notifyAcademicCalendarChange(
   })
 }
 
+export async function notifyEnrolledStudentsOfRecording(
+  db: InstitutionDb,
+  input: {
+    offeringId: string
+    sessionId: string
+    title: string
+    courseCode: string
+    kind: 'ready' | 'reminder'
+    expiresAt: string
+    policy: RecordingRetention
+  },
+): Promise<void> {
+  const studentIds = await enrolledStudentUserIds(db, input.offeringId)
+  if (studentIds.length === 0) return
+  const code = formatCourseCode(input.courseCode)
+  const until = formatAppDateTimeDdMmYyyy(input.expiresAt)
+  const window = formatRetentionWindow(input.policy)
+  const remaining = formatDurationUntil(Date.now(), new Date(input.expiresAt).getTime())
+  await notifyUserIds(db, studentIds, {
+    title: input.kind === 'ready' ? `Class recording: ${code}` : `Recording ends soon: ${code}`,
+    body:
+      input.kind === 'ready'
+        ? `Download the recording for "${input.title}". It will not be available after ${until} (${window}).`
+        : `The recording for "${input.title}" will be removed in ${remaining}. Download it before ${until}.`,
+    category: 'Classroom',
+    actionUrl: `/student/classroom-session?id=${input.sessionId}`,
+    metadata: { sessionId: input.sessionId, kind: input.kind, expiresAt: input.expiresAt },
+  })
+}
+
 export async function notifyLecturerOfResultReview(
   db: InstitutionDb,
   lecturerUserId: string,
@@ -253,7 +290,7 @@ export async function notifyLecturerOfResultReview(
     title: action === 'approved' ? `Results approved: ${courseCode}` : `Results returned: ${courseCode}`,
     body:
       action === 'approved'
-        ? `${courseName} results have been approved and can be published to students.`
+        ? `${courseName} results have been approved and published to students.`
         : reason ?? `${courseName} results were returned for revision.`,
     category: 'Results',
     actionUrl: '/lecturer/results',

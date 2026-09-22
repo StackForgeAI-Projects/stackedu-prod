@@ -10,6 +10,8 @@ import {
   timetableWeekdayLabel,
 } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -117,6 +119,7 @@ export function TimetableEventDialog({
             <DialogTitle className="pr-8" style={{ fontFamily: 'var(--font-display)' }}>
               {slot.courseName}
             </DialogTitle>
+            <FormInfoBox lines={formInfo.timetableReminder} />
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div

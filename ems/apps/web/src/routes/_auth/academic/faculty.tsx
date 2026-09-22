@@ -47,7 +47,7 @@ function FacultyManagementPage() {
           <div>
             <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}>Faculty Management</h1>
             <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              {isPending ? 'Loading…' : `${lecturers.length} lecturers`}
+              {isPending ? 'Loading…' : lecturers.length === 1 ? '1 lecturer' : `${lecturers.length} lecturers`}
             </p>
           </div>
           <button type="button" onClick={() => { showReadOnly(); setAddFacultyOpen(true) }}

@@ -4,11 +4,16 @@ import { useRef, useState } from 'react'
 import { Upload, FileText, CheckCircle2 } from 'lucide-react'
 import type { ApplicationDocument, ApplicationDocumentType } from '@stackedu/shared'
 import {
+  MAX_UPLOAD_MB,
   REQUIRED_APPLICATION_DOCUMENT_TYPES,
   buildCustomDocumentType,
   formatRequestedDocumentsList,
+  formatUploadBytes,
 } from '@stackedu/shared'
 import { ApplyLayout, type ApplyStep } from '@/components/ApplyLayout'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { useApplication } from '@/hooks/useApplication'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { requireVerifiedApplicant } from '@/lib/auth/guards'
@@ -61,7 +66,7 @@ const DOCS: DocSpec[] = [
     required: true,
     accept:   '.pdf,.jpg,.jpeg,.png',
     hint:     'PDF, JPG, PNG',
-    maxMB:    5,
+    maxMB:    MAX_UPLOAD_MB,
     note:     'Clear copy of both sides for National ID',
   },
   {
@@ -70,7 +75,7 @@ const DOCS: DocSpec[] = [
     required: true,
     accept:   '.pdf',
     hint:     'PDF only',
-    maxMB:    10,
+    maxMB:    MAX_UPLOAD_MB,
     note:     'REB / NESA certificate or REB equivalence for foreign results',
   },
   {
@@ -79,7 +84,7 @@ const DOCS: DocSpec[] = [
     required: true,
     accept:   '.pdf',
     hint:     'PDF only',
-    maxMB:    10,
+    maxMB:    MAX_UPLOAD_MB,
   },
   {
     id:       'Photo',
@@ -87,7 +92,7 @@ const DOCS: DocSpec[] = [
     required: true,
     accept:   '.jpg,.jpeg,.png',
     hint:     'JPG, PNG',
-    maxMB:    2,
+    maxMB:    MAX_UPLOAD_MB,
     note:     'Recent colour photo, square format preferred',
   },
   {
@@ -96,7 +101,7 @@ const DOCS: DocSpec[] = [
     required: true,
     accept:   '.pdf,.jpg,.jpeg,.png',
     hint:     'PDF, JPG, PNG',
-    maxMB:    5,
+    maxMB:    MAX_UPLOAD_MB,
     note:     'Student or parent/guardian medical insurance',
   },
   {
@@ -105,7 +110,7 @@ const DOCS: DocSpec[] = [
     required: false,
     accept:   '.pdf,.jpg,.jpeg',
     hint:     'PDF, JPG',
-    maxMB:    5,
+    maxMB:    MAX_UPLOAD_MB,
   },
 ]
 
@@ -113,9 +118,7 @@ const documentsQueryKeyFor = (userId: string | undefined) =>
   [...applicationQueryKeyFor(userId), 'documents'] as const
 
 function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return formatUploadBytes(bytes)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +128,8 @@ function ApplyDocumentsPage() {
   const { user } = useCurrentUser()
   const { application } = useApplication()
   const [uploadingType, setUploadingType] = useState<string | null>(null)
+  const [pendingSpec, setPendingSpec] = useState<DocSpec | null>(null)
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
   const documentsQueryKey = documentsQueryKeyFor(user?.id)
 
   const respondMode =
@@ -192,14 +197,15 @@ function ApplyDocumentsPage() {
     ? Math.round((uploadedCount / visibleDocs.length) * 100)
     : 0
 
-  const handleUpload = (spec: DocSpec, file: File) => {
-    if (responseSubmitted) return
-    if (file.size > spec.maxMB * 1024 * 1024) {
-      notifyError(`That file is larger than ${spec.maxMB} MB.`)
-      return
-    }
+  const startUpload = (spec: DocSpec, file: File) => {
     setUploadingType(spec.id)
     uploadMutation.mutate({ documentType: spec.id, file })
+  }
+
+  const handleUpload = (spec: DocSpec, file: File) => {
+    if (responseSubmitted) return
+    takeFile(file, (next) => startUpload(spec, next))
+    setPendingSpec(spec)
   }
 
   return (
@@ -217,11 +223,7 @@ function ApplyDocumentsPage() {
         >
           {respondMode ? 'Upload requested documents' : 'Upload your documents'}
         </h2>
-        <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          {respondMode
-            ? 'Admissions has requested additional documents. Upload clear copies for each item below.'
-            : 'Upload clear, readable copies. Accepted formats are PDF, JPG, and PNG.'}
-        </p>
+        <FormInfoBox lines={respondMode ? formInfo.applyDocumentsRequested : formInfo.applyDocuments} />
       </div>
 
       {respondMode && application?.documentRequest ? (
@@ -373,6 +375,18 @@ function ApplyDocumentsPage() {
           </div>
         ) : null}
       </div>
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          if (pendingSpec) startUpload(pendingSpec, next)
+          setPendingSpec(null)
+          setOversizeFile(null)
+        }}
+        onClose={() => {
+          setPendingSpec(null)
+          setOversizeFile(null)
+        }}
+      />
     </ApplyLayout>
   )
 }
@@ -388,7 +402,7 @@ function buildRespondDocSpecs(request: {
     required: true,
     accept: '.pdf,.jpg,.jpeg,.png',
     hint: 'PDF, JPG, PNG',
-    maxMB: 10,
+    maxMB: MAX_UPLOAD_MB,
   }))
   return [...standard, ...custom]
 }

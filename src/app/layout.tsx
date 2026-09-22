@@ -26,7 +26,7 @@ export default async function RootLayout({
   const lang = market === "rw" ? "en-RW" : "en";
 
   return (
-    <html lang={lang} className={`${plusJakarta.variable} h-full`}>
+    <html lang={lang} className={`${plusJakarta.variable} h-full`} suppressHydrationWarning>
       <head>
         <GoogleAnalytics measurementId={getGaMeasurementId(market)} />
       </head>

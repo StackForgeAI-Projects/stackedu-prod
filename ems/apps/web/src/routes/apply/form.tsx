@@ -4,6 +4,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
 import type { Application, SaveApplicationRequest } from '@stackedu/shared'
 import { ApplyLayout, type ApplyStep } from '@/components/ApplyLayout'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { SearchableSelect } from '@/components/apply/SearchableSelect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -405,9 +407,7 @@ function Step1({
       <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
         Personal Details
       </h2>
-      <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-        Enter your identity and contact details as on your National ID or passport.
-      </p>
+      <FormInfoBox lines={formInfo.applyPersonal} />
 
       <SectionDivider title="BASIC INFORMATION" />
       <FieldGrid>
@@ -554,9 +554,7 @@ function Step2({ values, errors, set, onNext, onBack, onSave, saving }: StepProp
       <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
         Academic History
       </h2>
-      <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-        Use the details from your Senior 6 / A-Level certificate or equivalent.
-      </p>
+      <FormInfoBox lines={formInfo.applyAcademic} />
 
       <SectionDivider title="SECONDARY / PRIOR EDUCATION" />
       <FieldGrid>
@@ -670,9 +668,7 @@ function Step3({
       <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
         Programme Selection
       </h2>
-      <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-        Confirm the programme and intake you are applying for.
-      </p>
+      <FormInfoBox lines={formInfo.applyProgramme} />
 
       <SectionDivider title="PROGRAMME DETAILS" />
       <FieldGrid>
@@ -763,9 +759,7 @@ function Step4({ values, errors, set, onNext, onBack, onSave, saving }: StepProp
       <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
         Parent / Guardian
       </h2>
-      <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-        Parent or legal guardian details are required for undergraduate applicants.
-      </p>
+      <FormInfoBox lines={formInfo.applyGuardian} />
 
       <SectionDivider title="GUARDIAN INFORMATION" />
       <FieldGrid>
@@ -846,9 +840,7 @@ function Step5({ values, errors, set, onNext, onBack, onSave, saving }: StepProp
       <h2 className="t-h3" style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)' }}>
         Additional Information
       </h2>
-      <p className="t-body mt-1" style={{ color: 'var(--muted-foreground)' }}>
-        Motivation, emergency contact, and your declaration of truth.
-      </p>
+      <FormInfoBox lines={formInfo.applyAdditional} />
 
       <SectionDivider title="PERSONAL STATEMENT" />
       <div className="mt-4">

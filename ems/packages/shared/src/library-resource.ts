@@ -1,6 +1,8 @@
 import type { ResourceType } from './enums'
 
-export const LIBRARY_RESOURCE_MAX_BYTES = 500 * 1024 * 1024
+import { MAX_UPLOAD_BYTES, formatUploadBytes } from './upload-limits'
+
+export const LIBRARY_RESOURCE_MAX_BYTES = MAX_UPLOAD_BYTES
 
 export const LIBRARY_RESOURCE_MIME_TYPES = new Set([
   'application/pdf',
@@ -72,8 +74,5 @@ export function formatFromLibraryFile(fileName: string, mimeType: string | null 
 }
 
 export function formatLibraryFileSize(bytes: number | null | undefined): string {
-  if (bytes == null || bytes <= 0) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return formatUploadBytes(bytes)
 }

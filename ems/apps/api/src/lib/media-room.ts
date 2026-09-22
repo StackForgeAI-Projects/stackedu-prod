@@ -24,6 +24,7 @@ export interface MediaRoomAdapter {
   closeRoom(roomName: string): Promise<void>
   startRecording(input: { roomName: string; fileKey: string }): Promise<{ jobId: string }>
   stopRecording(jobId: string): Promise<void>
+  muteAllStudents(roomName: string, hostIdentity: string): Promise<number>
 }
 
 let override: MediaRoomAdapter | null = null
@@ -133,6 +134,30 @@ function createLiveKitAdapter(creds: { url: string; apiKey: string; apiSecret: s
       const settings = requireLiveKit()
       const egress = new EgressClient(settings.url, settings.apiKey, settings.apiSecret)
       await egress.stopEgress(jobId)
+    },
+    async muteAllStudents(roomName, hostIdentity) {
+      const settings = requireLiveKit()
+      const rooms = new RoomServiceClient(settings.url, settings.apiKey, settings.apiSecret)
+      const participants = await rooms.listParticipants(roomName)
+      let muted = 0
+      for (const participant of participants) {
+        if (participant.identity === hostIdentity) continue
+        for (const track of participant.tracks ?? []) {
+          const sid = track.sid
+          if (!sid || track.muted) continue
+          const source = String(track.source ?? '')
+          const type = String(track.type ?? '')
+          const isMic =
+            source.includes('MICROPHONE') ||
+            source === '2' ||
+            type.includes('AUDIO') ||
+            type === '1'
+          if (!isMic) continue
+          await rooms.mutePublishedTrack(roomName, participant.identity, sid, true)
+          muted += 1
+        }
+      }
+      return muted
     },
   }
 }

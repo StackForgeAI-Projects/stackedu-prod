@@ -25,3 +25,13 @@ export function formatAppDateDdMmYyyy(value: string | Date | null | undefined): 
   const yyyy = parsed.getFullYear()
   return `${dd}-${mm}-${yyyy}`
 }
+
+/** Date and time on one line: DD-MM-YYYY HH:mm */
+export function formatAppDateTimeDdMmYyyy(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return '—'
+  const parsed = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(parsed.getTime())) return formatAppDateDdMmYyyy(value)
+  const hh = String(parsed.getHours()).padStart(2, '0')
+  const min = String(parsed.getMinutes()).padStart(2, '0')
+  return `${formatAppDateDdMmYyyy(parsed)} ${hh}:${min}`
+}

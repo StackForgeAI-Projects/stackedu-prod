@@ -1,4 +1,6 @@
-export const COURSE_MATERIAL_MAX_BYTES = 10 * 1024 * 1024
+import { MAX_UPLOAD_BYTES, formatUploadBytes } from './upload-limits'
+
+export const COURSE_MATERIAL_MAX_BYTES = MAX_UPLOAD_BYTES
 
 export const COURSE_MATERIAL_MIME_TYPES = new Set([
   'application/pdf',
@@ -27,10 +29,7 @@ export function mimeTypeForMaterialFile(file: File): string {
 }
 
 export function formatMaterialFileSize(bytes: number | null | undefined): string {
-  if (bytes == null || bytes <= 0) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return formatUploadBytes(bytes)
 }
 
 export function materialSourceLabel(input: {

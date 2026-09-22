@@ -13,6 +13,7 @@ import {
   generateLecturerQuestionsRequestSchema,
   createClassroomSessionRequestSchema,
   saveClassroomWhiteboardRequestSchema,
+  updateClassroomPreferencesRequestSchema,
   reserveLecturerQuestionImportRequestSchema,
   saveLecturerAssessmentItemsRequestSchema,
   updateLecturerAnnouncementRequestSchema,
@@ -92,12 +93,15 @@ import {
   draftClassroomSummary,
   endLecturerClassroomSession,
   getClassroomRecordingDownloadUrl,
+  getLecturerClassroomPreferences,
   getLecturerClassroomSession,
   joinLecturerClassroomSession,
   listLecturerClassroomSessions,
   loadClassroomWhiteboard,
+  muteAllClassroomStudents,
   publishClassroomSummary,
   saveClassroomWhiteboard,
+  saveLecturerClassroomPreferences,
   startLecturerClassroomSession,
   startLecturerRecording,
   stopLecturerRecording,
@@ -558,6 +562,21 @@ lecturerRoutes.get('/lecturer/analytics/:offeringId', ...lecturerOnly, async (c)
   })
 })
 
+lecturerRoutes.get('/lecturer/classroom/preferences', ...lecturerOnly, async (c) => {
+  const user = c.get('user')!
+  return c.json({
+    preferences: await getLecturerClassroomPreferences(user.institution.id, user.id),
+  })
+})
+
+lecturerRoutes.put('/lecturer/classroom/preferences', ...lecturerOnly, async (c) => {
+  const parsed = updateClassroomPreferencesRequestSchema.safeParse(await c.req.json().catch(() => ({})))
+  if (!parsed.success) throw validationFailed(fieldErrors(parsed.error))
+  return c.json({
+    preferences: await saveLecturerClassroomPreferences(c.get('user')!.institution.id, actor(c), parsed.data),
+  })
+})
+
 lecturerRoutes.get('/lecturer/classroom', ...lecturerOnly, async (c) => {
   const user = c.get('user')!
   return c.json({
@@ -607,6 +626,10 @@ lecturerRoutes.post('/lecturer/classroom/:id/record/start', ...lecturerOnly, asy
   return c.json({
     session: await startLecturerRecording(c.get('user')!.institution.id, actor(c), c.req.param('id')),
   })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/mute-all', ...lecturerOnly, async (c) => {
+  return c.json(await muteAllClassroomStudents(c.get('user')!.institution.id, actor(c), c.req.param('id')))
 })
 
 lecturerRoutes.post('/lecturer/classroom/:id/record/stop', ...lecturerOnly, async (c) => {

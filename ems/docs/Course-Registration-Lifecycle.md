@@ -123,10 +123,12 @@ These sit under the totals line. They use a filled background so closed, open, h
 1. **Totals** — how many courses are already registered, and how many credits those courses add up to, out of this semester’s **max credits** (default 21; Academic Admin can change it on a Semester calendar event). Example: `7 courses registered · 21 of 21 credits`. The same line is repeated at the foot of the **Already registered** list.
 2. **Download PDF** — a labeled button (not a mutation, so there is no confirm dialog). It stays off until at least one course is registered and the student profile has loaded. The file is built in the browser (same pattern as a fee receipt). It is not stored as an object in the database.
 3. **Already registered** — courses with status Approved or Pending. “None yet” if empty. This list is visible even when registration is closed. Each row has **Drop** (confirm) while registration is open, or while the student is over the cap so they can get back under it.
-4. **Available** — other offerings in the **current** semester. Each row is code, name, credits, and Compulsory or Elective.
+4. **Available** — other offerings in the **current** semester that belong to the **student’s programme department**. Courses from other departments do not appear. Each row is code, name, credits, and Compulsory or Elective.
+   - The page shows the student’s programme and department under the totals line.
    - Compulsory means the course’s year matches the student’s year of study.
    - Elective means it does not.
    - A course closed on **Edit Course** still lists here with a **Closed** badge. Its tick box stays off.
+   - A course the student already registered still shows under **Already registered** even if it is from another department, so they can drop it. After they drop it, it does not come back on **Available**.
 5. Tick offerings (only while registration is open, there is no fee hold, and that course is open for registration).
 6. **Confirm registration**. The button stays off when nothing is ticked, registration is closed, a fee hold is on, the credit cap would be broken, or the save is already running. Confirm before the request is sent.
 
@@ -148,7 +150,7 @@ The file name is `Course-registration-<student-id>-<semester>.pdf`. Download doe
 
 ### What happens on confirm
 
-1. The server checks fee hold (for adds), open semester status (adds always; drops also need open registration unless the student is already over the cap), that every id is an offering this semester, that each new offering is **open for registration**, and the semester credit cap. If any check fails, the student sees the error and nothing is saved.
+1. The server checks fee hold (for adds), open semester status (adds always; drops also need open registration unless the student is already over the cap), that every id is an offering this semester **in the student’s programme department**, that each new offering is **open for registration**, and the semester credit cap. If any check fails, the student sees the error and nothing is saved.
 2. New rows are stored as **Approved** with the time of registration. Courses already on the list are skipped (no double row). A previously dropped course is set back to **Approved** on the same unique student+offering row.
 3. Dropped rows are set to **Dropped** with the drop time. The offering **enrolled** count goes down by one.
 4. The offering **enrolled** count goes up by one for each new add.

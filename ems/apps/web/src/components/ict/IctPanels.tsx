@@ -13,6 +13,8 @@ import {
 } from '@stackedu/shared'
 import { buildAuditDetail } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -106,12 +108,14 @@ export function IctDialog({
   onOpenChange,
   title,
   description,
+  infoLines,
   children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   description?: string
+  infoLines?: readonly string[]
   children: React.ReactNode
 }) {
   return (
@@ -123,7 +127,8 @@ export function IctDialog({
         <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <DialogHeader className="pr-8">
             <DialogTitle className="text-xl" style={{ fontFamily: 'var(--font-display)' }}>{title}</DialogTitle>
-            {description ? <DialogDescription className="text-sm leading-relaxed">{description}</DialogDescription> : null}
+            {infoLines ? <FormInfoBox lines={infoLines} /> : null}
+            {!infoLines && description ? <DialogDescription className="text-sm leading-relaxed">{description}</DialogDescription> : null}
           </DialogHeader>
         </div>
         <div className="px-6 py-5">{children}</div>
@@ -371,6 +376,7 @@ export function IntegrationActionsPanel({ item }: { item: IctIntegration }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <FormInfoBox lines={formInfo.ictIntegration} />
       <p className="text-sm leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
         {item.description}
       </p>

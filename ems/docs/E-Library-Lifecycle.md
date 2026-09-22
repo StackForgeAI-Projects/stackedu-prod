@@ -1,27 +1,57 @@
 # E-Library lifecycle
 
-Plain-English path for how a title moves through StackEDU. Dates on these screens are shown as DD-MM-YYYY.
+A simple process flow for how a title moves through StackEDU. Dates on these screens show as **DD-MM-YYYY**.
+
+---
+
+## What the e-library is
+
+The e-library is the shared catalogue of titles for the institution. A **title** is one catalogue record (a book, journal, video, or other file). Readers search published titles and download a signed copy. The librarian owns the catalogue.
+
+A title is never hard-deleted. The librarian unpublishes it so it leaves the reader catalogues. Files stay.
+
+---
 
 ## Who does what
 
-- **Librarian** owns the catalogue. They add, edit, publish, unpublish, attach files, set who may open a title, group titles into collections, and fulfil or decline requests.
-- **Student**, **Lecturer**, and **Academic Admin** can search published titles, download a signed copy, and ask the librarian to add a title they cannot find.
-- **ICT Manager** and **Bursar** cannot use the e-library. Fee hold is decided on the student record, not in the bursar portal.
+| Who | What they do |
+| --- | --- |
+| **Librarian** | Adds, edits, publishes, and unpublishes titles. Attaches files. Sets who may open a title. Groups titles into collections. Fulfils or declines requests. |
+| **Student, Lecturer, Academic Admin** | Search published titles, download a signed copy, and ask the librarian to add a title they cannot find. |
+| **ICT Manager and Bursar** | Cannot use the e-library. Fee hold is decided on the student record, not in the bursar portal. |
 
-A title is never hard-deleted. The librarian unpublishes it so it leaves student, lecturer, and academic catalogues. Collections can be removed because they are only groupings; the titles inside stay in the catalogue.
+---
 
-## Add a title (Librarian)
+## Process flow
 
-1. Open **Resource Catalogue** (or **Add resource**).
-2. Fill in title, type, author, and the rest of the record.
-3. Optionally attach a file: PDF, Word, EPUB, other office formats, text, or video. Maximum 500 MB.
-4. Optionally draft a description with AI. Review it before saving.
-5. Leave **Publish** off if it is still a draft. Turn it on when readers may see it.
-6. Confirm in the dialog, then save.
+```
+Reader cannot find a title ──► Request a title ──► Librarian reviews
+                                                      │
+                              ┌───────────────────────┴───────────────────────┐
+                              ▼                                               ▼
+                           Fulfil                                          Decline
+                     (optionally link a                               (write a reason)
+                      catalogue title)                                        │
+                              │                                               │
+                              └──────────────► Requester is told in the app ──┘
 
-The record is created first. The file is uploaded to object storage after that, then attached to the record. Saving a file also drafts a description (if empty) and indexes the text so search can find it.
+Librarian adds a title ──► Set who may open it ──► Publish ──► Readers search and download
+                                      │
+                                      └── Unpublish later if it must leave the catalogues
+```
 
-## Set who may open it (Librarian)
+### 1. Librarian adds a title
+
+1. Open **Resource Catalogue** or **Add resource**.
+2. Fill in the title, type, author, and the rest of the record.
+3. Attach a file if you have one (PDF, Word, EPUB, office, text, or video). Maximum **14 MB**. A file over 14 MB opens a size dialog; images are reduced automatically when possible.
+4. You can draft a description with AI. Read it before you save.
+5. Leave **Publish** off while it is a draft. Turn it on when readers may see it.
+6. Confirm, then save.
+
+The record is created first. The file is uploaded after that, then attached. Saving a file can also draft a description (if empty) and index the text so search can find it.
+
+### 2. Librarian sets who may open it
 
 On the same form:
 
@@ -31,44 +61,49 @@ On the same form:
 
 Confirm, then save. Access rules apply only after the title is published.
 
-## Publish and unpublish (Librarian)
+### 3. Librarian publishes or unpublishes
 
 - **Publish** puts the title in the student, lecturer, and academic e-library.
 - **Unpublish** (archive icon) takes it back out. Files stay. Readers can no longer download it.
 
-## Collections (Librarian)
+### 4. Librarian groups titles (optional)
 
-Collections are reading lists for the librarian, not a second catalogue for students.
+A **collection** is a named group of catalogue titles for the librarian. It is not a second catalogue for students.
 
 1. Create a collection and confirm.
 2. Open it, add a catalogue title, confirm.
 3. Remove a title from the list if needed. The title stays in the catalogue.
 4. Edit or delete the collection. Deleting the collection does not delete the titles.
 
-## Requests and approvals
+### 5. A reader asks for a missing title
 
-1. A student, lecturer, or academic admin opens **E-Library**, chooses **Request a title**, fills title (and optional author and reason), then confirms.
-2. The librarian is notified and sees the row on **Resource Requests**.
-3. **Fulfil**: optionally link an existing catalogue title, confirm. The requester is notified and sent to their own e-library page.
-4. **Decline**: write a reason, confirm. The requester is notified with that reason.
+1. A student, lecturer, or academic admin opens **E-Library**.
+2. They choose **Request a title**, fill title (and optional author and reason), then confirm.
+3. Sending the request does **not** add the title. The librarian is notified and sees the row on **Resource Requests**.
+4. **Fulfil:** optionally link an existing catalogue title, confirm. The requester is notified and sent to their own e-library page.
+5. **Decline:** write a reason, confirm. The requester is notified with that reason.
 
 The requester can see Pending, Fulfilled, and Declined on their e-library page.
 
-## Browse and download (Student, Lecturer, Academic Admin)
+### 6. Readers browse and download
 
 1. Open **E-Library** (student, lecturer, or academic sidebar).
 2. Search by title, author, subject, or words inside the file. Typing waits a moment, then runs the search.
-3. The catalogue is a **table**, not a card grid: type, title, author (and year), subjects, and a download control. Sort a column by clicking its header. Filter by **Type** (book, journal, video, and so on). Empty types stay off the filter list.
+3. The catalogue is a **table**: type, title, author (and year), subjects, and a download control. Sort a column by clicking its header. Filter by **Type**. Empty types stay off the filter list.
 4. The table is paginated. Change page or how many rows to show (5, 10, 25, 50, 100) at the foot of the table. Default is 10 rows.
 5. Download a file with the row download control (tooltip on hover). That opens a short-lived signed link. The app records the download for licensing reports. A title with no file shows **No file**.
-6. **Request a title** if the search does not find it. Fill title (and optional author and reason), then confirm. Pending, fulfilled, and declined requests sit above the table with the date as DD-MM-YYYY.
+6. **Request a title** if the search does not find it.
 7. Unpublished titles never appear. Restricted titles never appear for that person.
 
-ICT and bursar accounts are refused if they call these routes. The same browse table is used for student, lecturer, and academic readers so the path stays one place.
+ICT and bursar accounts are refused if they call these routes. The same browse table is used for student, lecturer, and academic readers.
+
+---
 
 ## Analytics (Librarian)
 
 **Analytics** and the librarian dashboard count published titles, pending requests, and signed downloads and opens. Use this for licence reporting, not for guessing who opened a file without a signed link.
+
+---
 
 ## What readers never see
 

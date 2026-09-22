@@ -67,7 +67,9 @@ export function describeTimetableClash(input: {
     return `${input.room ?? 'This room'} is not available. It is already booked on ${when} for ${input.right}.`
   }
   if (input.kind === 'lecturer') {
-    return `${input.lecturer ?? 'This lecturer'} is already teaching on ${when} (${input.left} and ${input.right}).`
+    const who = input.lecturer ?? 'This lecturer'
+    const verb = who === 'You' ? 'are' : 'is'
+    return `${who} ${verb} already teaching on ${when} (${input.left} and ${input.right}).`
   }
   return `${input.left} already has a class on ${when}.`
 }

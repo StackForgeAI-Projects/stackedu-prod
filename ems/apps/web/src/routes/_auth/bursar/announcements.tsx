@@ -16,6 +16,8 @@ import { toast } from 'sonner'
 import { BursarShell } from '@/components/BursarShell'
 import { PortalErrorPanel } from '@/components/PortalErrorPanel'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { DataTable } from '@/components/DataTable'
 import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
@@ -464,6 +466,9 @@ function BursarAnnouncementsPage() {
                   </Button>
                 </div>
 
+                <div className="px-4 pt-3">
+                  <FormInfoBox lines={formInfo.composeFeeMessage} />
+                </div>
                 <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4" style={{ backgroundColor: 'var(--muted)' }}>
                   {!selectionCount && !title.trim() && !body.trim() ? (
                     <div className="flex flex-col items-center justify-center text-center px-6 py-10">
@@ -667,7 +672,8 @@ function BursarAnnouncementsPage() {
       <Sheet open={audienceSheetOpen} onOpenChange={setAudienceSheetOpen}>
         <SheetContent side="left" className="p-0 w-[min(100vw,360px)]">
           <SheetHeader className="px-4 pt-4 pb-0">
-            <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>Choose recipients</SheetTitle>
+              <SheetTitle style={{ fontFamily: 'var(--font-display)' }}>Choose recipients</SheetTitle>
+              <FormInfoBox lines={formInfo.chooseFeeRecipients} />
           </SheetHeader>
           <div className="h-[calc(100dvh-72px)]">
             {audiencePanelProps ? <AudiencePanel {...audiencePanelProps} /> : null}

@@ -14,10 +14,14 @@ import {
   ASSESSMENT_TYPE_LABELS,
   blankOptionsForQuestionType,
   DOCUMENT_IMPORT_ACCEPT,
+  MAX_UPLOAD_LABEL,
 } from '@stackedu/shared'
 import { LecturerShell } from '@/components/LecturerShell'
 import { PagedList } from '@/components/ListPagination'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { FileTooLargeDialog, useOversizeUpload } from '@/components/FileTooLargeDialog'
+import { FormInfoBox } from '@/components/FormInfoBox'
+import { formInfo } from '@/lib/form-info-copy'
 import { IconActionButton } from '@/components/IconActionButton'
 import { AssessmentWeightField } from '@/components/AssessmentWeightField'
 import { Button } from '@/components/ui/button'
@@ -200,7 +204,7 @@ function AssessmentBuilderPage() {
                               </span>
                             </div>
                             <p className="t-caption" style={{ color: 'var(--muted-foreground)' }}>
-                              {course?.code ?? quiz.courseCode} · {quiz.itemCount} question{quiz.itemCount === 1 ? '' : 's'}
+                              {course?.code ?? quiz.courseCode} · {quiz.itemCount === 1 ? '1 question' : `${quiz.itemCount} questions`}
                               {quiz.dueAt ? ` · due ${formatDateShort(quiz.dueAt)}` : ''} · {quiz.totalMarks} marks
                             </p>
                           </div>
@@ -490,14 +494,12 @@ function CreateQuizForm({
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
           Create Assessment/Quiz
         </h3>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          Choose the type first. Then pin questions from the bank, or draw a random set from a topic.
-        </p>
+        <FormInfoBox lines={formInfo.createAssessment} />
       </div>
       <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 5 quiz" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Assessment title" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -970,11 +972,15 @@ function QuestionForm({
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
           {isEdit ? 'Edit question' : 'Add question'}
         </h3>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          {isEdit && question.answeredCount > 0
-            ? 'Students have answered this item. Saving creates a new version and leaves the old one on past papers.'
-            : 'This question lives in the institution bank, not only on one quiz.'}
-        </p>
+        <FormInfoBox
+          lines={
+            isEdit && question.answeredCount > 0
+              ? formInfo.editQuestionAnswered
+              : isEdit
+                ? formInfo.editQuestion
+                : formInfo.addQuestion
+          }
+        />
       </div>
       <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
@@ -984,7 +990,7 @@ function QuestionForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Topic</label>
-            <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Foundations" />
+            <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic" />
           </div>
           <div>
             <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Course (optional)</label>
@@ -1137,6 +1143,7 @@ function GenerateQuestionsForm({
   const [count, setCount] = useState('4')
   const [types, setTypes] = useState<QuestionType[]>(['MultipleChoice', 'TrueFalse', 'ShortAnswer'])
   const [file, setFile] = useState<File | null>(null)
+  const { oversizeFile, setOversizeFile, takeFile } = useOversizeUpload()
   const [formUrl, setFormUrl] = useState('')
   const [useMaterials, setUseMaterials] = useState(true)
   const [alsoCreate, setAlsoCreate] = useState(Boolean(defaultAlsoCreate && !attachAssessmentId))
@@ -1205,9 +1212,7 @@ function GenerateQuestionsForm({
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--foreground)' }}>
           Generate with AI
         </h3>
-        <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-          Questions follow the selected course. You can also upload a PDF, Word, Excel or CSV file, or paste a Google Form link. If a cloud model is slow or missing a key, the in-built generator is used instead.
-        </p>
+        <FormInfoBox lines={formInfo.generateQuestions} />
       </div>
       <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
@@ -1257,11 +1262,15 @@ function GenerateQuestionsForm({
           <input
             type="file"
             accept={DOCUMENT_IMPORT_ACCEPT}
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const next = event.target.files?.[0] ?? null
+              event.target.value = ''
+              takeFile(next, setFile)
+            }}
             className="w-full text-sm"
           />
           <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
-            PDF, Word, Excel, CSV, or a Google Form link below.
+            PDF, Word, Excel, CSV · max {MAX_UPLOAD_LABEL}. Or a Google Form link below.
           </p>
         </div>
         <div>
@@ -1291,7 +1300,7 @@ function GenerateQuestionsForm({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Assessment title</label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 4 quiz" />
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Assessment title" />
                 </div>
                 <div>
                   <label className="t-label mb-1.5 block" style={{ color: 'var(--foreground)' }}>Type</label>
@@ -1337,6 +1346,14 @@ function GenerateQuestionsForm({
           onConfirm={run}
         />
       </div>
+      <FileTooLargeDialog
+        file={oversizeFile}
+        onAccept={(next) => {
+          setFile(next)
+          setOversizeFile(null)
+        }}
+        onClose={() => setOversizeFile(null)}
+      />
     </div>
   )
 }

@@ -90,6 +90,7 @@ Open **System Settings**. You can change:
 - **Timezone** (class times and reminder emails use this)
 - Language
 - Attendance edit window
+- Classroom recording keep-window (hours or days; default 72 hours)
 - Payment collection (full payment or instalments)
 
 Click **Save settings** only if you changed something and confirmed.
@@ -114,7 +115,7 @@ Open **Analytics**. Tiles include total users, active sessions, pending revocati
 
 ## Notifications
 
-Open **Notifications**. System messages sent to this ICT account appear here. The page can be empty. That is normal.
+Open the bell in the header, or open **Notifications** in the sidebar. System messages sent to this ICT account appear here. The page can be empty. That is normal. Click an unread item in the dropdown or on the page. It marks as read at once and the red number on the bell drops.
 
 ---
 
