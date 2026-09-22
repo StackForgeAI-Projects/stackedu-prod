@@ -7,6 +7,8 @@ This is a live product. `main` is production. Nothing goes onto `main` except th
 - `development` — where you work. Docs, context, and the design system live here.
 - `main` — the live site. Code gets here only after a pull request.
 
+A third name, `auto/strip-dev-only`, appears only while a cleanup pull request is open. That pull request takes docs and design off `main` after a production merge. It is not a place to do work. After you merge it, the next update to `main` deletes that branch.
+
 ## What “PR required” means
 
 You cannot push straight to `main` from your laptop. You open a pull request from `development` to `main`. CodeRabbit reviews it. Then you merge it.
@@ -22,7 +24,7 @@ So the cleanup robot does not push to `main`. If a merge accidentally copies doc
 ## Daily flow
 
 1. Work and push on `development`. That push does not update the live website.
-2. Open a pull request: `development` → `main`.
+2. If a pull request from `development` to `main` is already open, the push updates it. If the last one was merged, open a new pull request. The organisation does not let a GitHub Action open that pull request, so it is opened with your GitHub login.
 3. Wait until the **CodeRabbit** check is green. GitHub blocks **Merge pull request** while that check is still running or has failed.
 4. **You** press **Merge pull request**. GitHub must not merge by itself. Auto-merge is off.
 5. That merge is the only thing that updates `main`. Vercel deploys the live site from `main` only, after the merge.
@@ -30,6 +32,12 @@ So the cleanup robot does not push to `main`. If a merge accidentally copies doc
 7. If docs/context/design landed on `main`, the cleanup robot opens a pull request. You merge that one too, after its CodeRabbit check is green. It does not merge itself.
 
 A green “deployed” line on a pull request is not the live site. Live Vercel deploys are the rows marked Production on `main`.
+
+## What “1 commit ahead and 2 commits behind” means
+
+**Ahead** means `development` has work that is not on `main` yet. That work belongs in a pull request.
+
+**Behind** means `main` has merge commits that are not in `development`’s history. Those commits are created when you press Merge. They do not mean files are missing from `development`. After the next catch-up merge, the “behind” count goes back to zero. It can show up again the next time you merge to `main`.
 
 ## Work list — 22 Sep 2026
 
@@ -52,6 +60,7 @@ Mark each item DONE when it is finished. Do not reopen a DONE item.
 15. DONE — E-library lifecycle stays the plain-English guide in `ems/docs/E-Library-Lifecycle.md`.
 16. DONE — Relevant API tests passed: config, live classroom, course modules, role notifications, and provisioning. The web production build passed.
 17. DONE — Live Vercel deploy waits for a manual merge to `main`. CodeRabbit is a required check, so Merge stays blocked until that review finishes. Pull-request builds are ignored; only a production deploy of `main` is built.
+18. DONE — After pull request 11 was merged, the next `development` push had no open pull request. `development` is caught up with `main`’s merge commits, and a new pull request is open. The extra branch is only the docs cleanup.
 
 Track new files under the development-only paths with `git add -f`.
 
