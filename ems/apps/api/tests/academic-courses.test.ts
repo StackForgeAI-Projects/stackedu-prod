@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { DEFAULT_SEMESTER_MAX_CREDITS, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, reachableNotificationActionUrl } from '@stackedu/shared'
+import { DEFAULT_SEMESTER_MAX_CREDITS, DRAFT_APPLICATION_REVIEW_MESSAGE, LECTURER_ASSIGNMENT_REQUIRES_SEMESTER, reachableNotificationActionUrl } from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
 import { academicYears, courses, departments, faculties, programmes, semesters, academicCalendarEvents } from '../src/db/institution/schema/academic'
+import { applications } from '../src/db/institution/schema/admissions'
 import { notifications } from '../src/db/institution/schema/communication'
 import { students } from '../src/db/institution/schema/students'
 import { courseOfferings, courseRegistrations } from '../src/db/institution/schema/teaching'
@@ -13,10 +14,12 @@ import {
   deleteAcademicCourse,
   createAcademicCalendarEvent,
   deleteAcademicCalendarEvent,
+  listAcademicCourses,
   listAcademicSemesters,
   updateAcademicCalendarEvent,
   updateAcademicCourse,
 } from '../src/services/academic'
+import { getApplicationForReview } from '../src/services/admissions-review'
 import { getRegistrationState, getStudentProfile, listStudentNotifications, registerForCourses } from '../src/services/student'
 import { createUser } from '../src/services/users'
 import { createTestPlatform, uniqueSlug, type TestPlatform } from './helpers/test-database'
@@ -158,6 +161,59 @@ describe('academic courses', () => {
     })
 
     expect(created.lecturerId).toBe(lecturerId)
+  })
+
+  it('lists the assigned lecturer when the course is on a semester that is not current', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const [year] = await db.select({ id: academicYears.id }).from(academicYears).limit(1)
+    const [other] = await db.insert(semesters).values({
+      academicYearId: year!.id,
+      name: 'Semester 2',
+      sequence: 2,
+      startDate: '2027-02-01',
+      endDate: '2027-06-30',
+      isCurrent: false,
+      status: 'Planned',
+    }).returning({ id: semesters.id })
+
+    const created = await createAcademicCourse(institutionId, actor, {
+      code: 'CMP109',
+      name: 'Networks',
+      departmentName: 'Department of Computing',
+      credits: 3,
+      lecturerId,
+      semesterId: other!.id,
+    })
+
+    const listed = await listAcademicCourses(institutionId)
+    const row = listed.find((course) => course.id === created.id)
+    expect(row?.lecturerId).toBe(lecturerId)
+    expect(row?.lecturerName).toContain('Course Lecturer')
+  })
+
+  it('tells Academic Admin that a draft application has not been submitted', async () => {
+    const db = await getInstitutionDb(institutionId)
+    const [programme] = await db.select({ id: programmes.id }).from(programmes).limit(1)
+    const [draft] = await db.insert(applications).values({
+      reference: 'APP-DRAFT-1',
+      programmeId: programme!.id,
+      firstName: 'Uba',
+      lastName: 'Mike',
+      email: 'uba@draft.test',
+      phone: '0780000000',
+      status: 'Draft',
+    }).returning({ id: applications.id })
+
+    const draftError = await getApplicationForReview(institutionId, draft!.id).catch((cause: AppError) => cause)
+    expect(draftError).toBeInstanceOf(AppError)
+    expect((draftError as AppError).message).toBe(DRAFT_APPLICATION_REVIEW_MESSAGE)
+
+    const missing = await getApplicationForReview(
+      institutionId,
+      '00000000-0000-4000-8000-000000000099',
+    ).catch((cause: AppError) => cause)
+    expect(missing).toBeInstanceOf(AppError)
+    expect((missing as AppError).message).toBe('Application could not be found.')
   })
 
   it('lets an academic admin delete a course with no enrolments', async () => {

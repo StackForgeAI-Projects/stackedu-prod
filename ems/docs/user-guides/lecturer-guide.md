@@ -118,11 +118,7 @@ Open **E-Library**. Search published titles. You can click **Request a title** i
 
 ## Timetable
 
-Open **Timetable**. You see weekly slots and **Add slot**.
-
-If two classes share a room or your time, a red box lists the clashes in simple English (the room is not available, or you are already teaching).
-
-Do not add another slot on a taken room. Use **Edit** or **Remove** (confirm first) to move a class.
+Open **Timetable**. Academic Admin sets the times. Open a class and **Confirm availability**, or **Request a change** and write why. Students see the class only after you confirm. A red box lists a room or time that overlaps. Ask Academic Admin to move it.
 
 ---
 

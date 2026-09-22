@@ -162,7 +162,7 @@ export const ROLE_APP_PATH_PREFIX: Record<UserRole, string> = {
   ICTManager: '/ict',
 }
 
-/** Default credit cap for a semester. Academic Admin can raise or lower it. */
+/** Default credit cap stored on a semester. Course registration enforces it. */
 export const DEFAULT_SEMESTER_MAX_CREDITS = 21
 
 /** Hide Open links that would send this role to another portal. */

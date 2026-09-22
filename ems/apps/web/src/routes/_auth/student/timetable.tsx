@@ -49,7 +49,7 @@ function TimetablePage() {
   const schedule = data?.schedule ?? []
 
   return (
-    <StudentShell pageTitle="Timetable" guide="Your approved classes this week. Click a class to set a reminder — StackEDU emails you and notifies you in the app.">
+    <StudentShell pageTitle="Timetable" guide="Your approved classes this week, after the lecturer has confirmed the time. Click a class to set a reminder — StackEDU emails you and notifies you in the app.">
       <div className="animate-fade-up" style={{ padding: '24px 16px 56px' }}>
         <div className="mb-8">
           <h1 className="t-h1 mb-1" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.015em' }}>

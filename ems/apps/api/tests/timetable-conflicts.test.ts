@@ -4,14 +4,19 @@ import { timetableTimesOverlap } from '@stackedu/shared'
 import { getInstitutionDb } from '../src/db/connection'
 import { provisionInstitution } from '../src/db/provision'
 import { academicYears, departments, faculties, programmes, semesters } from '../src/db/institution/schema/academic'
-import { courseOfferings, rooms } from '../src/db/institution/schema/teaching'
+import { students } from '../src/db/institution/schema/students'
+import { courseOfferings, courseRegistrations, rooms } from '../src/db/institution/schema/teaching'
 import { AppError } from '../src/lib/errors'
-import { askLecturerToFreeTimetableSlot, createAcademicCourse, listAcademicTimetableSlots } from '../src/services/academic'
-import { notifications } from '../src/db/institution/schema/communication'
 import {
-  createLecturerTimetableSlot,
-  updateLecturerTimetableSlot,
-} from '../src/services/lecturer'
+  askLecturerToFreeTimetableSlot,
+  createAcademicCourse,
+  createAcademicTimetableSlot,
+  listAcademicTimetableSlots,
+  updateAcademicTimetableSlot,
+} from '../src/services/academic'
+import { notifications } from '../src/db/institution/schema/communication'
+import { confirmLecturerTimetableSlot, requestLecturerTimetableChange } from '../src/services/lecturer'
+import { getStudentDashboard } from '../src/services/student'
 import { createUser } from '../src/services/users'
 import { createTestPlatform, uniqueSlug, type TestPlatform } from './helpers/test-database'
 
@@ -135,8 +140,9 @@ describe('timetable slot clashes', () => {
   })
 
   it('refuses a room that is already booked in that time', async () => {
-    await createLecturerTimetableSlot(institutionId, lecturerActor, {
+    await createAcademicTimetableSlot(institutionId, adminActor, {
       offeringId: offeringA,
+      lecturerId: lecturerActor.id,
       dayOfWeek: 1,
       startTime: '08:00',
       endTime: '10:00',
@@ -144,8 +150,9 @@ describe('timetable slot clashes', () => {
       roomId: hallA,
     })
 
-    const clash = await createLecturerTimetableSlot(institutionId, lecturerActor, {
+    const clash = await createAcademicTimetableSlot(institutionId, adminActor, {
       offeringId: offeringB,
+      lecturerId: lecturerActor.id,
       dayOfWeek: 1,
       startTime: '09:00',
       endTime: '11:00',
@@ -159,8 +166,9 @@ describe('timetable slot clashes', () => {
   })
 
   it('refuses a lecturer teaching two overlapping classes even in different rooms', async () => {
-    const clash = await createLecturerTimetableSlot(institutionId, lecturerActor, {
+    const clash = await createAcademicTimetableSlot(institutionId, adminActor, {
       offeringId: offeringB,
+      lecturerId: lecturerActor.id,
       dayOfWeek: 1,
       startTime: '08:30',
       endTime: '09:30',
@@ -173,8 +181,9 @@ describe('timetable slot clashes', () => {
   })
 
   it('allows back-to-back use of the same room and lists the live week for Academic Admin', async () => {
-    const slot = await createLecturerTimetableSlot(institutionId, lecturerActor, {
+    const slot = await createAcademicTimetableSlot(institutionId, adminActor, {
       offeringId: offeringB,
+      lecturerId: lecturerActor.id,
       dayOfWeek: 1,
       startTime: '10:00',
       endTime: '12:00',
@@ -182,19 +191,17 @@ describe('timetable slot clashes', () => {
       roomId: hallA,
     })
     expect(slot.startTime).toBe('10:00')
+    expect(slot.availabilityStatus).toBe('Pending')
 
-    const other = await createLecturerTimetableSlot(
-      institutionId,
-      { id: lecturerTwoId, email: 'lecturer2@clash.test', role: 'Lecturer' },
-      {
-        offeringId: offeringC,
-        dayOfWeek: 1,
-        startTime: '08:00',
-        endTime: '10:00',
-        sessionType: 'Lab',
-        roomId: lab3,
-      },
-    )
+    const other = await createAcademicTimetableSlot(institutionId, adminActor, {
+      offeringId: offeringC,
+      lecturerId: lecturerTwoId,
+      dayOfWeek: 1,
+      startTime: '08:00',
+      endTime: '10:00',
+      sessionType: 'Lab',
+      roomId: lab3,
+    })
     expect(other.courseCode).toContain('CLS')
 
     const week = await listAcademicTimetableSlots(institutionId)
@@ -207,9 +214,9 @@ describe('timetable slot clashes', () => {
     const labSlot = week.find((row) => row.room === 'Lab 3' && row.startTime === '08:00')
     expect(labSlot).toBeTruthy()
 
-    const moved = await updateLecturerTimetableSlot(
+    const moved = await updateAcademicTimetableSlot(
       institutionId,
-      { id: lecturerTwoId, email: 'lecturer2@clash.test', role: 'Lecturer' },
+      adminActor,
       labSlot!.id,
       { roomId: hallA },
     ).catch((cause: AppError) => cause)
@@ -242,8 +249,9 @@ describe('timetable slot clashes', () => {
   })
 
   it('refuses a second overlapping slot on the same course', async () => {
-    const clash = await createLecturerTimetableSlot(institutionId, lecturerActor, {
+    const clash = await createAcademicTimetableSlot(institutionId, adminActor, {
       offeringId: offeringA,
+      lecturerId: lecturerActor.id,
       dayOfWeek: 1,
       startTime: '08:30',
       endTime: '09:00',
@@ -253,5 +261,75 @@ describe('timetable slot clashes', () => {
 
     expect(clash).toBeInstanceOf(AppError)
     expect((clash as AppError).message).toContain('already has a class')
+  })
+
+  it('shows a class to students only after the lecturer confirms', async () => {
+    const created = await createAcademicTimetableSlot(institutionId, adminActor, {
+      offeringId: offeringB,
+      lecturerId: lecturerActor.id,
+      dayOfWeek: 3,
+      startTime: '14:00',
+      endTime: '16:00',
+      sessionType: 'Lecture',
+      roomId: lab3,
+    })
+    expect(created.availabilityStatus).toBe('Pending')
+
+    const student = await createUser({
+      institutionId,
+      email: 'student@clash.test',
+      fullName: 'Clash Student',
+      role: 'Student',
+      password: 'Correct#Horse2026',
+    })
+    const db = await getInstitutionDb(institutionId)
+    const [programme] = await db.select({ id: programmes.id }).from(programmes).limit(1)
+    const [studentRow] = await db.insert(students).values({
+      userId: student.id,
+      studentNumber: 'CLU-2026-0001',
+      programmeId: programme!.id,
+      yearOfStudy: 1,
+    }).returning({ id: students.id })
+    await db.insert(courseRegistrations).values({
+      studentId: studentRow!.id,
+      courseOfferingId: offeringB,
+      status: 'Approved',
+    })
+
+    const hidden = await getStudentDashboard(institutionId, student.id)
+    expect(hidden.schedule.some((row) => row.id === created.id)).toBe(false)
+
+    const lecturerNotes = await db
+      .select({ title: notifications.title })
+      .from(notifications)
+      .where(eq(notifications.userId, lecturerActor.id))
+    expect(lecturerNotes.some((note) => note.title.startsWith('Confirm your class:'))).toBe(true)
+
+    const confirmed = await confirmLecturerTimetableSlot(institutionId, lecturerActor, created.id)
+    expect(confirmed.availabilityStatus).toBe('Confirmed')
+    const visible = await getStudentDashboard(institutionId, student.id)
+    expect(visible.schedule.some((row) => row.id === created.id)).toBe(true)
+
+    const studentNotes = () => db
+      .select({ title: notifications.title })
+      .from(notifications)
+      .where(eq(notifications.userId, student.id))
+    expect((await studentNotes()).filter((note) => note.title.startsWith('Class on your timetable:'))).toHaveLength(1)
+
+    await confirmLecturerTimetableSlot(institutionId, lecturerActor, created.id)
+    expect((await studentNotes()).filter((note) => note.title.startsWith('Class on your timetable:'))).toHaveLength(1)
+
+    const changed = await requestLecturerTimetableChange(institutionId, lecturerActor, created.id, {
+      reason: 'I already teach at that time.',
+    })
+    expect(changed.availabilityStatus).toBe('ChangeRequested')
+    const pulled = await getStudentDashboard(institutionId, student.id)
+    expect(pulled.schedule.some((row) => row.id === created.id)).toBe(false)
+
+    const adminNotes = await db
+      .select({ body: notifications.body })
+      .from(notifications)
+      .where(eq(notifications.userId, adminActor.id))
+    expect(adminNotes.some((note) => note.body.includes('I already teach at that time.'))).toBe(true)
   })
 })

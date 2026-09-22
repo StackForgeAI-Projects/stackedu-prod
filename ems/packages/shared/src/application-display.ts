@@ -1,6 +1,10 @@
 import type { ApplicationDocumentType, RequestedDocuments } from './schemas/application'
 import type { ApplicationStatus, PaymentMethod, PaymentStatus } from './enums'
 
+/** Shown when Academic Admin opens Review on an application that is still a draft. */
+export const DRAFT_APPLICATION_REVIEW_MESSAGE =
+  "Application could not be found because the applicant hasn't yet submitted it"
+
 /** Prefix for ad-hoc document requests outside the standard application set. */
 export const CUSTOM_DOCUMENT_PREFIX = 'Other:'
 

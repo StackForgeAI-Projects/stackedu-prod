@@ -557,7 +557,14 @@ export const lecturerRoomOptionSchema = z.object({
   building: z.string().nullable(),
 })
 
-export const lecturerTimetableSlotSchema = lecturerScheduleItemSchema
+export const lecturerTimetableSlotSchema = lecturerScheduleItemSchema.extend({
+  availabilityStatus: z.enum(['Pending', 'Confirmed', 'ChangeRequested']),
+  changeReason: z.string().nullable(),
+})
+
+export const requestTimetableChangeRequestSchema = z.object({
+  reason: z.string().trim().min(4, 'Write a short reason (at least 4 characters).').max(1000),
+})
 
 export const saveLecturerTimetableSlotRequestSchema = z.object({
   offeringId: uuidSchema,
@@ -616,6 +623,7 @@ export type LecturerRoomOption = z.infer<typeof lecturerRoomOptionSchema>
 export type LecturerTimetableSlot = z.infer<typeof lecturerTimetableSlotSchema>
 export type SaveLecturerTimetableSlotRequest = z.infer<typeof saveLecturerTimetableSlotRequestSchema>
 export type UpdateLecturerTimetableSlotRequest = z.infer<typeof updateLecturerTimetableSlotRequestSchema>
+export type RequestTimetableChangeRequest = z.infer<typeof requestTimetableChangeRequestSchema>
 export type DescribeLecturerMaterialRequest = z.infer<typeof describeLecturerMaterialRequestSchema>
 export type LecturerQuestion = z.infer<typeof lecturerQuestionSchema>
 export type CreateLecturerQuestionRequest = z.infer<typeof createLecturerQuestionRequestSchema>

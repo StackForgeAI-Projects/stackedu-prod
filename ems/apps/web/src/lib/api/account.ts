@@ -1,4 +1,5 @@
 import type {
+  AccountLiveCursor,
   AccountNotification,
   AccountProfile,
   ChangePasswordRequest,
@@ -16,6 +17,7 @@ import { api } from './client'
 export const accountProfileQueryKey = ['account', 'profile'] as const
 export const accountNotificationPrefsQueryKey = ['account', 'notification-preferences'] as const
 export const accountNotificationsQueryKey = ['account', 'notifications'] as const
+export const accountLiveQueryKey = ['account', 'live'] as const
 
 export async function getAccountProfile(): Promise<AccountProfile> {
   const { profile } = await api.get<{ profile: AccountProfile }>('/account/profile')
@@ -60,6 +62,11 @@ export async function updateAccountNotificationPreferences(input: UpdateNotifica
     input,
   )
   return preferences
+}
+
+export async function getAccountLiveCursor(): Promise<AccountLiveCursor> {
+  const { cursor } = await api.get<{ cursor: AccountLiveCursor }>('/account/live')
+  return cursor
 }
 
 export async function getAccountNotifications(limit = 8): Promise<AccountNotification[]> {

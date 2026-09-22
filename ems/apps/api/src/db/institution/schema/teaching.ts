@@ -122,6 +122,13 @@ export const timetableSlots = pgTable(
     endTime: time('end_time').notNull(),
     /** e.g. Lecture, Tutorial, Practical. */
     sessionType: text('session_type').notNull().default('Lecture'),
+    /**
+     * Pending until the assigned lecturer confirms. Students only see Confirmed.
+     * Existing rows stay Confirmed so a migration does not hide a live week.
+     */
+    availabilityStatus: text('availability_status').notNull().default('Confirmed'),
+    changeReason: text('change_reason'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true, mode: 'string' }),
     ...timestamps(),
   },
   (t) => [

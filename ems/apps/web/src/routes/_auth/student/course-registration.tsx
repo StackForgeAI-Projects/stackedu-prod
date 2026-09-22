@@ -184,7 +184,7 @@ function CourseRegistrationPage() {
                 body={
                   extraCredits > 0
                     ? `You cannot register more than ${data.maxCredits} credits. Uncheck a course, or drop one you already registered.`
-                    : `You have ${data.registeredCredits} of ${data.maxCredits} credits. Drop a course before you add another, unless Academic Admin raises the cap.`
+                    : `You have ${data.registeredCredits} of ${data.maxCredits} credits. Drop a course before you add another.`
                 }
               />
             ) : null}

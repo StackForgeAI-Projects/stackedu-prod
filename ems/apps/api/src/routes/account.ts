@@ -19,6 +19,7 @@ import {
   enableAccountTwoFactor,
   getAccountNotificationPreferences,
   getAccountProfile,
+  getAccountLiveCursor,
   listAccountNotifications,
   markAccountNotificationRead,
   sessionUserFrom,
@@ -107,6 +108,11 @@ accountRoutes.patch('/account/notification-preferences', requireAuth, async (c) 
   return c.json({
     preferences: Object.entries(stored).map(([key, value]) => ({ key, ...value })),
   })
+})
+
+accountRoutes.get('/account/live', requireAuth, async (c) => {
+  const user = c.get('user')!
+  return c.json({ cursor: await getAccountLiveCursor(user.institution.id, user.id) })
 })
 
 accountRoutes.get('/account/notifications', requireAuth, async (c) => {

@@ -24,6 +24,25 @@ export const TIMETABLE_WEEKDAYS = [
 /** Teaching week shown on the student grid (Monday–Friday). */
 export const TIMETABLE_GRID_DAYS = TIMETABLE_WEEKDAYS.filter((day) => day.iso <= 5)
 
+export const TIMETABLE_AVAILABILITY_STATUSES = ['Pending', 'Confirmed', 'ChangeRequested'] as const
+export type TimetableAvailabilityStatus = (typeof TIMETABLE_AVAILABILITY_STATUSES)[number]
+
+export function timetableAvailabilityStatus(value: string): TimetableAvailabilityStatus {
+  return (TIMETABLE_AVAILABILITY_STATUSES as readonly string[]).includes(value)
+    ? (value as TimetableAvailabilityStatus)
+    : 'Pending'
+}
+
+const TIMETABLE_AVAILABILITY_LABELS: Record<TimetableAvailabilityStatus, string> = {
+  Pending: 'Waiting for lecturer',
+  Confirmed: 'Live for students',
+  ChangeRequested: 'Change requested',
+}
+
+export function timetableAvailabilityLabel(status: TimetableAvailabilityStatus): string {
+  return TIMETABLE_AVAILABILITY_LABELS[status]
+}
+
 export function jsWeekdayToIso(jsDay: number): number {
   return jsDay === 0 ? 7 : jsDay
 }

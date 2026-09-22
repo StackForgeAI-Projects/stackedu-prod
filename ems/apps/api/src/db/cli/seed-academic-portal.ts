@@ -511,6 +511,7 @@ export async function seedAcademicPortal(
         startTime: '14:00',
         endTime: '16:00',
         sessionType: 'Tutorial',
+        availabilityStatus: 'Pending',
       })
     }
   }
@@ -647,6 +648,7 @@ async function seedLecturerDemo(
       startTime: slot.start,
       endTime: slot.end,
       sessionType: slot.type,
+      availabilityStatus: 'Pending',
     })
     booked.push({
       day: slot.day,

@@ -15,6 +15,9 @@ import type {
   AcademicStudentRow,
   AcademicTimetableSlot,
   AskLecturerTimetableSlotRequest,
+  CreateAcademicTimetableSlotRequest,
+  LecturerRoomOption,
+  UpdateAcademicTimetableSlotRequest,
   AcademicDepartmentOption,
   CreateAcademicCalendarEventRequest,
   CreateAcademicCourseRequest,
@@ -39,6 +42,7 @@ export const academicProgrammesQueryKey = ['academic', 'programmes'] as const
 export const academicProgrammeQueryKey = (id: string) => ['academic', 'programme', id] as const
 export const academicCalendarQueryKey = ['academic', 'calendar'] as const
 export const academicTimetableQueryKey = ['academic', 'timetable'] as const
+export const academicRoomsQueryKey = ['academic', 'rooms'] as const
 export const academicLecturersQueryKey = ['academic', 'lecturers'] as const
 export const academicDepartmentsQueryKey = ['academic', 'departments'] as const
 export const academicSemestersQueryKey = ['academic', 'semesters'] as const
@@ -109,6 +113,30 @@ export async function listAcademicCalendarEvents(): Promise<AcademicCalendarEven
 export async function listAcademicTimetableSlots(): Promise<AcademicTimetableSlot[]> {
   const { slots } = await api.get<{ slots: AcademicTimetableSlot[] }>('/academic/timetable')
   return slots
+}
+
+export async function listAcademicRooms(): Promise<LecturerRoomOption[]> {
+  const { rooms } = await api.get<{ rooms: LecturerRoomOption[] }>('/academic/rooms')
+  return rooms
+}
+
+export async function createAcademicTimetableSlot(
+  input: CreateAcademicTimetableSlotRequest,
+): Promise<AcademicTimetableSlot> {
+  const { slot } = await api.post<{ slot: AcademicTimetableSlot }>('/academic/timetable', input)
+  return slot
+}
+
+export async function updateAcademicTimetableSlot(
+  slotId: string,
+  input: UpdateAcademicTimetableSlotRequest,
+): Promise<AcademicTimetableSlot> {
+  const { slot } = await api.patch<{ slot: AcademicTimetableSlot }>(`/academic/timetable/${slotId}`, input)
+  return slot
+}
+
+export async function deleteAcademicTimetableSlot(slotId: string): Promise<void> {
+  await api.delete(`/academic/timetable/${slotId}`)
 }
 
 export async function askLecturerToFreeTimetableSlot(

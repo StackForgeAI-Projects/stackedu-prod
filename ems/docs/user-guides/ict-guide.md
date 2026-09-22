@@ -60,7 +60,7 @@ Open **User Management**. Search by name, email, or student number. Filter by ro
 
 Open **Access Levels**. Pick a role (Academic Admin, Applicant, Bursar, ICT Manager, Lecturer, Librarian, Student). Each switch is one action.
 
-The timetable switch explains that lecturers set times and a room cannot be booked twice.
+The timetable switch explains that Academic Admin sets class times and the lecturer confirms them. A room or lecturer cannot be booked twice.
 
 Do not save changes unless you mean to change what that role can do.
 

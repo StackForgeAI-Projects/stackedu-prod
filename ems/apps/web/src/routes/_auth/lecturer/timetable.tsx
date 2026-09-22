@@ -1,63 +1,33 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react'
-import type { LecturerTimetableSlot, SaveLecturerTimetableSlotRequest } from '@stackedu/shared'
-import { TIMETABLE_WEEKDAYS, findTimetableClashes, timetableWeekdayLabel } from '@stackedu/shared'
+import { useMemo, useState } from 'react'
+import { CalendarDays } from 'lucide-react'
+import type { LecturerTimetableSlot } from '@stackedu/shared'
+import { findTimetableClashes, timetableAvailabilityLabel, timetableWeekdayLabel } from '@stackedu/shared'
 import { LecturerShell } from '@/components/LecturerShell'
 import { CourseCodePill } from '@/components/CourseCodePill'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
-import { FormInfoBox } from '@/components/FormInfoBox'
-import { formInfo } from '@/lib/form-info-copy'
 import { PagedList } from '@/components/ListPagination'
 import { TimetableClashBanner } from '@/components/timetable/TimetableClashBanner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-import { toast } from 'sonner'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { apiErrorMessage } from '@/lib/api/client'
+import { academicTimetableQueryKey } from '@/lib/api/academic'
 import {
-  createLecturerTimetableSlot,
-  deleteLecturerTimetableSlot,
-  lecturerCoursesQueryKey,
+  confirmLecturerTimetableSlot,
   lecturerDashboardQueryKey,
-  lecturerRoomsQueryKey,
   lecturerTimetableQueryKey,
-  listLecturerCourses,
-  listLecturerRooms,
   listLecturerTimetableSlots,
-  updateLecturerTimetableSlot,
+  requestLecturerTimetableChange,
 } from '@/lib/api/lecturer'
+import { studentDashboardQueryKey } from '@/lib/api/student'
+import { notifyError, notifySuccess } from '@/lib/notify'
 
 export const Route = createFileRoute('/_auth/lecturer/timetable')({
   component: LecturerTimetablePage,
 })
-
-const SESSION_TYPES = ['Lecture', 'Tutorial', 'Lab', 'Practical'] as const
-
-type SlotForm = {
-  offeringId: string
-  dayOfWeek: number
-  startTime: string
-  endTime: string
-  sessionType: (typeof SESSION_TYPES)[number]
-  roomId: string
-}
-
-const EMPTY_FORM: SlotForm = {
-  offeringId: '',
-  dayOfWeek: 1,
-  startTime: '08:00',
-  endTime: '10:00',
-  sessionType: 'Lecture',
-  roomId: '',
-}
 
 function dayLabel(dayOfWeek: number): string {
   return timetableWeekdayLabel(dayOfWeek)
@@ -65,79 +35,18 @@ function dayLabel(dayOfWeek: number): string {
 
 function LecturerTimetablePage() {
   const queryClient = useQueryClient()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [confirmSave, setConfirmSave] = useState(false)
-  const [editingSlot, setEditingSlot] = useState<LecturerTimetableSlot | null>(null)
-  const [deleteSlot, setDeleteSlot] = useState<LecturerTimetableSlot | null>(null)
-  const [form, setForm] = useState<SlotForm>(EMPTY_FORM)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [changeOpen, setChangeOpen] = useState(false)
+  const [confirmChange, setConfirmChange] = useState(false)
+  const [reason, setReason] = useState('')
 
-  const { data: courses = [] } = useQuery({
-    queryKey: lecturerCoursesQueryKey,
-    queryFn: listLecturerCourses,
-  })
-  const { data: rooms = [] } = useQuery({
-    queryKey: lecturerRoomsQueryKey,
-    queryFn: listLecturerRooms,
-  })
   const { data: slots = [], isPending, error } = useQuery({
     queryKey: lecturerTimetableQueryKey,
     queryFn: listLecturerTimetableSlots,
   })
 
-  useEffect(() => {
-    if (!form.offeringId && courses[0]) {
-      setForm((current) => ({ ...current, offeringId: courses[0]!.offeringId }))
-    }
-  }, [courses, form.offeringId])
-
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: lecturerTimetableQueryKey })
-    void queryClient.invalidateQueries({ queryKey: lecturerCoursesQueryKey })
-    void queryClient.invalidateQueries({ queryKey: lecturerDashboardQueryKey })
-  }
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const payload: SaveLecturerTimetableSlotRequest = {
-        offeringId: form.offeringId,
-        dayOfWeek: form.dayOfWeek,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        sessionType: form.sessionType,
-        roomId: form.roomId || null,
-      }
-      if (editingSlot) {
-        return updateLecturerTimetableSlot(editingSlot.id, {
-          dayOfWeek: payload.dayOfWeek,
-          startTime: payload.startTime,
-          endTime: payload.endTime,
-          sessionType: payload.sessionType,
-          roomId: payload.roomId,
-        })
-      }
-      return createLecturerTimetableSlot(payload)
-    },
-    onSuccess: () => {
-      toast.success(editingSlot ? 'Timetable slot updated.' : 'Timetable slot added.')
-      setConfirmSave(false)
-      setDialogOpen(false)
-      setEditingSlot(null)
-      setForm(EMPTY_FORM)
-      invalidate()
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not save timetable slot.')),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (slotId: string) => deleteLecturerTimetableSlot(slotId),
-    onSuccess: () => {
-      toast.success('Timetable slot removed.')
-      setDeleteSlot(null)
-      invalidate()
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, 'Could not delete timetable slot.')),
-  })
-
+  const selected = slots.find((slot) => slot.id === selectedId) ?? null
   const sortedSlots = useMemo(
     () => [...slots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime)),
     [slots],
@@ -155,56 +64,62 @@ function LecturerTimetablePage() {
     [sortedSlots],
   )
   const clashIds = useMemo(() => new Set(clashes.flatMap((clash) => clash.slotIds)), [clashes])
-  const selectedCourse = courses.find((course) => course.offeringId === form.offeringId)
-  const selectedRoom = rooms.find((room) => room.id === form.roomId)
 
-  const openCreate = () => {
-    setEditingSlot(null)
-    setForm({
-      ...EMPTY_FORM,
-      offeringId: courses[0]?.offeringId ?? '',
-    })
-    setDialogOpen(true)
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: lecturerTimetableQueryKey })
+    await queryClient.invalidateQueries({ queryKey: lecturerDashboardQueryKey })
+    await queryClient.invalidateQueries({ queryKey: academicTimetableQueryKey })
+    await queryClient.invalidateQueries({ queryKey: studentDashboardQueryKey })
   }
 
-  const openEdit = (slot: LecturerTimetableSlot) => {
-    setEditingSlot(slot)
-    const roomMatch = rooms.find((room) => room.name === slot.room)
-    setForm({
-      offeringId: slot.offeringId,
-      dayOfWeek: slot.dayOfWeek,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      sessionType: SESSION_TYPES.includes(slot.sessionType as (typeof SESSION_TYPES)[number])
-        ? slot.sessionType as (typeof SESSION_TYPES)[number]
-        : 'Lecture',
-      roomId: roomMatch?.id ?? '',
-    })
-    setDialogOpen(true)
+  const confirmMutation = useMutation({
+    mutationFn: (slotId: string) => confirmLecturerTimetableSlot(slotId),
+    onSuccess: async () => {
+      notifySuccess('Availability confirmed. Students can see this class.')
+      setConfirmOpen(false)
+      setSelectedId(null)
+      await refresh()
+    },
+    onError: (err) => notifyError(apiErrorMessage(err, 'Could not confirm that class.')),
+  })
+
+  const changeMutation = useMutation({
+    mutationFn: () => {
+      if (!selected) throw new Error('No class selected.')
+      return requestLecturerTimetableChange(selected.id, { reason: reason.trim() })
+    },
+    onSuccess: async () => {
+      notifySuccess('Change request sent to Academic Admin.')
+      setConfirmChange(false)
+      setChangeOpen(false)
+      setReason('')
+      setSelectedId(null)
+      await refresh()
+    },
+    onError: (err) => notifyError(apiErrorMessage(err, 'Could not send that request.')),
+  })
+
+  const openSlot = (slot: LecturerTimetableSlot) => {
+    setSelectedId(slot.id)
+    setReason(slot.changeReason ?? '')
   }
 
   return (
     <LecturerShell
       pageTitle="Timetable"
-      guide="Add class times for your assigned courses. A room or lecturer cannot be booked twice at the same time. Students and Academic Admin see the live week as soon as you save."
+      guide="Academic Admin sets your class times. Confirm you are free, or ask for a different time and say why. Students see the class only after you confirm."
     >
       <div className="page-body animate-fade-up">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1
-              className="t-h1 mb-1"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}
-            >
-              Timetable
-            </h1>
-            <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              Add and manage weekly class slots. A taken room cannot be booked again.
-            </p>
-          </div>
-          <Button onClick={openCreate} disabled={courses.length === 0} className="self-start sm:self-auto">
-            <Plus style={{ width: 16, height: 16, marginRight: 6 }} />
-            Add slot
-          </Button>
+        <div className="mb-6">
+          <h1
+            className="t-h1 mb-1"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--foreground)', letterSpacing: '-0.015em' }}
+          >
+            Timetable
+          </h1>
+          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
+            Confirm the times Academic Admin assigned, or ask for a change.
+          </p>
         </div>
 
         {error ? (
@@ -216,43 +131,32 @@ function LecturerTimetablePage() {
         <TimetableClashBanner
           clashes={clashes}
           uniqueCount={clashIds.size}
-          hint="Move one class. A taken room cannot be booked again."
+          hint="Ask Academic Admin to move one class. A taken room cannot be booked again."
         />
 
-        {courses.length === 0 ? (
+        {isPending ? (
+          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading timetable…</p>
+        ) : sortedSlots.length === 0 ? (
           <div
             className="p-6 rounded-xl text-center"
             style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
           >
             <CalendarDays style={{ width: 28, height: 28, color: 'var(--muted-foreground)', margin: '0 auto 12px' }} />
             <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>
-              No courses assigned this semester. Contact Academic Admin to get course assignments first.
+              No classes yet. Academic Admin adds them on the Timetable page.
             </p>
-          </div>
-        ) : isPending ? (
-          <p className="t-body" style={{ color: 'var(--muted-foreground)' }}>Loading timetable…</p>
-        ) : sortedSlots.length === 0 ? (
-          <div
-            className="p-6 rounded-xl"
-            style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
-          >
-            <p className="t-body mb-4" style={{ color: 'var(--muted-foreground)' }}>
-              No timetable slots yet. Add your first class time so students and Academic Admin can see your schedule.
-            </p>
-            <Button onClick={openCreate}>
-              <Plus style={{ width: 16, height: 16, marginRight: 6 }} />
-              Add first slot
-            </Button>
           </div>
         ) : (
           <PagedList
             items={sortedSlots}
             getKey={(slot) => slot.id}
             defaultPageSize={5}
-            itemLabel="slots"
+            itemLabel="classes"
             renderItem={(slot) => (
-              <div
-                className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl"
+              <button
+                type="button"
+                onClick={() => openSlot(slot)}
+                className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl w-full text-left"
                 style={{
                   backgroundColor: clashIds.has(slot.id) ? 'var(--error-bg)' : 'var(--card)',
                   border: `1px solid ${clashIds.has(slot.id) ? 'var(--error)' : 'var(--border)'}`,
@@ -264,7 +168,7 @@ function LecturerTimetablePage() {
                   <p className="text-sm font-semibold truncate" style={{ color: 'var(--foreground)' }}>{slot.courseName}</p>
                   <p className="t-caption mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
                     {dayLabel(slot.dayOfWeek)} · {slot.startTime} – {slot.endTime}
-                    {slot.room ? ` · ${slot.room}` : ' · TBA'}
+                    {slot.room ? ` · ${slot.room}` : ''}
                   </p>
                   <span
                     className="t-label inline-block mt-1.5 px-2 py-0.5"
@@ -273,162 +177,124 @@ function LecturerTimetablePage() {
                       color: slot.color,
                       borderRadius: 'var(--radius-sm)',
                       fontSize: 10,
-                      textTransform: 'uppercase',
                     }}
                   >
-                    {slot.sessionType}
+                    {timetableAvailabilityLabel(slot.availabilityStatus)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(slot)}>
-                    <Pencil style={{ width: 14, height: 14, marginRight: 4 }} />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setDeleteSlot(slot)}>
-                    <Trash2 style={{ width: 14, height: 14, marginRight: 4 }} />
-                    Remove
-                  </Button>
-                </div>
-              </div>
+              </button>
             )}
           />
         )}
 
         <p className="t-caption mt-6" style={{ color: 'var(--muted-foreground)' }}>
-          Slots appear on your dashboard, in My Courses, and in the Academic Admin timetable view.
+          Confirmed classes appear on the student timetable.
           {' '}
           <Link to="/lecturer/courses" className="underline hover:opacity-80">View courses →</Link>
         </p>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
+      <Dialog open={selected !== null && !changeOpen} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
+        <DialogContent className="max-w-md w-[calc(100%-2rem)]">
+          {selected ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="pr-8" style={{ fontFamily: 'var(--font-display)' }}>{selected.courseName}</DialogTitle>
+              </DialogHeader>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--muted)', border: '1px solid var(--border)' }}>
+                <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                  {dayLabel(selected.dayOfWeek)} · {selected.startTime}–{selected.endTime}
+                </p>
+                <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  {selected.room ?? 'No location'} · {selected.sessionType}
+                </p>
+                <p className="text-sm mt-2" style={{ color: 'var(--foreground)' }}>
+                  {timetableAvailabilityLabel(selected.availabilityStatus)}
+                </p>
+                {selected.changeReason ? (
+                  <p className="t-caption mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    Your reason: {selected.changeReason}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <Button variant="outline" onClick={() => setSelectedId(null)}>Close</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setReason(selected.changeReason ?? '')
+                    setChangeOpen(true)
+                  }}
+                >
+                  Request a change
+                </Button>
+                {selected.availabilityStatus !== 'Confirmed' ? (
+                  <Button onClick={() => setConfirmOpen(true)}>Confirm availability</Button>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={changeOpen} onOpenChange={(open) => { if (!open) setChangeOpen(false) }}>
+        <DialogContent className="max-w-md w-[calc(100%-2rem)]">
           <DialogHeader>
-            <DialogTitle>{editingSlot ? 'Edit timetable slot' : 'Add timetable slot'}</DialogTitle>
-            <FormInfoBox lines={editingSlot ? formInfo.editTimetableSlot : formInfo.addTimetableSlot} />
+            <DialogTitle>Request a time change</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4 pt-2">
-            <div>
-              <Label className="mb-1.5 block">Course</Label>
-              <Select
-                value={form.offeringId}
-                onValueChange={(value) => setForm((current) => ({ ...current, offeringId: value }))}
-                disabled={Boolean(editingSlot)}
-              >
-                <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
-                <SelectContent>
-                  {courses.map((course) => (
-                    <SelectItem key={course.offeringId} value={course.offeringId}>
-                      {course.code} — {course.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Day</Label>
-              <Select
-                value={String(form.dayOfWeek)}
-                onValueChange={(value) => setForm((current) => ({ ...current, dayOfWeek: Number(value) }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIMETABLE_WEEKDAYS.map((day) => (
-                    <SelectItem key={day.iso} value={String(day.iso)}>{day.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="mb-1.5 block">Start</Label>
-                <Input type="time" value={form.startTime} onChange={(e) => setForm((c) => ({ ...c, startTime: e.target.value }))} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">End</Label>
-                <Input type="time" value={form.endTime} onChange={(e) => setForm((c) => ({ ...c, endTime: e.target.value }))} />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Session type</Label>
-              <Select
-                value={form.sessionType}
-                onValueChange={(value) => setForm((current) => ({
-                  ...current,
-                  sessionType: value as (typeof SESSION_TYPES)[number],
-                }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SESSION_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Room (optional)</Label>
-              <Select
-                value={form.roomId || '__none__'}
-                onValueChange={(value) => setForm((current) => ({
-                  ...current,
-                  roomId: value === '__none__' ? '' : value,
-                }))}
-              >
-                <SelectTrigger><SelectValue placeholder="Select room" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">No room / TBA</SelectItem>
-                  {rooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id}>
-                      {room.name}{room.building ? ` (${room.building})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button
-                onClick={() => setConfirmSave(true)}
-                disabled={!form.offeringId || saveMutation.isPending}
-              >
-                {editingSlot ? 'Save changes' : 'Add slot'}
-              </Button>
-            </div>
+          <div>
+            <Label htmlFor="change-reason" className="mb-1.5 block">Reason</Label>
+            <Textarea
+              id="change-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Say which day or time does not work."
+              rows={4}
+            />
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+            <Button variant="outline" onClick={() => setChangeOpen(false)}>Cancel</Button>
+            <Button disabled={reason.trim().length < 4} onClick={() => setConfirmChange(true)}>
+              Send request
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <ConfirmAlertDialog
-        open={confirmSave}
-        onOpenChange={setConfirmSave}
-        title={editingSlot ? 'Save this class time?' : 'Add this class time?'}
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Confirm you are free?"
         tone="success"
-        headline={editingSlot ? 'Update timetable' : 'Add to timetable'}
-        summary={`${selectedCourse?.code ?? 'Course'} · ${dayLabel(form.dayOfWeek)} ${form.startTime}–${form.endTime}${selectedRoom ? ` · ${selectedRoom.name}` : ''}.`}
+        headline="This class goes live for students"
+        summary={selected
+          ? `${selected.courseCode} · ${dayLabel(selected.dayOfWeek)} ${selected.startTime}–${selected.endTime}${selected.room ? ` · ${selected.room}` : ''}.`
+          : ''}
         notices={[
-          { icon: 'clock', label: 'Students and Academic Admin see this on the live timetable as soon as you confirm.' },
-          { icon: 'shield', label: 'If this room is already booked in that time, the save is refused. The room is not available.' },
+          { icon: 'bell', label: 'Registered students are notified and the class appears on their timetable.' },
         ]}
-        confirmLabel={saveMutation.isPending ? 'Saving…' : editingSlot ? 'Save changes' : 'Add slot'}
+        confirmLabel={confirmMutation.isPending ? 'Confirming…' : 'Confirm availability'}
         confirmVariant="brand"
-        loading={saveMutation.isPending}
-        onConfirm={() => saveMutation.mutate()}
+        loading={confirmMutation.isPending}
+        onConfirm={() => { if (selected) confirmMutation.mutate(selected.id) }}
       />
 
       <ConfirmAlertDialog
-        open={Boolean(deleteSlot)}
-        onOpenChange={(open) => { if (!open) setDeleteSlot(null) }}
-        title="Remove timetable slot?"
-        tone="destructive"
-        headline="This cannot be undone"
-        summary={deleteSlot
-          ? `${deleteSlot.courseCode} on ${dayLabel(deleteSlot.dayOfWeek)} ${deleteSlot.startTime}–${deleteSlot.endTime} will be removed.`
+        open={confirmChange}
+        onOpenChange={setConfirmChange}
+        title="Send this change request?"
+        tone="warning"
+        headline="Academic Admin will see your reason"
+        summary={selected
+          ? `${selected.courseCode} · ${dayLabel(selected.dayOfWeek)} ${selected.startTime}–${selected.endTime}. ${reason.trim()}`
           : ''}
-        confirmLabel="Remove"
-        confirmVariant="destructive"
-        onConfirm={() => { if (deleteSlot) void deleteMutation.mutate(deleteSlot.id) }}
-        loading={deleteMutation.isPending}
+        notices={[
+          { icon: 'bell', label: 'Students do not see this class until you confirm a time.' },
+        ]}
+        confirmLabel={changeMutation.isPending ? 'Sending…' : 'Send request'}
+        confirmVariant="brand"
+        loading={changeMutation.isPending}
+        onConfirm={() => changeMutation.mutate()}
       />
     </LecturerShell>
   )

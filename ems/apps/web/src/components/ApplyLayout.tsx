@@ -8,6 +8,7 @@ import { LogoutDialog, useLogoutDialog } from '@/components/LogoutDialog'
 import { APPLICANT_SIGN_IN_PATH } from '@/lib/auth/portals'
 import { useApplication } from '@/hooks/useApplication'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { initialsFrom } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -77,6 +78,7 @@ export function ApplyLayout({
 
   const { user } = useCurrentUser()
   const { application } = useApplication()
+  useLiveRefresh(Boolean(user))
 
   const applicantName = application?.fullName ?? user?.fullName ?? ''
   const applicantInitials = applicantName ? initialsFrom(applicantName) : '—'

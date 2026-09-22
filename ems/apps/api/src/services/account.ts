@@ -1,5 +1,6 @@
-import { and, desc, eq, isNull, ne } from 'drizzle-orm'
+import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm'
 import type {
+  AccountLiveCursor,
   AccountProfile,
   ChangePasswordRequest,
   DisableTwoFactorRequest,
@@ -13,6 +14,12 @@ import { reachableNotificationActionUrl, splitFullName, titleAndFirstName, STUDE
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
 import { institutions, userDirectory } from '../db/platform/schema'
 import { notifications } from '../db/institution/schema/communication'
+import {
+  applicationDocuments,
+  applicationReviews,
+  applications,
+} from '../db/institution/schema/admissions'
+import { timetableSlots } from '../db/institution/schema/teaching'
 import { users, sessions } from '../db/institution/schema/people'
 import { studentProfiles, students } from '../db/institution/schema/students'
 import { faculties, departments, programmes } from '../db/institution/schema/academic'
@@ -193,6 +200,36 @@ export async function updateAccountSecurity(
     .set({ twoFactorEnabled: false, twoFactorSecret: null })
     .where(eq(users.id, userId))
   return getAccountProfile(institutionId, userId)
+}
+
+function latestStamp(values: Array<string | null | undefined>): string | null {
+  const present = values.filter((value): value is string => Boolean(value))
+  if (present.length === 0) return null
+  return present.sort().at(-1) ?? null
+}
+
+/** Stamps the open app polls so admissions and the timetable update without a reload. */
+export async function getAccountLiveCursor(
+  institutionId: string,
+  userId: string,
+): Promise<AccountLiveCursor> {
+  const db = await getInstitutionDb(institutionId)
+  const [notes, documents, applicationsRow, reviews, slots] = await Promise.all([
+    db
+      .select({ at: sql<string | null>`max(${notifications.createdAt})` })
+      .from(notifications)
+      .where(eq(notifications.userId, userId)),
+    db.select({ at: sql<string | null>`max(${applicationDocuments.createdAt})` }).from(applicationDocuments),
+    db.select({ at: sql<string | null>`max(${applications.updatedAt})` }).from(applications),
+    db.select({ at: sql<string | null>`max(${applicationReviews.createdAt})` }).from(applicationReviews),
+    db.select({ at: sql<string | null>`max(${timetableSlots.updatedAt})` }).from(timetableSlots),
+  ])
+
+  return {
+    notificationsAt: notes[0]?.at ?? null,
+    admissionsAt: latestStamp([documents[0]?.at, applicationsRow[0]?.at, reviews[0]?.at]),
+    timetableAt: slots[0]?.at ?? null,
+  }
 }
 
 export async function listAccountNotifications(

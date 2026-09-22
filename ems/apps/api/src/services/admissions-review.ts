@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, ne, or, sql } from 'drizzle-orm'
 import {
   applicationStatusSchema,
+  DRAFT_APPLICATION_REVIEW_MESSAGE,
   type AcademicApplicationDetail,
   type AcademicApplicationSummary,
   type ApplicationPayment,
@@ -14,7 +15,7 @@ import {
   applications,
 } from '../db/institution/schema/admissions'
 import { programmes } from '../db/institution/schema/academic'
-import { badRequest, conflict, notFound } from '../lib/errors'
+import { AppError, badRequest, conflict, notFound } from '../lib/errors'
 import { isDocumentNewForAdmin } from '../lib/application-documents'
 import { notifyApplicationDecision } from '../lib/admissions-email'
 import { createDownloadUrl } from '../lib/storage'
@@ -178,7 +179,17 @@ export async function getApplicationForReview(
     .where(and(eq(applications.id, applicationId), ne(applications.status, 'Draft')))
     .limit(1)
 
-  if (!row) throw notFound('Application')
+  if (!row) {
+    const [hidden] = await db
+      .select({ status: applications.status })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .limit(1)
+    if (hidden?.status === 'Draft') {
+      throw new AppError('NOT_FOUND', 404, DRAFT_APPLICATION_REVIEW_MESSAGE)
+    }
+    throw notFound('Application')
+  }
 
   const [latestDocumentRequest, docs] = await Promise.all([
     loadLatestDocumentRequest(institutionId, applicationId),

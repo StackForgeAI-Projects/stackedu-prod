@@ -24,14 +24,13 @@ import type {
   LecturerResultBatch,
   LecturerRoomOption,
   LecturerTimetableSlot,
+  RequestTimetableChangeRequest,
   ResolveLecturerAtRiskRequest,
   ReserveLecturerMaterialUploadRequest,
   SaveLecturerAttendanceRequest,
   SaveLecturerGradeRequest,
   SaveLecturerResultsRequest,
-  SaveLecturerTimetableSlotRequest,
   UpdateLecturerMaterialRequest,
-  UpdateLecturerTimetableSlotRequest,
   UserRole,
 } from '@stackedu/shared'
 import {
@@ -42,6 +41,8 @@ import {
   COURSE_MATERIAL_MIME_TYPES,
   DEFAULT_ATTENDANCE_POLICY,
   isAttendanceSessionEditable,
+  timetableAvailabilityStatus,
+  timetableWeekdayLabel,
   uploadLimitMessage,
 } from '@stackedu/shared'
 import { getInstitutionDb, getPlatformDb } from '../db/connection'
@@ -75,10 +76,11 @@ import {
   notifyAcademicAdminsOfResultSubmit,
   notifyEnrolledStudentsOfAnnouncement,
   notifyEnrolledStudentsOfAssessment,
+  notifyAcademicAdminsOfTimetableChange,
   notifyEnrolledStudentsOfMaterial,
+  notifyStudentsTimetableLive,
 } from './role-notifications'
 import { writeAudit } from '../lib/audit'
-import { assertTimetableSlotFree } from '../lib/timetable-conflicts'
 import { courseColor, formatClock } from '../lib/course-color'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import {
@@ -2511,10 +2513,6 @@ export async function markAllLecturerNotificationsRead(
   return listLecturerNotifications(institutionId, userId)
 }
 
-function assertValidSlotTimes(startTime: string, endTime: string): void {
-  if (startTime >= endTime) throw badRequest('End time must be after start time.')
-}
-
 async function loadLecturerTimetableSlotRows(
   db: InstitutionDb,
   offeringIds: string[],
@@ -2528,6 +2526,8 @@ async function loadLecturerTimetableSlotRows(
   endTime: string
   room: string | null
   dayOfWeek: number
+  availabilityStatus: string
+  changeReason: string | null
 }>> {
   if (offeringIds.length === 0) return []
   return db
@@ -2541,6 +2541,8 @@ async function loadLecturerTimetableSlotRows(
       endTime: timetableSlots.endTime,
       room: rooms.name,
       dayOfWeek: timetableSlots.dayOfWeek,
+      availabilityStatus: timetableSlots.availabilityStatus,
+      changeReason: timetableSlots.changeReason,
     })
     .from(timetableSlots)
     .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
@@ -2560,6 +2562,8 @@ function mapLecturerTimetableSlot(row: {
   endTime: string
   room: string | null
   dayOfWeek: number
+  availabilityStatus: string
+  changeReason: string | null
 }): LecturerTimetableSlot {
   return {
     id: row.id,
@@ -2572,6 +2576,8 @@ function mapLecturerTimetableSlot(row: {
     room: row.room,
     dayOfWeek: row.dayOfWeek,
     color: courseColor(row.courseCode),
+    availabilityStatus: timetableAvailabilityStatus(row.availabilityStatus),
+    changeReason: row.changeReason,
   }
 }
 
@@ -2627,148 +2633,123 @@ export async function listLecturerRooms(
   }))
 }
 
-export async function createLecturerTimetableSlot(
-  institutionId: string,
-  actor: { id: string; email: string; role: UserRole },
-  input: SaveLecturerTimetableSlotRequest,
-): Promise<LecturerTimetableSlot> {
-  const { db } = await requireLecturer(institutionId, actor.id)
-  await requireAssignedOffering(db, actor.id, input.offeringId)
-  assertValidSlotTimes(input.startTime, input.endTime)
-
-  if (input.roomId) {
-    const [room] = await db.select({ id: rooms.id }).from(rooms).where(eq(rooms.id, input.roomId)).limit(1)
-    if (!room) throw badRequest('Room not found.')
-  }
-
-  await assertTimetableSlotFree(db, {
-    offeringId: input.offeringId,
-    dayOfWeek: input.dayOfWeek,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    roomId: input.roomId ?? null,
-  })
-
-  const [created] = await db
-    .insert(timetableSlots)
-    .values({
-      courseOfferingId: input.offeringId,
-      roomId: input.roomId ?? null,
-      dayOfWeek: input.dayOfWeek,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      sessionType: input.sessionType,
+async function ownedTimetableSlotDetail(
+  db: InstitutionDb,
+  lecturerId: string,
+  slotId: string,
+) {
+  const owned = await requireOwnedTimetableSlot(db, lecturerId, slotId)
+  const [slot] = await db
+    .select({
+      id: timetableSlots.id,
+      offeringId: timetableSlots.courseOfferingId,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      startTime: timetableSlots.startTime,
+      endTime: timetableSlots.endTime,
+      room: rooms.name,
+      courseCode: courses.code,
+      courseName: courses.name,
+      availabilityStatus: timetableSlots.availabilityStatus,
+      lecturerName: users.fullName,
     })
-    .returning({ id: timetableSlots.id })
-
-  await writeAudit({
-    institutionId,
-    actorId: actor.id,
-    actorEmail: actor.email,
-    actorRole: actor.role,
-    action: 'timetable.slot.create',
-    targetType: 'timetable_slot',
-    targetId: created!.id,
-  })
-
-  const rows = await loadLecturerTimetableSlotRows(db, [input.offeringId])
-  const slot = rows.find((row) => row.id === created!.id)
+    .from(timetableSlots)
+    .innerJoin(courseOfferings, eq(courseOfferings.id, timetableSlots.courseOfferingId))
+    .innerJoin(courses, eq(courses.id, courseOfferings.courseId))
+    .innerJoin(users, eq(users.id, lecturerId))
+    .leftJoin(rooms, eq(rooms.id, timetableSlots.roomId))
+    .where(eq(timetableSlots.id, slotId))
+    .limit(1)
   if (!slot) throw notFound('Timetable slot not found.')
-  return mapLecturerTimetableSlot(slot)
+  return { owned, slot }
 }
 
-export async function updateLecturerTimetableSlot(
+export async function confirmLecturerTimetableSlot(
   institutionId: string,
   actor: { id: string; email: string; role: UserRole },
   slotId: string,
-  input: UpdateLecturerTimetableSlotRequest,
 ): Promise<LecturerTimetableSlot> {
   const { db } = await requireLecturer(institutionId, actor.id)
-  const owned = await requireOwnedTimetableSlot(db, actor.id, slotId)
+  const { owned, slot } = await ownedTimetableSlotDetail(db, actor.id, slotId)
 
-  const [existing] = await db
-    .select({
-      startTime: timetableSlots.startTime,
-      endTime: timetableSlots.endTime,
-      dayOfWeek: timetableSlots.dayOfWeek,
-      roomId: timetableSlots.roomId,
+  if (slot.availabilityStatus !== 'Confirmed') {
+    await db
+      .update(timetableSlots)
+      .set({
+        availabilityStatus: 'Confirmed',
+        changeReason: null,
+        confirmedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(timetableSlots.id, slotId))
+
+    const when = `${timetableWeekdayLabel(slot.dayOfWeek)} ${formatClock(slot.startTime)}–${formatClock(slot.endTime)}`
+    await notifyStudentsTimetableLive(db, owned.offeringId, {
+      courseCode: slot.courseCode,
+      courseName: slot.courseName,
+      when,
+      room: slot.room,
     })
-    .from(timetableSlots)
-    .where(eq(timetableSlots.id, slotId))
-    .limit(1)
-  if (!existing) throw notFound('Timetable slot not found.')
 
-  const startTime = input.startTime ?? existing.startTime.slice(0, 5)
-  const endTime = input.endTime ?? existing.endTime.slice(0, 5)
-  assertValidSlotTimes(startTime, endTime)
-
-  if (input.roomId) {
-    const [room] = await db.select({ id: rooms.id }).from(rooms).where(eq(rooms.id, input.roomId)).limit(1)
-    if (!room) throw badRequest('Room not found.')
+    await writeAudit({
+      institutionId,
+      actorId: actor.id,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: 'timetable.slot.confirm',
+      targetType: 'timetable_slot',
+      targetId: slotId,
+    })
   }
 
-  await assertTimetableSlotFree(db, {
-    offeringId: owned.offeringId,
-    dayOfWeek: input.dayOfWeek ?? existing.dayOfWeek,
-    startTime,
-    endTime,
-    roomId: input.roomId !== undefined ? input.roomId : existing.roomId,
-    exceptSlotId: slotId,
+  const rows = await loadLecturerTimetableSlotRows(db, [owned.offeringId])
+  const saved = rows.find((row) => row.id === slotId)
+  if (!saved) throw notFound('Timetable slot not found.')
+  return mapLecturerTimetableSlot(saved)
+}
+
+export async function requestLecturerTimetableChange(
+  institutionId: string,
+  actor: { id: string; email: string; role: UserRole },
+  slotId: string,
+  input: RequestTimetableChangeRequest,
+): Promise<LecturerTimetableSlot> {
+  const { db } = await requireLecturer(institutionId, actor.id)
+  const { owned, slot } = await ownedTimetableSlotDetail(db, actor.id, slotId)
+  const reason = input.reason.trim()
+
+  await db
+    .update(timetableSlots)
+    .set({
+      availabilityStatus: 'ChangeRequested',
+      changeReason: reason,
+      confirmedAt: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(timetableSlots.id, slotId))
+
+  const when = `${timetableWeekdayLabel(slot.dayOfWeek)} ${formatClock(slot.startTime)}–${formatClock(slot.endTime)}`
+  await notifyAcademicAdminsOfTimetableChange(db, {
+    courseCode: slot.courseCode,
+    lecturerName: slot.lecturerName,
+    when,
+    reason,
   })
-
-  const patch: {
-    dayOfWeek?: number
-    startTime?: string
-    endTime?: string
-    sessionType?: string
-    roomId?: string | null
-    updatedAt: string
-  } = { updatedAt: new Date().toISOString() }
-  if (input.dayOfWeek !== undefined) patch.dayOfWeek = input.dayOfWeek
-  if (input.startTime !== undefined) patch.startTime = input.startTime
-  if (input.endTime !== undefined) patch.endTime = input.endTime
-  if (input.sessionType !== undefined) patch.sessionType = input.sessionType
-  if (input.roomId !== undefined) patch.roomId = input.roomId
-
-  await db.update(timetableSlots).set(patch).where(eq(timetableSlots.id, slotId))
 
   await writeAudit({
     institutionId,
     actorId: actor.id,
     actorEmail: actor.email,
     actorRole: actor.role,
-    action: 'timetable.slot.update',
+    action: 'timetable.slot.change',
     targetType: 'timetable_slot',
     targetId: slotId,
+    metadata: { reason },
   })
 
   const rows = await loadLecturerTimetableSlotRows(db, [owned.offeringId])
-  const slot = rows.find((row) => row.id === slotId)
-  if (!slot) throw notFound('Timetable slot not found.')
-  return mapLecturerTimetableSlot(slot)
-}
-
-export async function deleteLecturerTimetableSlot(
-  institutionId: string,
-  actor: { id: string; email: string; role: UserRole },
-  slotId: string,
-): Promise<LecturerTimetableSlot[]> {
-  const { db } = await requireLecturer(institutionId, actor.id)
-  await requireOwnedTimetableSlot(db, actor.id, slotId)
-
-  await db.delete(timetableSlots).where(eq(timetableSlots.id, slotId))
-
-  await writeAudit({
-    institutionId,
-    actorId: actor.id,
-    actorEmail: actor.email,
-    actorRole: actor.role,
-    action: 'timetable.slot.delete',
-    targetType: 'timetable_slot',
-    targetId: slotId,
-  })
-
-  return listLecturerTimetableSlots(institutionId, actor.id)
+  const saved = rows.find((row) => row.id === slotId)
+  if (!saved) throw notFound('Timetable slot not found.')
+  return mapLecturerTimetableSlot(saved)
 }
 
 export { formatDisplayDate, relativeTime, initials }

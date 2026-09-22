@@ -115,7 +115,7 @@ After class, the board is view-only. If there is a recording, download it from t
 
 ## Timetable
 
-Open **Timetable**. You get a Monday–Friday grid of your classes (hall, lab, time).
+Open **Timetable**. You get a Monday–Friday grid of classes you are approved for, after the lecturer has confirmed the time.
 
 1. Click a class.
 2. A reminder box opens (title, when to send, optional notes).

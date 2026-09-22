@@ -12,6 +12,7 @@ import {
   type ProgrammeOption,
   type RegisterApplicantRequest,
   type SaveApplicationRequest,
+  formatDocumentTypeLabel,
   uploadLimitMessage,
 } from '@stackedu/shared'
 import { env } from '../config/env'
@@ -24,6 +25,7 @@ import {
 import { users } from '../db/institution/schema/people'
 import { programmes } from '../db/institution/schema/academic'
 import { badRequest, conflict, notFound } from '../lib/errors'
+import { notifyAcademicAdminsOfApplicationDocument } from './role-notifications'
 import { notifyApplicationSubmitted } from '../lib/admissions-email'
 import {
   assertDocumentDeleteAllowed,
@@ -506,7 +508,10 @@ export async function confirmDocument(
   const application = await getApplicationFor(institutionId, applicantUserId)
   const db = await getInstitutionDb(institutionId)
   const [pending] = await db
-    .select({ documentType: applicationDocuments.documentType })
+    .select({
+      documentType: applicationDocuments.documentType,
+      fileName: applicationDocuments.fileName,
+    })
     .from(applicationDocuments)
     .where(
       and(
@@ -537,6 +542,14 @@ export async function confirmDocument(
     .limit(1)
 
   if (!row) throw notFound('That document')
+
+  await notifyAcademicAdminsOfApplicationDocument(db, {
+    applicationId: application.id,
+    applicantName: application.fullName,
+    documentLabel: formatDocumentTypeLabel(pending.documentType),
+    fileName: pending.fileName,
+  })
+
   return loadDocuments(institutionId, application.id)
 }
 
