@@ -1,0 +1,151 @@
+/* =========================================================================
+   StackEDU Design System — colors_and_type.css
+   Single source of truth for color, typography, spacing, radii, and shadow tokens.
+   Hex values lifted from StackFix src/styles.css (OKLCH → hex) per the
+   EMS Master Context document. Tokens marked /* + */ are suggested
+   complements not present in the StackFix codebase.
+   ========================================================================= */
+
+/* ── Webfonts ──────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('fonts/ClashGrotesk-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('fonts/ClashGrotesk-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('fonts/ClashGrotesk-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Grotesk';
+  src: url('fonts/ClashGrotesk-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Inter — paragraph / body face. Loaded from Google Fonts.
+   JetBrains Mono — student IDs, registration numbers, code refs. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── COLOR — Brand ──────────────────────────────────────────────────── */
+  --brand:               #20F44E;   /* Primary green — CTAs, focus, brand */
+  --brand-ink:           #05131D;   /* Used for text on top of --brand */
+
+  /* ── COLOR — Surface & Ink ──────────────────────────────────────────── */
+  --ink:                 #05131D;   /* Sidebar bg, dark cards, primary text */
+  --background:          #F8FAFC;   /* Outermost page canvas */
+  --card:                #FFFFFF;   /* Card surfaces, modals, form panels */
+  --muted:               #F1F5F9;   /* Input bg, tag fills, skeletons */
+  --muted-foreground:    #64748B;   /* Placeholder text, secondary labels */
+  --border:              #E2E8F0;   /* Dividers, card borders, table rules */
+  --foreground:          #05131D;   /* Body copy on light backgrounds */
+
+  /* ── COLOR — Semantic ───────────────────────────────────────────────── */
+  --success:             #16A34A;
+  --success-bg:          #DCFCE7;
+  --warning:             #CA8A04;
+  --warning-bg:          #FEF9C3;
+  --error:               #DC2626;
+  --error-bg:            #FEE2E2;
+  --info:                #2563EB;   /* + suggested complement */
+  --info-bg:             #DBEAFE;   /* + suggested complement */
+
+  /* ── COLOR — Inverse (used inside Ink-coloured surfaces) ────────────── */
+  --ink-foreground:      #F8FAFC;   /* Text on --ink */
+  --ink-muted:           #94A3B8;   /* Secondary text on --ink */
+  --ink-border:          #1F2A35;   /* Dividers within Ink surfaces */
+  --ink-surface:         #0F1E2B;   /* Slightly raised within --ink */
+
+  /* ── TYPOGRAPHY — Families ──────────────────────────────────────────── */
+  /* Inter for body / paragraphs / UI text.
+     Clash Grotesk for headings, display, page hero copy.
+     JetBrains Mono for IDs and code. */
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Clash Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── TYPOGRAPHY — Scale (size / weight / line-height) ───────────────── */
+  --fs-display:  48px;  --fw-display: 700; --lh-display: 1.1;
+  --fs-h1:       32px;  --fw-h1:      700; --lh-h1:      1.2;
+  --fs-h2:       24px;  --fw-h2:      700; --lh-h2:      1.3;
+  --fs-h3:       18px;  --fw-h3:      600; --lh-h3:      1.4;
+  --fs-body-lg:  16px;  --fw-body-lg: 400; --lh-body-lg: 1.6;
+  --fs-body:     14px;  --fw-body:    400; --lh-body:    1.5;
+  --fs-body-sm:  13px;  --fw-body-sm: 400; --lh-body-sm: 1.5;
+  --fs-caption:  12px;  --fw-caption: 400; --lh-caption: 1.4;
+  --fs-label:    11px;  --fw-label:   600; --lh-label:   1.3;
+  --fs-mono:     13px;  --fw-mono:    400; --lh-mono:    1.5;
+
+  /* Label / chip text — uppercase with slight tracking */
+  --tracking-label: 0.04em;
+
+  /* ── SPACING — 4 px base grid ───────────────────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── RADII ───────────────────────────────────────────────────────────── */
+  --radius-sm:  10px;   /* Badges, chips */
+  --radius-md:  12px;   /* Inputs, buttons */
+  --radius-lg:  14px;   /* Inputs, buttons (large), small cards */
+  --radius-xl:  18px;   /* Cards */
+  --radius-2xl: 22px;   /* Hero cards, modals */
+  --radius-3xl: 26px;   /* Marketing surfaces */
+
+  /* ── ELEVATION ───────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 1px rgba(5,19,29,0.04);
+  --shadow-sm: 0 1px 2px rgba(5,19,29,0.05), 0 1px 1px rgba(5,19,29,0.04);
+  --shadow-md: 0 4px 8px -2px rgba(5,19,29,0.06), 0 2px 4px -2px rgba(5,19,29,0.05);
+  --shadow-lg: 0 12px 24px -8px rgba(5,19,29,0.12), 0 4px 8px -4px rgba(5,19,29,0.06);
+  --shadow-xl: 0 24px 48px -16px rgba(5,19,29,0.18), 0 8px 16px -8px rgba(5,19,29,0.10);
+  --shadow-focus: 0 0 0 3px rgba(32,244,78,0.35);  /* brand focus ring */
+
+  /* ── MOTION ──────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+}
+
+/* ── BASE ──────────────────────────────────────────────────────────────── */
+html, body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── SEMANTIC TYPE CLASSES ─────────────────────────────────────────────── */
+.t-display { font-family: var(--font-display); font-size: var(--fs-display); font-weight: var(--fw-display); line-height: var(--lh-display); letter-spacing: -0.02em; }
+.t-h1      { font-family: var(--font-display); font-size: var(--fs-h1);      font-weight: var(--fw-h1);      line-height: var(--lh-h1);      letter-spacing: -0.015em; }
+.t-h2      { font-family: var(--font-display); font-size: var(--fs-h2);      font-weight: var(--fw-h2);      line-height: var(--lh-h2);      letter-spacing: -0.01em; }
+.t-h3      { font-family: var(--font-display); font-size: var(--fs-h3);      font-weight: var(--fw-h3);      line-height: var(--lh-h3); }
+.t-body-lg { font-size: var(--fs-body-lg); font-weight: var(--fw-body-lg); line-height: var(--lh-body-lg); }
+.t-body    { font-size: var(--fs-body);    font-weight: var(--fw-body);    line-height: var(--lh-body); }
+.t-body-sm { font-size: var(--fs-body-sm); font-weight: var(--fw-body-sm); line-height: var(--lh-body-sm); color: var(--muted-foreground); }
+.t-caption { font-size: var(--fs-caption); font-weight: var(--fw-caption); line-height: var(--lh-caption); color: var(--muted-foreground); }
+.t-label   { font-size: var(--fs-label);   font-weight: var(--fw-label);   line-height: var(--lh-label); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.t-mono    { font-family: var(--font-mono); font-size: var(--fs-mono); font-weight: var(--fw-mono); line-height: var(--lh-mono); }

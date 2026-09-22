@@ -1,0 +1,62 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Data table — Rows + pagination</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--background); }
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: 13px; }
+  thead th { background: #F8FAFC; padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--foreground); }
+  tbody tr:last-child td { border-bottom: none; }
+  .mono { font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); }
+  .name { font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .b-success { background: #DCFCE7; color: #15803D; }
+  .b-warning { background: #FEF9C3; color: #854D0E; }
+  .b-error   { background: #FEE2E2; color: #B91C1C; }
+  .pag { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; }
+  .pg-pages { display: flex; gap: 4px; }
+  .pg-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); display: inline-flex; align-items: center; justify-content: center; font: 600 12px/1 var(--font-sans); color: var(--foreground); cursor: pointer; }
+  .pg-btn.active { background: var(--ink); color: var(--ink-foreground); border-color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>ID</th>
+          <th>Programme</th>
+          <th>Year</th>
+          <th>Fee status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="name">Jean‑Paul Mugisha</td><td class="mono">STU‑2024‑0481</td><td>BSc Software Engineering</td><td>Year 3</td><td><span class="badge b-success">Paid</span></td></tr>
+        <tr><td class="name">Diane Ingabire</td><td class="mono">STU‑2024‑0512</td><td>BSc Computer Science</td><td>Year 2</td><td><span class="badge b-warning">Pending</span></td></tr>
+        <tr><td class="name">Patrick Habimana</td><td class="mono">STU‑2023‑0193</td><td>BBA Accounting</td><td>Year 4</td><td><span class="badge b-error">Unpaid</span></td></tr>
+        <tr><td class="name">Aline Uwase</td><td class="mono">STU‑2024‑0644</td><td>BSc Civil Engineering</td><td>Year 1</td><td><span class="badge b-success">Paid</span></td></tr>
+      </tbody>
+    </table>
+    <div class="pag">
+      <span class="mono">Showing 1–4 of 1,247</span>
+      <div class="pg-pages">
+        <button class="pg-btn">‹</button>
+        <button class="pg-btn active">1</button>
+        <button class="pg-btn">2</button>
+        <button class="pg-btn">3</button>
+        <button class="pg-btn">…</button>
+        <button class="pg-btn">312</button>
+        <button class="pg-btn">›</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

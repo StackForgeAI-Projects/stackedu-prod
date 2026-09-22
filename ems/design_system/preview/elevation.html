@@ -1,0 +1,29 @@
+<!-- @dsCard group="Spacing" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Elevation / shadows</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--background); }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; padding: 16px 8px 24px; }
+  .tok { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .box { width: 88px; height: 64px; background: var(--card); border-radius: 14px; border: 1px solid var(--border); }
+  .name { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+  .label { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="tok"><div class="box" style="box-shadow: var(--shadow-xs);"></div><div class="label">xs</div><div class="name">shadow-xs</div></div>
+    <div class="tok"><div class="box" style="box-shadow: var(--shadow-sm);"></div><div class="label">sm</div><div class="name">shadow-sm</div></div>
+    <div class="tok"><div class="box" style="box-shadow: var(--shadow-md);"></div><div class="label">md</div><div class="name">shadow-md</div></div>
+    <div class="tok"><div class="box" style="box-shadow: var(--shadow-lg);"></div><div class="label">lg</div><div class="name">shadow-lg</div></div>
+    <div class="tok"><div class="box" style="box-shadow: var(--shadow-xl);"></div><div class="label">xl</div><div class="name">shadow-xl</div></div>
+  </div>
+  <div class="note">Ink‑tinted (rgba(5,19,29,…)) so shadows feel native to the palette. Cards rest on borders alone; shadow appears on hover or for floating surfaces.</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Modal dialog</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--background); }
+  .scrim {
+    height: 100%;
+    background: linear-gradient(180deg, rgba(5,19,29,0.0) 0%, rgba(5,19,29,0.35) 100%);
+    backdrop-filter: blur(2px);
+    border-radius: 16px;
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dialog {
+    width: 420px; max-width: 100%;
+    background: var(--card); border-radius: 22px; border: 1px solid var(--border);
+    box-shadow: var(--shadow-xl);
+    padding: 28px 24px 24px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px;
+    text-align: center;
+  }
+  .dialog .icon {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--error-bg); color: var(--error);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .dialog h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--foreground);
+    text-wrap: balance;
+  }
+  .dialog p {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 14px; line-height: 1.55;
+    color: var(--muted-foreground);
+    max-width: 320px;
+    text-wrap: pretty;
+  }
+  .actions {
+    display: flex; flex-direction: row; gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+  }
+  .btn {
+    flex: 1;
+    height: 44px; padding: 0 16px;
+    border-radius: 12px;
+    font: 600 14px/1 var(--font-sans);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .b-destr {
+    background: var(--error); color: white;
+    border: 1px solid transparent;
+  }
+  .b-sec {
+    background: var(--card); color: var(--foreground);
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="card" style="padding: 0; min-height: 420px;">
+  <div class="scrim">
+    <div class="dialog">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <h3>Suspend Jean‑Paul Mugisha?</h3>
+      <p>Suspended students lose portal access until reinstated. Their academic record is preserved. This is reversible.</p>
+      <div class="actions">
+        <button class="btn b-sec">Cancel</button>
+        <button class="btn b-destr">Suspend student</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

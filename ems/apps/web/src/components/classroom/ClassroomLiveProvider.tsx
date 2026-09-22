@@ -6,18 +6,19 @@ import { useNavigate } from '@tanstack/react-router'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import {
   createContext,
+  forwardRef,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ButtonHTMLAttributes,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { ClassroomJoin, ClassroomSessionDetail } from '@stackedu/shared'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
-import { IconActionButton } from '@/components/IconActionButton'
 import { Button } from '@/components/ui/button'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
@@ -305,14 +306,10 @@ function ClassroomMediaChrome({
           Recording
         </div>
       ) : null}
-      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+      <div className="absolute top-3 right-3 z-20 flex flex-wrap items-center justify-end gap-2">
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
-            trigger={
-              <Button type="button" size="sm" variant="outline">
-                Mute all
-              </Button>
-            }
+            trigger={<ClassroomVideoLabelButton>Mute all</ClassroomVideoLabelButton>}
             title="Mute all students?"
             tone="warning"
             headlineLabel="Action"
@@ -325,11 +322,10 @@ function ClassroomMediaChrome({
             onConfirm={() => muteMutation.mutate()}
           />
         ) : null}
-        <IconActionButton
-          label={full ? 'Exit full screen' : 'Full screen'}
-          icon={full ? Minimize2 : Maximize2}
-          onClick={toggleFull}
-        />
+        <ClassroomVideoLabelButton onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>
+          {full ? <Minimize2 style={{ width: 14, height: 14 }} /> : <Maximize2 style={{ width: 14, height: 14 }} />}
+          {full ? 'Exit full screen' : 'Full screen'}
+        </ClassroomVideoLabelButton>
       </div>
       <div className="h-full min-w-0 overflow-hidden">
         <VideoConference />
@@ -361,10 +357,7 @@ function ClassroomMediaChrome({
         <p className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>
           {session?.title ?? 'Live class'}
         </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
+        <ClassroomVideoLabelButton
           onClick={() => {
             void navigate({
               to: role === 'lecturer' ? '/lecturer/classroom-session' : '/student/classroom-session',
@@ -373,14 +366,14 @@ function ClassroomMediaChrome({
           }}
         >
           Back to class
-        </Button>
+        </ClassroomVideoLabelButton>
       </div>
       <div style={{ height: 200 }} data-lk-theme="default">{media}</div>
       <div className="flex flex-wrap gap-2 px-3 py-2">
-        <Button type="button" size="sm" variant="outline" onClick={onEnded}>Leave</Button>
+        <ClassroomVideoLabelButton onClick={onEnded}>Leave</ClassroomVideoLabelButton>
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
-            trigger={<Button type="button" size="sm" variant="outline">End class</Button>}
+            trigger={<ClassroomVideoLabelButton>End class</ClassroomVideoLabelButton>}
             title="End this class?"
             tone="destructive"
             headlineLabel="Action"
@@ -397,3 +390,21 @@ function ClassroomMediaChrome({
     </div>
   )
 }
+
+const ClassroomVideoLabelButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(
+  function ClassroomVideoLabelButton({ children, ...props }, ref) {
+    return (
+      <Button
+        ref={ref}
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0 gap-1.5"
+        style={{ backgroundColor: 'var(--card)' }}
+        {...props}
+      >
+        {children}
+      </Button>
+    )
+  },
+)

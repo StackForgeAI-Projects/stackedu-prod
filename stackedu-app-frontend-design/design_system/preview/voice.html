@@ -1,0 +1,43 @@
+<!-- @dsCard group="Brand" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Voice &amp; copy</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ex { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .h { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--foreground); letter-spacing: -0.005em; }
+  .p { font-family: var(--font-sans); font-size: 13px; color: var(--foreground); line-height: 1.5; }
+  .meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="ex">
+      <span class="meta">success toast</span>
+      <span class="h">Result submitted.</span>
+      <span class="p">SE401 marks published to 42 students.</span>
+    </div>
+    <div class="ex">
+      <span class="meta">error</span>
+      <span class="h">Enter a valid Rwandan mobile number.</span>
+      <span class="p">Must start with 078, 079, 072 or 073.</span>
+    </div>
+    <div class="ex">
+      <span class="meta">fee hold banner</span>
+      <span class="h">Fee hold active.</span>
+      <span class="p">Course registration is blocked until your balance is cleared. See the Bursar's office.</span>
+    </div>
+    <div class="ex">
+      <span class="meta">empty state</span>
+      <span class="h">No notifications yet.</span>
+      <span class="p">When fees, results or registrations are released you'll see them here.</span>
+    </div>
+  </div>
+  <div class="note">Direct address (<em>you</em>), active voice, sentence case headings. No emoji, no exclamations. Surface the figure or date first — let it land.</div>
+</div>
+</body>
+</html>

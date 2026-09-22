@@ -1,0 +1,59 @@
+<!-- @dsCard group="Colors" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colors — Brand</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .big {
+    height: 220px;
+    border-radius: var(--radius-xl);
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid var(--border);
+  }
+  .big.brand { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+  .big.ink { background: var(--ink); color: var(--ink-foreground); border-color: transparent; }
+  .big.surface { background: var(--card); color: var(--foreground); }
+  .big .tag { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+  .big .name { font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+  .big .hex { font-family: var(--font-mono); font-size: 13px; opacity: 0.9; letter-spacing: 0.02em; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="hero">
+    <div class="big brand">
+      <div class="tag">Primary · Brand</div>
+      <div>
+        <div class="name">Brand green</div>
+        <div class="hex">#20F44E</div>
+      </div>
+    </div>
+    <div class="big ink">
+      <div class="tag">Secondary · Ink</div>
+      <div>
+        <div class="name">Ink</div>
+        <div class="hex">#05131D</div>
+      </div>
+    </div>
+    <div class="big surface">
+      <div class="tag">Surface · Card</div>
+      <div>
+        <div class="name">White</div>
+        <div class="hex">#FFFFFF</div>
+      </div>
+    </div>
+  </div>
+  <div class="note">Two anchors carry the brand. Ink owns the sidebar and dark cards; brand green is used sparingly — primary CTAs, focus rings, the logo accent slab.</div>
+</div>
+</body>
+</html>

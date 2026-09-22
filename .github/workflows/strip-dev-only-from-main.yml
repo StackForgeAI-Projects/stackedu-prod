@@ -45,6 +45,7 @@ jobs:
           done
           if [ "$found" -eq 0 ]; then
             echo "Main tree is clean."
+            git push origin --delete auto/strip-dev-only || true
             exit 0
           fi
 
