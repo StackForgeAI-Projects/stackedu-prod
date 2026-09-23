@@ -51,7 +51,7 @@ async function runClassroomRecordings() {
     for (const row of rows) {
       try {
         const db = await getInstitutionDb(row.id)
-        const changed = await processClassroomRecordings(db)
+        const changed = await processClassroomRecordings(db, new Date(), row.id)
         if (changed > 0) logger.info('Classroom recordings processed', { institutionId: row.id, changed })
       } catch (error) {
         logger.error('Classroom recording job failed for institution', { institutionId: row.id, error })

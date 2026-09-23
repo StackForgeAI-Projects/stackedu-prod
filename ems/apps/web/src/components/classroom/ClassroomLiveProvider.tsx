@@ -3,23 +3,21 @@ import '@livekit/components-styles'
 import { RoomEvent } from 'livekit-client'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { ArrowLeft, LogOut, Maximize2, MicOff, Minimize2, PhoneOff } from 'lucide-react'
 import {
   createContext,
-  forwardRef,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { ClassroomJoin, ClassroomSessionDetail } from '@stackedu/shared'
-import { cn } from '@/lib/utils'
 import { ConfirmAlertDialog } from '@/components/ConfirmAlertDialog'
+import { IconActionButton } from '@/components/IconActionButton'
 import { apiErrorMessage } from '@/lib/api/client'
 import {
   endLecturerClassroomSession,
@@ -306,10 +304,10 @@ function ClassroomMediaChrome({
           Recording
         </div>
       ) : null}
-      <div className="classroom-video-chrome absolute top-3 right-3 z-20 flex flex-wrap items-center justify-end gap-2">
+      <div className="classroom-video-chrome absolute top-3 right-3 z-20 flex flex-nowrap items-center justify-end gap-1.5">
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
-            trigger={<ClassroomVideoLabelButton>Mute all</ClassroomVideoLabelButton>}
+            trigger={<IconActionButton label="Mute all" icon={MicOff} className="classroom-video-icon-btn" />}
             title="Mute all students?"
             tone="warning"
             headlineLabel="Action"
@@ -322,10 +320,12 @@ function ClassroomMediaChrome({
             onConfirm={() => muteMutation.mutate()}
           />
         ) : null}
-        <ClassroomVideoLabelButton onClick={toggleFull} aria-label={full ? 'Exit full screen' : 'Full screen'}>
-          {full ? <Minimize2 style={{ width: 14, height: 14 }} /> : <Maximize2 style={{ width: 14, height: 14 }} />}
-          {full ? 'Exit full screen' : 'Full screen'}
-        </ClassroomVideoLabelButton>
+        <IconActionButton
+          label={full ? 'Exit full screen' : 'Full screen'}
+          icon={full ? Minimize2 : Maximize2}
+          className="classroom-video-icon-btn"
+          onClick={toggleFull}
+        />
       </div>
       <div className="h-full min-w-0 overflow-hidden" data-lk-theme="default">
         <VideoConference />
@@ -354,26 +354,27 @@ function ClassroomMediaChrome({
       }}
     >
       <div className="classroom-video-chrome px-3 py-2 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--border)' }}>
-        <p className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>
+        <p className="text-xs font-medium truncate min-w-0" style={{ color: 'var(--foreground)' }}>
           {session?.title ?? 'Live class'}
         </p>
-        <ClassroomVideoLabelButton
+        <IconActionButton
+          label="Back to class"
+          icon={ArrowLeft}
+          className="classroom-video-icon-btn"
           onClick={() => {
             void navigate({
               to: role === 'lecturer' ? '/lecturer/classroom-session' : '/student/classroom-session',
               search: { id: sessionId },
             })
           }}
-        >
-          Back to class
-        </ClassroomVideoLabelButton>
+        />
       </div>
       <div style={{ height: 200 }}>{media}</div>
-      <div className="classroom-video-chrome flex flex-wrap gap-2 px-3 py-2">
-        <ClassroomVideoLabelButton onClick={onEnded}>Leave</ClassroomVideoLabelButton>
+      <div className="classroom-video-chrome flex flex-nowrap items-center gap-1.5 px-3 py-2">
+        <IconActionButton label="Leave" icon={LogOut} className="classroom-video-icon-btn" onClick={onEnded} />
         {role === 'lecturer' ? (
           <ConfirmAlertDialog
-            trigger={<ClassroomVideoLabelButton>End class</ClassroomVideoLabelButton>}
+            trigger={<IconActionButton label="End class" icon={PhoneOff} danger className="classroom-video-icon-btn classroom-video-icon-btn-danger" />}
             title="End this class?"
             tone="destructive"
             headlineLabel="Action"
@@ -391,24 +392,3 @@ function ClassroomMediaChrome({
   )
 }
 
-const ClassroomVideoLabelButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(
-  function ClassroomVideoLabelButton({ children, className, style, type, ...props }, ref) {
-    return (
-      <button
-        ref={ref}
-        type={type ?? 'button'}
-        {...props}
-        className={cn('classroom-video-label-btn', className)}
-        style={{
-          ...style,
-          backgroundColor: 'var(--brand)',
-          color: 'var(--brand-ink)',
-          WebkitTextFillColor: 'var(--brand-ink)',
-          borderColor: 'var(--brand-ink)',
-        }}
-      >
-        {children}
-      </button>
-    )
-  },
-)

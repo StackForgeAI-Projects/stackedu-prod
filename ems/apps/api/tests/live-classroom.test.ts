@@ -43,6 +43,7 @@ import {
   startLecturerClassroomSession,
   startLecturerRecording,
   stopLecturerRecording,
+  discardLecturerRecording,
 } from '../src/services/live-sessions'
 import { getLecturerCourseAnalytics } from '../src/services/course-analytics'
 import { askStudyAssistant } from '../src/services/study-assistant'
@@ -350,6 +351,73 @@ describe('live classroom, analytics, and study assistant', () => {
     )
     expect(after.recordings.some((row) => row.id === recording!.id)).toBe(false)
     await endLecturerClassroomSession(institutionId, lecturerActor, created.id)
+  })
+
+  it('keeps a live recording while people are in the room and discards it when the room is empty', async () => {
+    let roomCount = 1
+    setMediaRoomAdapter({
+      isConfigured: () => true,
+      canRecordToObjectStorage: () => true,
+      participantToken: async (input) => ({
+        url: 'wss://media.test.local',
+        token: `tok-${input.identity}`,
+        roomName: input.roomName,
+      }),
+      ensureRoom: async () => {},
+      closeRoom: async () => {},
+      startRecording: async () => ({ jobId: 'job-empty' }),
+      stopRecording: async () => {},
+      muteAllStudents: async () => 2,
+      roomParticipantCount: async () => roomCount,
+    })
+
+    const created = await createLecturerClassroomSession(institutionId, lecturerActor, {
+      offeringId,
+      title: 'Empty room leftover',
+    })
+    await startLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    await startLecturerRecording(institutionId, lecturerActor, created.id)
+
+    const db = await getInstitutionDb(institutionId)
+    await processClassroomRecordings(db, new Date(), institutionId)
+    const stillLive = await getLecturerClassroomSession(institutionId, lecturerActor.id, created.id)
+    expect(stillLive.recordings.some((row) => row.status === 'Pending')).toBe(true)
+
+    roomCount = 0
+    const discarded = await processClassroomRecordings(db, new Date(), institutionId)
+    expect(discarded).toBeGreaterThan(0)
+    const afterJob = await getLecturerClassroomSession(institutionId, lecturerActor.id, created.id)
+    expect(afterJob.recordings.some((row) => row.status === 'Pending')).toBe(false)
+
+    const leftoverNotes = await db
+      .select({ title: notifications.title, body: notifications.body })
+      .from(notifications)
+      .where(eq(notifications.userId, studentUserId))
+    expect(
+      leftoverNotes.some(
+        (row) => row.title.startsWith('Class recording:') && row.body.includes('Empty room leftover'),
+      ),
+    ).toBe(false)
+
+    await startLecturerRecording(institutionId, lecturerActor, created.id)
+    const discardedByLecturer = await discardLecturerRecording(institutionId, lecturerActor, created.id)
+    expect(discardedByLecturer.recordings.some((row) => row.status === 'Pending')).toBe(false)
+
+    await endLecturerClassroomSession(institutionId, lecturerActor, created.id)
+    setMediaRoomAdapter({
+      isConfigured: () => true,
+      canRecordToObjectStorage: () => true,
+      participantToken: async (input) => ({
+        url: 'wss://media.test.local',
+        token: `tok-${input.identity}`,
+        roomName: input.roomName,
+      }),
+      ensureRoom: async () => {},
+      closeRoom: async () => {},
+      startRecording: async () => ({ jobId: 'job-1' }),
+      stopRecording: async () => {},
+      muteAllStudents: async () => 2,
+    })
   })
 
   it('joins attendance, materials, fees and grades on one analytics view', async () => {
