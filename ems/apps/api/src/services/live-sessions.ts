@@ -583,6 +583,90 @@ export async function stopLecturerRecording(
   return toDetail(institutionId, db, sessionId)
 }
 
+export async function discardPendingClassroomRecording(
+  institutionId: string,
+  db: InstitutionDb,
+  recording: { id: string; jobId: string | null; fileKey: string | null },
+  actor?: Actor,
+): Promise<void> {
+  if (recording.jobId) {
+    await (await mediaRoomFor(institutionId)).stopRecording(recording.jobId).catch(() => undefined)
+  }
+  if (recording.fileKey) await deleteStoredObject(recording.fileKey).catch(() => undefined)
+  const nowIso = new Date().toISOString()
+  await db
+    .update(sessionRecordings)
+    .set({
+      status: 'Failed',
+      purgedAt: nowIso,
+      fileKey: null,
+      jobId: null,
+      updatedAt: nowIso,
+    })
+    .where(eq(sessionRecordings.id, recording.id))
+  if (!actor) return
+  await writeAudit({
+    institutionId,
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: 'classroom.record.discard',
+    targetType: 'session_recording',
+    targetId: recording.id,
+  })
+}
+
+export async function discardAbandonedClassroomRecordings(
+  institutionId: string,
+  db: InstitutionDb,
+): Promise<number> {
+  const pending = await db
+    .select({
+      id: sessionRecordings.id,
+      jobId: sessionRecordings.jobId,
+      fileKey: sessionRecordings.fileKey,
+      sessionStatus: liveSessions.status,
+      roomName: liveSessions.roomName,
+    })
+    .from(sessionRecordings)
+    .innerJoin(liveSessions, eq(liveSessions.id, sessionRecordings.sessionId))
+    .where(and(eq(sessionRecordings.status, 'Pending'), isNull(sessionRecordings.purgedAt)))
+
+  let changed = 0
+  const live = await mediaRoomFor(institutionId)
+  for (const row of pending) {
+    if (row.sessionStatus !== 'Live') {
+      await discardPendingClassroomRecording(institutionId, db, row)
+      changed += 1
+      continue
+    }
+    if (!live.isConfigured() || !live.roomParticipantCount) continue
+    const people = await live.roomParticipantCount(row.roomName)
+    if (people > 0) continue
+    await discardPendingClassroomRecording(institutionId, db, row)
+    changed += 1
+  }
+  return changed
+}
+
+export async function discardLecturerRecording(
+  institutionId: string,
+  actor: Actor,
+  sessionId: string,
+): Promise<ClassroomSessionDetail> {
+  const { db } = await requireLecturer(institutionId, actor.id)
+  const row = await loadSessionRow(db, sessionId)
+  await requireAssignedOffering(db, actor.id, row.offeringId)
+  const [pending] = await db
+    .select({ id: sessionRecordings.id, jobId: sessionRecordings.jobId, fileKey: sessionRecordings.fileKey })
+    .from(sessionRecordings)
+    .where(and(eq(sessionRecordings.sessionId, sessionId), eq(sessionRecordings.status, 'Pending')))
+    .limit(1)
+  if (!pending) throw notFound('That recording')
+  await discardPendingClassroomRecording(institutionId, db, pending, actor)
+  return toDetail(institutionId, db, sessionId)
+}
+
 export async function finalizeRecording(institutionId: string, recordingId: string): Promise<void> {
   const db = await getInstitutionDb(institutionId)
   const [row] = await db

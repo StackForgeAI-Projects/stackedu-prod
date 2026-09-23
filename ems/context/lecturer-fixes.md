@@ -173,4 +173,51 @@ Sentences stay short. No jargon. The box sits after the form title in the shared
 2. **Full screen** / **Exit full screen**, **Mute all**, **Back to class**, **Leave**, and **End class** keep that visible text on phone, tablet, and computer.
 3. Hover still works. It must not be the only way to read the name.
 
-**Status:** DONE. Overlay controls use a labelled button. The name stays visible on the video and in picture-in-picture.
+**Status:** DONE. Overlay controls are brand-green labelled buttons with ink text. The name stays readable on the dark video and in picture-in-picture, even when LiveKit paints type white.
+
+---
+
+## 11. Leave class must drop the call, not open picture-in-picture
+
+**Problem:** Clicking the red **Leave** control on the live video disconnects LiveKit but keeps the session mounted. Opening another page then shows a disconnected picture-in-picture window.
+
+**What must happen:**
+
+1. When a lecturer or student clicks **Leave** on the live video, they leave the room completely. Picture-in-picture must not open.
+2. Picture-in-picture opens only while they are still in the live class and they open another portal page.
+3. **Back to class** still returns to the class page. **Leave** on the small window still drops the call.
+
+**Status:** DONE. Leaving the room clears the live session. Picture-in-picture is only for people who are still in the class and open another page.
+
+---
+
+## 12. Stop and remove a leftover live recording
+
+**Problem:** A live class can keep writing a recording after nobody is in the room. A class may last an hour or more, so a short timer is wrong. A leftover file should not stay Pending, become Ready, or be offered to students.
+
+**What must happen:**
+
+1. A recording may run for the whole live class while people are in the room.
+2. Confirm **Stop recording?** still saves the file for download (Ready).
+3. Confirm **End class?** still stops a recording that is going and saves it.
+4. If the live room is empty, the leftover recording is stopped and deleted. Students are not told to download it.
+5. The leftover BUS 101 recording on the live class is stopped and removed.
+
+**Status:** DONE in code. An empty live room discards a leftover Pending recording (file deleted, not offered). Stop and End still save a file the lecturer meant to keep. Stopping a stuck LiveKit job waits at most 8 seconds so cleanup can finish.
+
+Live BUS 101 (`ba3468d1-f9d9-4220-b25a-5882663b1e40`): signed in as the lecturer. **Stop recording** was confirmed twice. Production `POST /record/stop` hung (LiveKit stop never returned; browser status 0). Production has no discard route yet (`POST /record/discard` → 404). The class was left Live. The leftover Pending row is still there until this change is on production.
+
+---
+
+## 13. Picture-in-picture controls are icons with names on hover
+
+**Problem:** Green labelled buttons fill the small picture-in-picture window. **Leave** and the other actions fall off the window.
+
+**What must happen:**
+
+1. On the live video and in picture-in-picture, **Mute all**, **Full screen**, **Back to class**, **Leave**, and **End class** are icons only.
+2. Hover shows the name in a tooltip (`IconActionButton`).
+3. The icon background is a calm ink surface, not bright green.
+4. The small window shows every action without sideways overflow.
+
+**Status:** DONE. Overlay and picture-in-picture actions use `IconActionButton` on a calm ink surface. The name is the tooltip.

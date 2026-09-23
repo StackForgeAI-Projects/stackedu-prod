@@ -227,17 +227,19 @@ Statuses: **Scheduled** → **Live** → **Ended**. Or **Cancelled** before it s
 
 1. On **Classroom**, the lecturer can turn **Automatically record live classes** on or off (confirm). When it is on, starting the class also starts a recording if LiveKit and object storage allow it.
 2. Confirm **Start recording?** Needs LiveKit and R2 storage. A red **Recording** notice stays on the video until it is stopped.
-3. Confirm **Stop recording?** when done. Ending the class also stops a recording that is still going.
+3. Confirm **Stop recording?** when done. That saves the file for download. Ending the class also stops a recording that is still going and saves it.
 4. Status goes Pending, then **Ready**. Lecturer and enrolled students can **Download** a Ready recording (signed, short-lived link) until ICT’s keep-window ends.
 5. When a recording becomes **Ready**, every enrolled student on that course (in class or not) is notified to download it, with the date and time it will be removed. A reminder is sent as that time gets close. After the window, the file is deleted.
+6. A class may stay Live for an hour or more. The recording keeps going while people are in the room.
+7. If the live room is empty and a recording is still Pending, the leftover is stopped and deleted. Students are not told to download it.
 
 ICT sets the keep-window under **System Settings** (hours or days). The default is 72 hours.
 
 ### During a live class
 
 - The lecturer can confirm **Mute all students?** to silence every student microphone. The lecturer stays unmuted. Students may unmute themselves.
-- Participants can put the video in **full screen** (video only). The name sits on a green button in dark ink, including in picture-in-picture.
-- The red **Leave** control drops that person from the room. Picture-in-picture does not open.
+- On the live video and in picture-in-picture, **Mute all**, **Full screen**, **Back to class**, **Leave**, and **End class** are icons. Hover shows the name. The icon background is a calm ink surface.
+- The **Leave** icon drops that person from the room. Picture-in-picture does not open.
 - Opening another portal page while still in the class keeps the call in picture-in-picture. Opening the class page again puts the video back.
 - The live class page does not scroll sideways.
 - The whiteboard stays in sync for everyone in the live class. A reload shows the latest saved board.

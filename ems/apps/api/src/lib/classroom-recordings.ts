@@ -11,8 +11,13 @@ import { sessionRecordings, liveSessions, courseOfferings } from '../db/institut
 import { deleteStoredObject } from './storage'
 import { readInstitutionSetting } from './institution-settings'
 import { notifyEnrolledStudentsOfRecording } from '../services/role-notifications'
+import { discardAbandonedClassroomRecordings } from '../services/live-sessions'
 
-export async function processClassroomRecordings(db: InstitutionDb, now = new Date()): Promise<number> {
+export async function processClassroomRecordings(
+  db: InstitutionDb,
+  now = new Date(),
+  institutionId?: string,
+): Promise<number> {
   const policy = await readInstitutionSetting(
     db,
     RECORDING_RETENTION_SETTING_KEY,
@@ -78,5 +83,6 @@ export async function processClassroomRecordings(db: InstitutionDb, now = new Da
     changed += 1
   }
 
+  if (institutionId) changed += await discardAbandonedClassroomRecordings(institutionId, db)
   return changed
 }

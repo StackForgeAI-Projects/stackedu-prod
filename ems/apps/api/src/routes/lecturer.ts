@@ -103,6 +103,7 @@ import {
   startLecturerClassroomSession,
   startLecturerRecording,
   stopLecturerRecording,
+  discardLecturerRecording,
 } from '../services/live-sessions'
 import { getLecturerCourseAnalytics } from '../services/course-analytics'
 import { registerLibraryReaderRoutes } from './library-reader'
@@ -625,6 +626,12 @@ lecturerRoutes.post('/lecturer/classroom/:id/mute-all', ...lecturerOnly, async (
 lecturerRoutes.post('/lecturer/classroom/:id/record/stop', ...lecturerOnly, async (c) => {
   return c.json({
     session: await stopLecturerRecording(c.get('user')!.institution.id, actor(c), c.req.param('id')),
+  })
+})
+
+lecturerRoutes.post('/lecturer/classroom/:id/record/discard', ...lecturerOnly, async (c) => {
+  return c.json({
+    session: await discardLecturerRecording(c.get('user')!.institution.id, actor(c), c.req.param('id')),
   })
 })
 

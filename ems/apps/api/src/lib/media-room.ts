@@ -25,6 +25,7 @@ export interface MediaRoomAdapter {
   startRecording(input: { roomName: string; fileKey: string }): Promise<{ jobId: string }>
   stopRecording(jobId: string): Promise<void>
   muteAllStudents(roomName: string, hostIdentity: string): Promise<number>
+  roomParticipantCount?(roomName: string): Promise<number>
 }
 
 let override: MediaRoomAdapter | null = null
@@ -133,7 +134,20 @@ function createLiveKitAdapter(creds: { url: string; apiKey: string; apiSecret: s
     async stopRecording(jobId) {
       const settings = requireLiveKit()
       const egress = new EgressClient(settings.url, settings.apiKey, settings.apiSecret)
-      await egress.stopEgress(jobId)
+      await Promise.race([
+        egress.stopEgress(jobId).then(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+      ])
+    },
+    async roomParticipantCount(roomName) {
+      const settings = requireLiveKit()
+      const rooms = new RoomServiceClient(settings.url, settings.apiKey, settings.apiSecret)
+      try {
+        const participants = await rooms.listParticipants(roomName)
+        return participants.length
+      } catch {
+        return 0
+      }
     },
     async muteAllStudents(roomName, hostIdentity) {
       const settings = requireLiveKit()
