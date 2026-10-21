@@ -41,7 +41,7 @@ function AcademicResultsPage() {
             </div>
             <select
               className="mb-4 text-sm px-3 py-2 rounded-lg"
-              style={{ border: '1px solid var(--border)', background: 'var(--card)' }}
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)' }}
               value={selected?.semesterId}
               onChange={(e) => setSemesterId(e.target.value)}
             >

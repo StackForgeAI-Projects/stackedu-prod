@@ -1,9 +1,11 @@
 import type { Market } from "@/lib/market";
 import { getPublicContactEmail, getStackeduSiteUrl, STACKEDU_SITE_URL } from "@/lib/market";
+import { AFRICA_COUNTRY_KEYWORDS, AFRICA_TOPIC_KEYWORDS } from "@/lib/seo/africa";
 
 export type SeoRoute =
   | "/"
   | "/next"
+  | "/next/register"
   | "/blog"
   | "/careers"
   | "/privacy"
@@ -209,6 +211,31 @@ const RW_SUPPLEMENTAL_KEYWORDS = [
   "stackedu.rw",
 ] as const;
 
+/** Queries institutions and ministries actually use, plus the live cohort. */
+const PILOT_PARTNERSHIP_KEYWORDS = [
+  "free school management system pilot",
+  "free university LMS pilot",
+  "free EMS for schools",
+  "free learning management system for schools",
+  "StackEDU free pilot",
+  "primary school management software",
+  "primary school LMS",
+  "college management system pilot",
+  "university student information system pilot",
+  "education partnership",
+  "government education partnership",
+  "ministry of education software",
+  "MINEDUC digital skills",
+  "TVET management system",
+  "TVET digital skills",
+  "education management information system",
+  "school information system",
+  "StackForgeNext November 2026",
+  "StackForgeNext cohort registration",
+  "free tech training cohort",
+  "1 KN 78 St Kigali",
+] as const;
+
 const AFRICA_SUPPLEMENTAL_KEYWORDS = [
   "education in Africa",
   "edtech Africa",
@@ -233,6 +260,7 @@ const RW_KEYWORDS = mergeKeywords(
   STACKEDU_KEYWORDS_SHARED,
   STACKEDU_KEYWORDS_RW,
   RW_SUPPLEMENTAL_KEYWORDS,
+  PILOT_PARTNERSHIP_KEYWORDS,
 );
 
 const AFRICA_KEYWORDS = mergeKeywords(
@@ -240,6 +268,9 @@ const AFRICA_KEYWORDS = mergeKeywords(
   STACKEDU_KEYWORDS_SHARED,
   STACKEDU_KEYWORDS_AFRICA,
   AFRICA_SUPPLEMENTAL_KEYWORDS,
+  PILOT_PARTNERSHIP_KEYWORDS,
+  AFRICA_TOPIC_KEYWORDS,
+  AFRICA_COUNTRY_KEYWORDS,
 );
 
 const profiles: Record<Market, MarketSeoProfile> = {
@@ -250,10 +281,10 @@ const profiles: Record<Market, MarketSeoProfile> = {
     locale: "en_RW",
     alternateLocales: ["rw_RW", "fr_RW", "en_US"],
     titleDefault:
-      "StackEDU Rwanda — School & University Management Software in Kigali",
+      "StackEDU Rwanda — Free EMS & LMS Pilot for Schools and Universities",
     titleTemplate: "%s | StackEDU Rwanda",
     description:
-      "StackEDU is Rwanda's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library, and build an institutional repository that helps your research get cited worldwide — built in Kigali by StackForgeAI.",
+      "Free StackEDU pilot for universities, colleges, schools and primary schools in Rwanda. EMS and LMS for admissions, records, fees and learning. 1 KN 78 St, Kigali. WhatsApp +250 799 486 531.",
     keywords: [...RW_KEYWORDS],
     ogImage: "/images/stackedu-hero.webp",
     ogImageAlt: "StackEDU platform for Rwandan tertiary institutions",
@@ -271,10 +302,10 @@ const profiles: Record<Market, MarketSeoProfile> = {
     locale: "en",
     alternateLocales: ["fr", "en_US"],
     titleDefault:
-      "StackEDU — School & University Management Software Across Africa",
+      "StackEDU Africa — Free EMS & LMS Pilot for Schools and Universities",
     titleTemplate: "%s | StackEDU Africa",
     description:
-      "StackEDU is Africa's AI-powered edtech platform for universities, polytechnics and colleges. Unify admissions, academics, fees, e-learning and e-library, and build an institutional repository that helps your research get cited worldwide — built by StackForgeAI.",
+      "Free StackEDU pilot for universities, colleges, schools and primary schools in every African country, and education partnerships worldwide. EMS and LMS from 1 KN 78 St, Kigali. WhatsApp +250 799 486 531.",
     keywords: [...AFRICA_KEYWORDS],
     ogImage: "/images/stackedu-hero.webp",
     ogImageAlt: "StackEDU platform for African tertiary institutions",
@@ -313,17 +344,18 @@ export function getNextPageSeo(market: Market): PageSeoCopy {
     return {
       title: "StackForgeNext — Free Tech Training for Rwanda's Youth",
       description:
-        "StackForgeNext is StackForgeAI's community initiative delivering free tech training, coding, AI skills and digital education to youth across Rwanda. Partner with schools and universities in Kigali and beyond.",
+        "StackForgeNext free tech training for Rwanda's youth. The next cohort starts 9 November 2026 — 20 seats, six weeks online. Register now. Schools can also request a free StackEDU pilot.",
       path: "/next",
       keywords: [
         "StackForgeNext",
+        "StackForgeNext register",
         "free tech training Rwanda",
         "coding academy Kigali",
         "digital skills Rwanda",
         "youth training Rwanda",
         "AI training Rwanda",
-        "community education Rwanda",
-        "tech academy Kigali",
+        "November 2026 cohort",
+        "TVET digital skills Rwanda",
       ],
     };
   }
@@ -331,28 +363,63 @@ export function getNextPageSeo(market: Market): PageSeoCopy {
   return {
     title: "StackForgeNext — Free Tech Training for Africa's Youth",
     description:
-      "StackForgeNext is StackForgeAI's community initiative delivering free tech training, coding, AI skills and digital education to youth across Africa. Partner with schools, universities and community organizations.",
+      "StackForgeNext free tech training for Africa's youth. The next cohort starts 9 November 2026 — 20 seats, six weeks online. Register now. Schools can also request a free StackEDU pilot.",
     path: "/next",
     keywords: [
       "StackForgeNext",
+      "StackForgeNext register",
       "free tech training Africa",
       "coding academy Africa",
       "digital skills Africa",
       "youth training Africa",
       "AI training Africa",
-      "community education Africa",
+      "November 2026 cohort",
+    ],
+  };
+}
+
+export function getRegisterPageSeo(market: Market): PageSeoCopy {
+  if (market === "rw") {
+    return {
+      title: "Register — StackForgeNext cohort starts 9 November 2026",
+      description:
+        "Start your StackForgeNext application. 20 free seats from 9 November 2026. Six weeks online, Monday, Wednesday and Friday, 10:00–12:00 CAT. AI, web and career readiness.",
+      path: "/next/register",
+      keywords: [
+        "StackForgeNext register",
+        "StackForgeNext application",
+        "free tech training Rwanda cohort",
+        "coding bootcamp Kigali",
+        "youth tech training November 2026",
+        "machine learning training Rwanda",
+      ],
+    };
+  }
+
+  return {
+    title: "Register — StackForgeNext cohort starts 9 November 2026",
+    description:
+      "Start your StackForgeNext application. 20 free seats from 9 November 2026. Six weeks online, Monday, Wednesday and Friday, 10:00–12:00 CAT. AI, web and career readiness.",
+    path: "/next/register",
+    keywords: [
+      "StackForgeNext register",
+      "StackForgeNext application",
+      "free tech training Africa cohort",
+      "coding bootcamp Africa",
+      "youth tech training November 2026",
+      "machine learning training Africa",
     ],
   };
 }
 
 export function getStaticPageSeo(
   market: Market,
-  page: Exclude<SeoRoute, "/" | "/next">,
+  page: Exclude<SeoRoute, "/" | "/next" | "/next/register">,
 ): PageSeoCopy {
   const brand = market === "rw" ? "StackEDU Rwanda" : "StackEDU Africa";
   const region = market === "rw" ? "Rwanda" : "Africa";
 
-  const pages: Record<Exclude<SeoRoute, "/" | "/next">, PageSeoCopy> = {
+  const pages: Record<Exclude<SeoRoute, "/" | "/next" | "/next/register">, PageSeoCopy> = {
     "/blog": {
       title: `Blog — ${brand}`,
       description: `Insights on edtech, higher education, student information systems and digital learning across ${region}. Coming soon from StackEDU.`,
@@ -393,6 +460,7 @@ export function getContactEmailForSeo(market: Market) {
 export const SITEMAP_ROUTES: { path: SeoRoute; priority: number; changeFrequency: "weekly" | "monthly" | "yearly" }[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/next", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/next/register", priority: 0.95, changeFrequency: "weekly" },
   { path: "/blog", priority: 0.5, changeFrequency: "monthly" },
   { path: "/careers", priority: 0.5, changeFrequency: "monthly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },

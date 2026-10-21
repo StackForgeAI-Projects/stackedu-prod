@@ -47,14 +47,20 @@ next-env.d.ts
 /stackforgenext-main/
 
 # Development-only paths. Tracked on `development` with `git add -f`.
-# Never present on `main` (production).
+# Never present on `main` (production). See context/non-production-files.md.
 /docs/
+/context/
+/scripts/
 /ems/docs/
 /ems/context/
 /ems/design_system/
 /ems/EMS-master-context.md
 /stackedu-app-frontend-design/
 /code-standards.md
+/StackEDU -Real-Time LMS and E-Library Build Prompt.pdf
+
+# Local uploads (not the EMS .data store)
+/.data/
 
 # EMS monorepo — secrets and local artifacts (also covered by ems/.gitignore)
 /ems/.env

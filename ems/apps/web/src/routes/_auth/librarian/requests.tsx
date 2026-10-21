@@ -127,7 +127,7 @@ function RequestsPage() {
               <Label>Link an existing resource (optional)</Label>
               <select
                 className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
-                style={{ border: '1px solid var(--border)', background: 'var(--background)' }}
+                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}
                 value={linkedId}
                 onChange={(event) => setLinkedId(event.target.value)}
               >

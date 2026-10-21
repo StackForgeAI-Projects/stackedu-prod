@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import { useStackForgeNextContent } from "@/lib/stackforgenext/use-content";
 
 const inputClass =
   "w-full rounded-lg border border-white/12 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-primary-bright/60 focus:bg-white/8 focus:ring-2 focus:ring-primary/30";
+const selectClass =
+  "w-full appearance-none rounded-lg border border-white/12 bg-white/5 py-3 pl-4 pr-11 text-sm text-white outline-none transition focus:border-primary-bright/60 focus:bg-white/8 focus:ring-2 focus:ring-primary/30";
 const labelClass = "eyebrow mb-2 block text-white/55";
 
 export function PartnerForm() {
@@ -125,16 +127,22 @@ export function PartnerForm() {
           <label className={labelClass} htmlFor="timeline">
             {c.timeline}
           </label>
-          <select id="timeline" name="timeline" defaultValue="" className={inputClass}>
-            <option value="" disabled className="bg-ink">
-              {c.timelinePlaceholder}
-            </option>
-            {c.timelineOptions.map((t) => (
-              <option key={t} value={t} className="bg-ink">
-                {t}
+          <div className="relative">
+            <select id="timeline" name="timeline" defaultValue="" className={selectClass}>
+              <option value="" disabled className="bg-ink">
+                {c.timelinePlaceholder}
               </option>
-            ))}
-          </select>
+              {c.timelineOptions.map((t) => (
+                <option key={t} value={t} className="bg-ink">
+                  {t}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-white/55"
+              aria-hidden
+            />
+          </div>
         </div>
 
         <div className="sm:col-span-2">

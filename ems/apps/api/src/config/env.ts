@@ -51,7 +51,9 @@ const envSchema = z
     /** Maximum idle time before an institution's connection pool is closed. */
     DB_POOL_IDLE_TIMEOUT_SECONDS: z.coerce.number().int().min(10).default(300),
     /** Connections held per institution. Kept low because there are many pools. */
-    DB_POOL_MAX_CONNECTIONS: z.coerce.number().int().min(1).default(5),
+    // Neon session mode allows few clients. One API pool of 5, plus the same
+    // again per institution, filled that limit and the process ran out of memory.
+    DB_POOL_MAX_CONNECTIONS: z.coerce.number().int().min(1).default(2),
 
     /** Surfaced on the health endpoint to confirm which build is running. */
     APP_VERSION: z.string().default('0.1.0'),

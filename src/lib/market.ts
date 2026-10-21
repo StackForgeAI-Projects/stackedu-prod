@@ -132,7 +132,7 @@ export function getContactEmailConfig(market: Market) {
         process.env.CONTACT_FROM_EMAIL_RW || legacyFrom || "StackEDU <hello@stackedu.rw>",
       ),
       to: normalizeRecipientEmail(
-        process.env.CONTACT_TO_EMAIL_RW || legacyTo || "hello@stackedu.africa",
+        process.env.CONTACT_TO_EMAIL_RW || legacyTo || "hello@stackedu.rw",
       ),
     };
   }

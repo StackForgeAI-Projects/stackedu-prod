@@ -1,0 +1,13 @@
+# StackEDU application
+
+> Education management system (EMS) and learning management system (LMS) for universities, colleges, schools, and primary schools. Built by StackForgeAI at 1 KN 78 St, Kigali, Rwanda.
+
+Sign in: https://app.stackedu.rw/ and https://app.stackedu.africa/
+Marketing site: https://stackedu.rw/ and https://stackedu.africa/
+Free institution pilot: https://stackedu.rw/#contact
+Next free tech cohort application: https://stackedu.rw/next/register
+Phone and WhatsApp: +250 799 486 531 (https://wa.me/250799486531)
+
+The November 2026 StackForgeNext cohort starts 2026-11-09, ends 2026-12-18, 20 free seats, Monday, Wednesday and Friday, 10:00–12:00 CAT.
+
+Education partnerships and government education programmes from any country start at the Kigali headquarters.

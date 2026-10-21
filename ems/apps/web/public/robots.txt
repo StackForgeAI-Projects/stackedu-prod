@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# The public product story and the cohort form live on the marketing site.
+# This host is the signed-in EMS and LMS.

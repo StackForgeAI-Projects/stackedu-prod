@@ -75,11 +75,10 @@ export function SearchableSelect({
             if (event.key === 'Escape') setOpen(false)
           }}
           className={cn(
-            'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+            'flex h-10 w-full rounded-md border border-input bg-background py-2 pl-3 pr-11 text-sm',
             'ring-offset-background placeholder:text-muted-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'pr-9',
           )}
         />
         <button
@@ -87,11 +86,11 @@ export function SearchableSelect({
           tabIndex={-1}
           disabled={disabled}
           onClick={() => setOpen((current) => !current)}
-          className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md"
+          className="absolute right-4 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center"
           style={{ color: 'var(--muted-foreground)', background: 'transparent', border: 'none' }}
           aria-label="Show options"
         >
-          <ChevronDown size={14} />
+          <ChevronDown className="size-4" />
         </button>
       </div>
 

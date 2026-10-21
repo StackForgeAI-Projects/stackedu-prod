@@ -778,6 +778,25 @@ h6 {
   -webkit-text-fill-color: var(--error) !important;
 }
 
+/* Native <select> chevron matches the marketing learning-track control:
+   16px icon, 16px from the right edge, text padded clear of the icon.
+   Use backgroundColor (not the background shorthand) on selects so this
+   image is not wiped. */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem 1rem;
+  padding-right: 2.75rem;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
 .course-code-pill__text {
   font-family: var(--font-mono);
   font-size: 10px;

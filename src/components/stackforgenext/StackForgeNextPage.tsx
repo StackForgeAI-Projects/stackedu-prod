@@ -22,6 +22,7 @@ import { WHATSAPP_URL } from "@/lib/content";
 import { useGsapNextPage } from "@/hooks/useGsapNextPage";
 import { BTN_INK_HEADER_CTA, BTN_INK_LG } from "@/lib/stackforgenext/buttons";
 import { useStackForgeNextContent } from "@/lib/stackforgenext/use-content";
+import { CohortSection } from "./CohortSection";
 import { PartnerForm } from "./PartnerForm";
 import { SiteFooter } from "./SiteFooter";
 
@@ -67,11 +68,17 @@ export function StackForgeNextPage() {
 
           <nav className="hidden flex-1 items-center justify-center lg:flex">
             <div className="flex items-center gap-9 text-sm font-semibold text-foreground/70">
-              {c.nav.links.map((l) => (
-                <a key={l.href} href={l.href} className="hover:text-foreground transition-colors">
-                  {l.label}
-                </a>
-              ))}
+              {c.nav.links.map((l) =>
+                l.href.startsWith("/") ? (
+                  <Link key={l.href} href={l.href} className="hover:text-foreground transition-colors">
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a key={l.href} href={l.href} className="hover:text-foreground transition-colors">
+                    {l.label}
+                  </a>
+                ),
+              )}
               <Link href="/" className="hover:text-foreground transition-colors">
                 {c.nav.stackeduLabel}
               </Link>
@@ -105,16 +112,27 @@ export function StackForgeNextPage() {
         >
           <div className="flex flex-col overflow-y-auto px-6 pb-8 pt-24">
             <div className="space-y-1">
-              {c.nav.links.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={closeMenu}
-                  className="block rounded-xl px-4 py-3 text-sm font-semibold text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  {l.label}
-                </a>
-              ))}
+              {c.nav.links.map((l) =>
+                l.href.startsWith("/") ? (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={closeMenu}
+                    className="block rounded-xl px-4 py-3 text-sm font-semibold text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    onClick={closeMenu}
+                    className="block rounded-xl px-4 py-3 text-sm font-semibold text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    {l.label}
+                  </a>
+                ),
+              )}
               <Link
                 href="/"
                 onClick={closeMenu}
@@ -355,6 +373,8 @@ export function StackForgeNextPage() {
           </div>
         </div>
       </section>
+
+      <CohortSection />
 
       <section id="partner" className="surface-ink relative overflow-hidden scroll-mt-20">
         <div className="dot-grid absolute inset-0 opacity-[0.06]" aria-hidden />

@@ -214,21 +214,30 @@ export async function getAccountLiveCursor(
   userId: string,
 ): Promise<AccountLiveCursor> {
   const db = await getInstitutionDb(institutionId)
-  const [notes, documents, applicationsRow, reviews, slots] = await Promise.all([
-    db
-      .select({ at: sql<string | null>`max(${notifications.createdAt})` })
-      .from(notifications)
-      .where(eq(notifications.userId, userId)),
-    db.select({ at: sql<string | null>`max(${applicationDocuments.createdAt})` }).from(applicationDocuments),
-    db.select({ at: sql<string | null>`max(${applications.updatedAt})` }).from(applications),
-    db.select({ at: sql<string | null>`max(${applicationReviews.createdAt})` }).from(applicationReviews),
-    db.select({ at: sql<string | null>`max(${timetableSlots.updatedAt})` }).from(timetableSlots),
-  ])
+  // One connection at a time. Five parallel scans filled the Neon session
+  // pool while the portal polled, and the queued work pushed the API over
+  // Render's 512 MB limit.
+  const [notes] = await db
+    .select({ at: sql<string | null>`max(${notifications.createdAt})` })
+    .from(notifications)
+    .where(eq(notifications.userId, userId))
+  const [documents] = await db
+    .select({ at: sql<string | null>`max(${applicationDocuments.createdAt})` })
+    .from(applicationDocuments)
+  const [applicationsRow] = await db
+    .select({ at: sql<string | null>`max(${applications.updatedAt})` })
+    .from(applications)
+  const [reviews] = await db
+    .select({ at: sql<string | null>`max(${applicationReviews.createdAt})` })
+    .from(applicationReviews)
+  const [slots] = await db
+    .select({ at: sql<string | null>`max(${timetableSlots.updatedAt})` })
+    .from(timetableSlots)
 
   return {
-    notificationsAt: notes[0]?.at ?? null,
-    admissionsAt: latestStamp([documents[0]?.at, applicationsRow[0]?.at, reviews[0]?.at]),
-    timetableAt: slots[0]?.at ?? null,
+    notificationsAt: notes?.at ?? null,
+    admissionsAt: latestStamp([documents?.at, applicationsRow?.at, reviews?.at]),
+    timetableAt: slots?.at ?? null,
   }
 }
 
