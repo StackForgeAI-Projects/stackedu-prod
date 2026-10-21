@@ -19,7 +19,9 @@ function createInstitutionDb(sql: postgres.Sql) {
 
 function poolOptions(max: number): postgres.Options<Record<string, never>> {
   return {
-    max,
+    // Hard cap. A larger pool fills Neon session mode, queues work in this
+    // process, and Render then kills the API at 512 MB.
+    max: Math.min(max, 2),
     // Closes individual connections that sit unused. Neon bills for compute
     // time, so idle connections are a cost as well as a resource.
     idle_timeout: 30,

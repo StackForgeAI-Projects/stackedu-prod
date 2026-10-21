@@ -102,6 +102,7 @@ const navLinks = [
   { label: "Tracks", href: "#tracks" },
   { label: "How it works", href: "#how" },
   { label: "Impact", href: "#impact" },
+  { label: "Register", href: "/next/register" },
 ];
 
 const enRw: StackForgeNextContent = {
@@ -194,7 +195,7 @@ const enRw: StackForgeNextContent = {
     email: "hello@stackforgeai.africa",
     phone: "+250 799 486 531",
     whatsapp: "WhatsApp +250 799 486 531",
-    location: "Kigali, Rwanda 🇷🇼",
+    location: "1 KN 78 St, Kigali, Rwanda",
   },
   form: {
     title: "Partner with us",
@@ -247,6 +248,7 @@ const enRw: StackForgeNextContent = {
           { label: "Training tracks", href: "#tracks" },
           { label: "How partnership works", href: "#how" },
           { label: "Impact", href: "#impact" },
+          { label: "Register", href: "/next/register" },
         ],
       },
       {
@@ -260,6 +262,7 @@ const enRw: StackForgeNextContent = {
           { label: "+250 799 486 531", href: "tel:+250799486531" },
           { label: "WhatsApp us", href: "https://wa.me/250799486531" },
           { label: "Partner with us", href: "#partner" },
+          { label: "Register", href: "/next/register" },
         ],
       },
     ],
@@ -282,6 +285,7 @@ const africaOverridesEn: Partial<StackForgeNextContent> = {
       { label: "Tracks", href: "#tracks" },
       { label: "How it works", href: "#how" },
       { label: "Impact", href: "#impact" },
+      { label: "Register", href: "/next/register" },
     ],
     cta: "Partner with us",
   },
@@ -386,6 +390,7 @@ const africaOverridesEn: Partial<StackForgeNextContent> = {
           { label: "Training tracks", href: "#tracks" },
           { label: "How partnership works", href: "#how" },
           { label: "Impact", href: "#impact" },
+          { label: "Register", href: "/next/register" },
         ],
       },
       {
@@ -399,6 +404,7 @@ const africaOverridesEn: Partial<StackForgeNextContent> = {
           { label: "+250 799 486 531", href: "tel:+250799486531" },
           { label: "WhatsApp us", href: "https://wa.me/250799486531" },
           { label: "Partner with us", href: "#partner" },
+          { label: "Register", href: "/next/register" },
         ],
       },
     ],
@@ -487,6 +493,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
         { label: "Parcours", href: "#tracks" },
         { label: "Comment ça marche", href: "#how" },
         { label: "Impact", href: "#impact" },
+        { label: "S'inscrire", href: "/next/register" },
       ],
       cta: "Devenir partenaire",
     },
@@ -573,7 +580,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
       email: "hello@stackforgeai.africa",
       phone: "+250 799 486 531",
       whatsapp: "WhatsApp +250 799 486 531",
-      location: "Kigali, Rwanda 🇷🇼",
+      location: "1 KN 78 St, Kigali, Rwanda",
     },
     form: {
       title: "Devenir partenaire",
@@ -631,6 +638,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
         { label: "Inzira", href: "#tracks" },
         { label: "Uko bikora", href: "#how" },
         { label: "Ingaruka", href: "#impact" },
+        { label: "Iyandikishe", href: "/next/register" },
       ],
       cta: "Tugire urwego",
     },
@@ -717,7 +725,7 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
       email: "hello@stackforgeai.africa",
       phone: "+250 799 486 531",
       whatsapp: "WhatsApp +250 799 486 531",
-      location: "Kigali, Rwanda 🇷🇼",
+      location: "1 KN 78 St, Kigali, Rwanda",
     },
     form: {
       title: "Tugire urwego",
@@ -782,11 +790,13 @@ const byLocale: Record<Locale, StackForgeNextContent> = {
                     ? "Uko ubufatanye bukora"
                     : link.label === "Impact"
                       ? "Ingaruka"
-                      : link.label === "Partner with us"
-                        ? "Tugire urwego"
-                        : link.label === "WhatsApp us"
-                          ? "Twohereze kuri WhatsApp"
-                          : link.label,
+                      : link.label === "Register"
+                        ? "Iyandikishe"
+                        : link.label === "Partner with us"
+                          ? "Tugire urwego"
+                          : link.label === "WhatsApp us"
+                            ? "Twohereze kuri WhatsApp"
+                            : link.label,
         })),
       })),
       copyright: "StackForgeNext, gahunda ya StackForgeAI. Uburenganzira bwose burabitswe.",
@@ -806,6 +816,7 @@ const africaByLocale: Partial<Record<Locale, ContentOverrides>> = {
         { label: "Parcours", href: "#tracks" },
         { label: "Comment ça marche", href: "#how" },
         { label: "Impact", href: "#impact" },
+        { label: "S'inscrire", href: "/next/register" },
       ],
       cta: "Devenir partenaire",
     },
@@ -871,6 +882,7 @@ const africaByLocale: Partial<Record<Locale, ContentOverrides>> = {
         { label: "Inzira", href: "#tracks" },
         { label: "Uko bikora", href: "#how" },
         { label: "Ingaruka", href: "#impact" },
+        { label: "Iyandikishe", href: "/next/register" },
       ],
       cta: "Tugire urwego",
     },

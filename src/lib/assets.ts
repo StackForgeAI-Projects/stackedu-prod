@@ -14,7 +14,14 @@ export const STACKFORGENEXT = {
   hero: "/images/stackforgenext/hero-training.jpg",
   mentorship: "/images/stackforgenext/mentorship.jpg",
   workshop: "/images/stackforgenext/workshop.jpg",
+  cohort: "/images/stackforgenext/cohort.jpg",
+  registerHero: "/images/stackforgenext/register-hero.jpg",
   skyline: "/images/stackforgenext/kigali-rwanda-city.webp",
+} as const;
+
+/** StackForgeNext learner community */
+export const STACKFORGENEXT_COMMUNITY = {
+  telegram: "https://t.me/stackforgenext",
 } as const;
 
 export const STUDENTS = {

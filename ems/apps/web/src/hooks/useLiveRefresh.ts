@@ -5,7 +5,7 @@ import { accountLiveQueryKey, getAccountLiveCursor } from '@/lib/api/account'
 import { academicDashboardQueryKey } from '@/lib/api/academic'
 import { academicApplicationsQueryKey, applicationQueryKey } from '@/lib/api/admissions'
 
-const POLL_MS = 2_000
+const POLL_MS = 20_000
 
 function stampChanged(previous: string | null, next: string | null): boolean {
   return previous !== next
@@ -27,7 +27,8 @@ export function useLiveRefresh(enabled = true): void {
     queryFn: getAccountLiveCursor,
     enabled,
     refetchInterval: POLL_MS,
-    staleTime: 0,
+    refetchIntervalInBackground: false,
+    staleTime: POLL_MS,
   })
 
   useEffect(() => {

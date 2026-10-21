@@ -83,7 +83,7 @@ function CollectionDetailPage() {
             <div className="mb-5 flex flex-col gap-2 sm:flex-row">
               <select
                 className="rounded-lg px-3 py-2 text-sm"
-                style={{ border: '1px solid var(--border)', background: 'var(--card)' }}
+                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)' }}
                 value={addingId}
                 onChange={(event) => setAddingId(event.target.value)}
               >

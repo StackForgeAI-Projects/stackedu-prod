@@ -1,12 +1,13 @@
 import { unstable_cache } from "next/cache";
 import type { Market } from "@/lib/market";
+import { AFRICAN_COUNTRY_CODES } from "@/lib/seo/africa";
 import { mergeKeywords } from "@/lib/seo/config";
 
 const EDTECH_PATTERN =
-  /educ|school|univers|student|college|academ|edtech|learn|campus|tertiary|polytechnic|teacher|fee|admission|emis|erp|transcript|bursar|registrar|curriculum|classroom|tuition|grading|timetable/i;
+  /educ|school|univers|student|college|academ|edtech|learn|campus|tertiary|polytechnic|teacher|fee|admission|emis|erp|transcript|bursar|registrar|curriculum|classroom|tuition|grading|timetable|tvet|lms|ministry|waec|necta|uneb|kcse|jamb|wassce/i;
 
 const RW_TREND_GEOS = ["RW"] as const;
-const AFRICA_TREND_GEOS = ["RW", "NG", "KE", "ZA", "GH"] as const;
+const AFRICA_TREND_GEOS = AFRICAN_COUNTRY_CODES;
 
 async function fetchGoogleTrendTitles(geo: string): Promise<string[]> {
   try {

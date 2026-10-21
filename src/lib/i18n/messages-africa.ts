@@ -151,7 +151,7 @@ export const africaMessagesEn: AfricaOverrides = {
   },
   contact: {
     email: "hello@stackedu.africa",
-    location: "Serving institutions across Africa · HQ in Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda · serving institutions across Africa",
     placeholders: {
       email: "you@university.ac",
       phone: "+234 ...",
@@ -234,7 +234,7 @@ export const africaMessagesFr: AfricaOverrides = {
   },
   contact: {
     email: "hello@stackedu.africa",
-    location: "Au service des institutions à travers l'Afrique · Siège à Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda · au service des institutions à travers l'Afrique",
   },
   footer: {
     blurb:
@@ -313,7 +313,7 @@ export const africaMessagesRw: AfricaOverrides = {
   },
   contact: {
     email: "hello@stackedu.africa",
-    location: "Dukorera amashuri mu Afrika yose · HQ i Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda · dukorera amashuri mu Afrika yose",
   },
   footer: {
     blurb:

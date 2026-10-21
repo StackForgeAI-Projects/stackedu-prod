@@ -236,11 +236,11 @@ const en = {
     eyebrow: "// Contact",
     title: "Book a free demo",
     subtitle:
-      "See how StackEDU brings admissions, student records, fees and e-learning into one platform for your institution. Book a free demo — we'll get back to you within 24 hours.",
+      "Request a free StackEDU EMS and LMS pilot for your university, college, school, or primary school. Admissions, records, fees and learning in one platform. We reply within 24 hours.",
     email: "hello@stackedu.rw",
     phone: "+250 799 486 531",
     whatsapp: "WhatsApp +250 799 486 531",
-    location: "Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda",
     formTitle: "Book a demo",
     formSubtitle: "Fill in the form below — we'll get back to you within 24 hours.",
     fields: {
@@ -534,11 +534,11 @@ const fr = {
     eyebrow: "// Contact",
     title: "Réservez une démo gratuite",
     subtitle:
-      "Découvrez comment StackEDU réunit admissions, dossiers étudiants, frais et e-learning sur une seule plateforme pour votre institution. Réservez une démo gratuite — nous vous répondrons sous 24 heures.",
+      "Demandez un pilote gratuit de StackEDU (EMS et LMS) pour votre université, collège, école ou école primaire. Admissions, dossiers, frais et apprentissage sur une seule plateforme. Réponse sous 24 heures.",
     email: "hello@stackedu.rw",
     phone: "+250 799 486 531",
     whatsapp: "WhatsApp +250 799 486 531",
-    location: "Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda",
     formTitle: "Réserver une démo",
     formSubtitle: "Remplissez le formulaire — nous vous répondrons sous 24 heures.",
     fields: {
@@ -832,11 +832,11 @@ const rw = {
     eyebrow: "// Twandikire",
     title: "Fata demo y'ubuntu",
     subtitle:
-      "Reba uko StackEDU ihuza kwiyandikisha, inyandiko z'abanyeshuri, amafaranga n'kwiga kuri interineti ku rubuga rumwe ku ishuri ryawe. Fata demo y'ubuntu — tuzagusubiza mu masaha 24.",
+      "Saba pilote y'ubuntu ya StackEDU (EMS na LMS) ku kaminuza, koleji, ishuri, cyangwa ishuri ry'incuke. Kwiyandikisha, inyandiko, amafaranga n'kwiga ku rubuga rumwe. Tuzagusubiza mu masaha 24.",
     email: "hello@stackedu.rw",
     phone: "+250 799 486 531",
     whatsapp: "WhatsApp +250 799 486 531",
-    location: "Kigali, Rwanda",
+    location: "1 KN 78 St, Kigali, Rwanda",
     formTitle: "Fata demo",
     formSubtitle: "Uzuza ifomu hepfo — tuzagusubiza mu masaha 24.",
     fields: {

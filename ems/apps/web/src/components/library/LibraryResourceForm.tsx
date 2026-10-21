@@ -155,7 +155,7 @@ export function LibraryResourceForm({
           <select
             id="lib-type"
             className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
-            style={{ border: '1px solid var(--border)', background: 'var(--background)' }}
+            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}
             value={type}
             onChange={(event) => setType(event.target.value as ResourceType)}
           >
