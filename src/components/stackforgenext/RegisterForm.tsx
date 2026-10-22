@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
-import { ArrowRight, Check, ChevronDown } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, X } from "lucide-react";
 import { useLocale } from "@/lib/i18n";
 import { RWANDA_DISTRICTS } from "@/lib/stackforgenext/rwanda-districts";
 import { getRegisterContent } from "@/lib/stackforgenext/register-content";
@@ -59,6 +59,7 @@ export function RegisterForm() {
   const [tracks, setTracks] = useState<string[]>([]);
   const [tracksOpen, setTracksOpen] = useState(false);
   const tracksRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const tracksListId = useId();
   const [isStudent, setIsStudent] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -81,6 +82,11 @@ export function RegisterForm() {
       document.removeEventListener("keydown", onKey);
     };
   }, [tracksOpen]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [status]);
 
   const toggleTrack = (item: string) =>
     setTracks((prev) => (prev.includes(item) ? prev.filter((t) => t !== item) : [...prev, item]));
@@ -174,17 +180,29 @@ export function RegisterForm() {
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
-      className="rounded-[1.75rem] border border-border bg-background/95 p-6 shadow-soft backdrop-blur-sm sm:p-8 lg:p-10"
+      className="scroll-mt-24 rounded-[1.75rem] border border-border bg-background/95 p-6 shadow-soft backdrop-blur-sm sm:p-8 lg:p-10"
     >
       <p className="eyebrow text-primary">StackForgeNext</p>
       <h3 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">{c.title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">{c.subtitle}</p>
 
       {status === "success" && (
-        <p className="mt-4 rounded-lg border border-primary/25 bg-primary/8 px-4 py-3 text-sm font-semibold text-primary">
-          {c.success}
-        </p>
+        <div
+          role="status"
+          className="mt-4 flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/8 px-4 py-3 text-sm font-semibold text-primary"
+        >
+          <p className="flex-1">{c.success}</p>
+          <button
+            type="button"
+            onClick={() => setStatus("idle")}
+            className="shrink-0 rounded-md p-1 text-primary/80 transition hover:bg-primary/10 hover:text-primary"
+            aria-label={c.dismiss}
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
       )}
       {status === "error" && errorMsg && (
         <p className="mt-4 rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-700">
