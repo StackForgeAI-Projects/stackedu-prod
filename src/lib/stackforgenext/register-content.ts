@@ -75,6 +75,7 @@ export type RegisterContent = {
     submitting: string;
     footerNote: string;
     success: string;
+    dismiss: string;
     errors: { generic: string; network: string; required: string };
   };
 };
@@ -175,7 +176,8 @@ const enRw: RegisterContent = {
     submitting: "Sending…",
     footerNote: "We reply within 24 hours",
     success:
-      "Thank you. Your application is in. We'll email you about the next steps for this cohort.",
+      "Thank you, Your application has been received. We'll send you the next steps within 24hrs.",
+    dismiss: "Close",
     errors: {
       generic: "Something went wrong. Please try again.",
       network: "Network error. Please check your connection and try again.",
@@ -290,7 +292,8 @@ const frRw: RegisterContent = {
     submitting: "Envoi…",
     footerNote: "Réponse sous 24 heures",
     success:
-      "Merci. Votre candidature est bien reçue. Nous vous écrirons pour la suite.",
+      "Merci, votre candidature a été reçue. Nous vous enverrons les prochaines étapes dans les 24 heures.",
+    dismiss: "Fermer",
     errors: {
       generic: "Une erreur s'est produite. Veuillez réessayer.",
       network: "Erreur réseau. Vérifiez votre connexion et réessayez.",
@@ -388,7 +391,9 @@ const rwLocale: RegisterContent = {
     submit: "Fata umwanya wawe",
     submitting: "Birimo koherezwa…",
     footerNote: "Tuzagusubiza mu masaha 24",
-    success: "Murakoze. Ifomu yawe yakiriwe. Tuzakwandikira ku byakurikiye.",
+    success:
+      "Murakoze, ifomu yawe yakiriwe. Tuzakwoherereza ibikurikira mu masaha 24.",
+    dismiss: "Funga",
     errors: {
       generic: "Hari ikintu kitagenze neza. Ongera ugerageze.",
       network: "Ikibazo cya interineti. Reba interineti yawe wongere ugerageze.",
