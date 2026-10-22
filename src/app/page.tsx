@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { preload } from "react-dom";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { HERO_IMAGE } from "@/lib/assets";
 import { getHomePageSeo } from "@/lib/seo/config";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getRequestMarket } from "@/lib/seo/request-market";
@@ -13,6 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const market = await getRequestMarket();
+  preload(HERO_IMAGE, { as: "image", fetchPriority: "high" });
 
   return (
     <>

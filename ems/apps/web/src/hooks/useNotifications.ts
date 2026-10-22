@@ -20,7 +20,7 @@ function writeSeen(ids: Set<string>): void {
 
 async function showBackgroundNotification(title: string, body: string, url: string | null): Promise<void> {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
-  const payload = { body, icon: '/stackedu-logo.png', data: { url: url || '/' } }
+  const payload = { body, icon: '/stackedu-logo.webp', data: { url: url || '/' } }
   try {
     const registration = await navigator.serviceWorker.ready
     await registration.showNotification(title, payload)

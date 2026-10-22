@@ -18,9 +18,9 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     categories: ["education", "business", "productivity"],
     icons: [
       {
-        src: "/favicon.png",
-        sizes: "512x512",
-        type: "image/png",
+        src: "/favicon.webp",
+        sizes: "16x16",
+        type: "image/webp",
         purpose: "any",
       },
     ],

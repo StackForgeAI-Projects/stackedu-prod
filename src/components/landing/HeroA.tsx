@@ -1,16 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { ArrowRight, Check, Play, Star, Volume2, VolumeX, X } from "lucide-react";
 import { FragmentCard } from "@/components/ui/FragmentCard";
 import { HERO_IMAGE, STUDENT_AVATARS } from "@/lib/assets";
 import { getHeroVideoUrl } from "@/lib/cloudinary";
 import { useLocale } from "@/lib/i18n";
 import { scrollToContact } from "@/lib/scroll";
-
-gsap.registerPlugin(useGSAP);
 
 export function HeroA() {
   const { t, locale, market } = useLocale();
@@ -61,70 +57,79 @@ export function HeroA() {
     };
   }, [modalOpen, closeModal]);
 
-  useGSAP(
-    () => {
-      gsap.from(".hero-text > *", {
-        y: 24,
-        opacity: 0,
-        stagger: 0.08,
-        duration: 0.9,
-        ease: "power3.out",
+  useEffect(() => {
+    const root = stageRef.current;
+    if (!root) return;
+    let revert: (() => void) | undefined;
+    let cancelled = false;
+
+    const start = () => {
+      void import("gsap").then(({ default: gsap }) => {
+        if (cancelled || !stageRef.current) return;
+        const ctx = gsap.context(() => {
+          gsap.from(".hero-text > :not(h1)", {
+            y: 24,
+            opacity: 0,
+            stagger: 0.08,
+            duration: 0.9,
+            ease: "power3.out",
+          });
+          const tl = gsap.timeline({ delay: 0.1 });
+          tl.from(".fragment", {
+            opacity: 0,
+            x: (i) => [-160, 180, -120, 200, -80][i] ?? 0,
+            y: (i) => [-120, 100, 180, -80, 160][i] ?? 0,
+            rotate: (i) => [-14, 12, -8, 10, -6][i] ?? 0,
+            scale: 0.85,
+            duration: 0.9,
+            ease: "power3.out",
+            stagger: 0.08,
+          })
+            .from(".hero-frame", { scale: 0.96, duration: 0.4, ease: "power2.out" }, "-=0.3")
+            .from(".play-btn", { opacity: 0, scale: 0.7, duration: 0.45, ease: "back.out(2.2)" }, "-=0.2");
+        }, stageRef);
+        revert = () => ctx.revert();
       });
-      const tl = gsap.timeline({ delay: 0.1 });
-      tl.from(".fragment", {
-        opacity: 0,
-        x: (i) => [-160, 180, -120, 200, -80][i] ?? 0,
-        y: (i) => [-120, 100, 180, -80, 160][i] ?? 0,
-        rotate: (i) => [-14, 12, -8, 10, -6][i] ?? 0,
-        scale: 0.85,
-        duration: 0.9,
-        ease: "power3.out",
-        stagger: 0.08,
-      })
-        .from(".hero-frame", { scale: 0.96, duration: 0.4, ease: "power2.out" }, "-=0.3")
-        .from(".play-btn", { opacity: 0, scale: 0.7, duration: 0.45, ease: "back.out(2.2)" }, "-=0.2");
-    },
-    { scope: stageRef },
-  );
+    };
 
-  useGSAP(
-    () => {
-      const btn = playBtnRef.current;
-      if (!btn || modalOpen) return;
+    const idleId = window.requestIdleCallback?.(start, { timeout: 1500 });
+    const timerId = idleId === undefined ? window.setTimeout(start, 400) : undefined;
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timerId !== undefined) window.clearTimeout(timerId);
+      revert?.();
+    };
+  }, []);
 
-      gsap.to(btn, {
-        scale: 1.08,
-        boxShadow: "0 0 0 12px rgba(255,255,255,0.15), 0 25px 50px -12px rgba(0,0,0,0.35)",
-        duration: 2.4,
-        ease: "sine.inOut",
-        yoyo: true,
-        repeat: -1,
-      });
-    },
-    { scope: stageRef, dependencies: [modalOpen], revertOnUpdate: true },
-  );
-
-  useGSAP(
-    () => {
-      if (!modalOpen) return;
-
-      gsap.fromTo(
-        ".hero-video-backdrop",
-        { opacity: 0 },
-        { opacity: 1, duration: 0.35, ease: "power2.out" },
-      );
-      gsap.fromTo(
-        ".hero-video-dialog",
-        { opacity: 0, scale: 0.9, y: 24 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power3.out" },
-      );
-
+  useEffect(() => {
+    if (!modalOpen) return;
+    let revert: (() => void) | undefined;
+    let cancelled = false;
+    void import("gsap").then(({ default: gsap }) => {
+      if (cancelled) return;
+      const ctx = gsap.context(() => {
+        gsap.fromTo(
+          ".hero-video-backdrop",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.35, ease: "power2.out" },
+        );
+        gsap.fromTo(
+          ".hero-video-dialog",
+          { opacity: 0, scale: 0.9, y: 24 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power3.out" },
+        );
+      }, modalRef);
+      revert = () => ctx.revert();
       requestAnimationFrame(() => {
         modalVideoRef.current?.play().catch(() => {});
       });
-    },
-    { scope: modalRef, dependencies: [modalOpen] },
-  );
+    });
+    return () => {
+      cancelled = true;
+      revert?.();
+    };
+  }, [modalOpen]);
 
   const toggleMute = () => {
     setMuted((prev) => {
@@ -190,6 +195,10 @@ export function HeroA() {
                   key={i}
                   src={src}
                   alt="Student"
+                  width={88}
+                  height={88}
+                  decoding="async"
+                  fetchPriority="low"
                   className="size-11 rounded-full object-cover border-2 border-white shadow-soft"
                 />
               ))}
@@ -217,6 +226,10 @@ export function HeroA() {
                   ? "Rwandan university student using StackEDU"
                   : "African university student using StackEDU"
               }
+              width={1600}
+              height={2400}
+              decoding="async"
+              fetchPriority="high"
               className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-ink/60 via-ink/10 to-transparent" />

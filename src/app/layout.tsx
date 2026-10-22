@@ -27,10 +27,10 @@ export default async function RootLayout({
 
   return (
     <html lang={lang} className={`${plusJakarta.variable} h-full`} suppressHydrationWarning>
-      <head>
+      <body className="min-h-full antialiased">
         <GoogleAnalytics measurementId={getGaMeasurementId(market)} />
-      </head>
-      <body className="min-h-full antialiased">{children}</body>
+        {children}
+      </body>
     </html>
   );
 }
