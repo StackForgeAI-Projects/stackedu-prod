@@ -57,7 +57,7 @@ function organizationSchema(market: Market): JsonLd {
     url: seo.siteUrl,
     logo: {
       "@type": "ImageObject",
-      url: absoluteUrl(market, "/images/stackedu-logo-dark.png"),
+      url: absoluteUrl(market, "/images/stackedu-logo-dark.webp"),
       width: 512,
       height: 256,
     },

@@ -55,7 +55,7 @@ export function AuthHero({
       style={{
         backgroundImage: [
           'linear-gradient(to bottom, rgba(5,19,29,0.72) 0%, rgba(5,19,29,0.88) 60%, rgba(5,19,29,0.97) 100%)',
-          "url('/login-hero.jpg')",
+          "url('/login-hero.webp')",
         ].join(', '),
         backgroundSize: 'cover',
         backgroundPosition: 'center top',

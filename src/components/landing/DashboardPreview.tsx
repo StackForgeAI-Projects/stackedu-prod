@@ -39,8 +39,8 @@ export function DashboardPreview() {
             <img
               src={DASHBOARD_IMAGE}
               alt="StackEDU institution dashboard overview"
-              width={1439}
-              height={921}
+              width={1400}
+              height={896}
               className="h-auto w-full rounded-[28px] border border-border shadow-lift"
               loading="lazy"
               decoding="async"

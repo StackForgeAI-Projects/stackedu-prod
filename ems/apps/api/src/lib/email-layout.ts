@@ -40,7 +40,7 @@ export interface BrandedEmailInput {
 }
 
 function defaultLogoUrl(): string {
-  return `${env().WEB_APP_URL.replace(/\/$/, '')}/stackedu-logo.png`
+  return `${env().WEB_APP_URL.replace(/\/$/, '')}/stackedu-logo.webp`
 }
 
 export async function getInstitutionEmailBranding(

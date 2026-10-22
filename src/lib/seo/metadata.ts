@@ -111,8 +111,8 @@ export async function buildRootMetadata(market: Market): Promise<Metadata> {
       template: seo.titleTemplate,
     },
     icons: {
-      icon: [{ url: "/favicon.png", type: "image/png" }],
-      apple: [{ url: "/favicon.png" }],
+      icon: [{ url: "/favicon.webp", type: "image/webp" }],
+      apple: [{ url: "/favicon.webp" }],
     },
     manifest: "/manifest.webmanifest",
   };

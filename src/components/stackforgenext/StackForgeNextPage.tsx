@@ -196,6 +196,8 @@ export function StackForgeNextPage() {
               alt={c.hero.imageAlt}
               width={1200}
               height={1408}
+              decoding="async"
+              fetchPriority="high"
               className="aspect-[4/5] w-full rounded-2xl object-cover shadow-soft"
             />
           </div>
@@ -280,8 +282,8 @@ export function StackForgeNextPage() {
             <img
               src={STACKFORGENEXT.skyline}
               alt={c.region.skylineAlt}
-              width={1920}
-              height={1080}
+              width={1600}
+              height={900}
               loading="lazy"
               className="h-48 w-full object-cover sm:h-56 md:h-80"
             />

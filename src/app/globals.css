@@ -210,3 +210,20 @@
 .animate-in {
   animation: fade-slide-in 0.5s ease-out both;
 }
+
+@keyframes play-btn-pulse {
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgba(255, 255, 255, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.play-btn {
+  animation: play-btn-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-btn {
+    animation: none;
+  }
+}

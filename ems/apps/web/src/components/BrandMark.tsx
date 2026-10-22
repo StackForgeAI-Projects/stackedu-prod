@@ -51,13 +51,13 @@ export function BrandMark({
           S
         </div>
         <img
-          src={logoSrc ?? '/stackedu-logo.png'}
+          src={logoSrc ?? '/stackedu-logo.webp'}
           alt={logoSrc ? institutionName : 'StackEDU'}
           className="absolute inset-0"
           style={{ width: size, height: size, objectFit: 'contain' }}
           onError={(e) => {
             if (logoSrc) {
-              e.currentTarget.src = '/stackedu-logo.png'
+              e.currentTarget.src = '/stackedu-logo.webp'
               return
             }
             e.currentTarget.style.display = 'none'
